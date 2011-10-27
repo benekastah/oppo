@@ -1,0 +1,14 @@
+
+(defn Y (le)
+  ((lambda (f) (f f))
+   (lambda (f)
+      (le (lambda (x) 
+        ((f f) x))))))
+    
+(def factorial
+  (Y (lambda (fac)
+    (if (<= n 2)
+      n
+      (fac (- n 1))))))
+      
+(print! factorial 5)

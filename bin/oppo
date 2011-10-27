@@ -1,0 +1,14 @@
+#! /usr/bin/env coffee
+# --nodejs debug
+
+args = process.argv.slice 2
+
+{parse} = require '../dist/parser'
+rt = require '../dist/runtime'
+fs = require 'fs'
+
+fs.readFile args[0], 'utf8', (err, data) ->
+  program = parse data if data
+  console.log program.toString()
+  console.log rt.eval rt, program
+  
