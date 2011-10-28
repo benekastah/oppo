@@ -1,5 +1,5 @@
 (function() {
-  var RT, compare, g, getNewScope, parser, recurse, recursive_walk, types, _base, _ref;
+  var DeferredEval, NamedArgsList, RT, compare, defer, evalProgram, g, getNewScope, getValue, getValues, parser, recurse, recursive_walk, types, _base, _ref;
   var __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -31,62 +31,45 @@
   })();
   types = {};
   types.List = parser.List;
-  types.Identifier = (function() {
-    function Identifier(name, scope) {
-      this.name = name;
-      this.scope = scope;
-      this.value = this.scope[name];
-    }
-    Identifier.prototype.set = function(val, scope) {
-      if (scope == null) {
-        scope = this.scope;
-      }
-      if ((scope.hasOwnProperty(this.name)) && typeof scope[this.name] !== 'undefined') {
-        return this.value = scope[this.name] = val;
+  types.identifier = {
+    test: function(s) {
+      return typeof s === "string" && !(types.string.test(s)) && !(types.number.test(s)) && /^[^\s]+$/.test(s);
+    },
+    value: function(scope, ident) {
+      return scope[ident];
+    },
+    def: function(scope, ident, val) {
+      if ((scope.hasOwnProperty(ident)) && typeof scope[ident] !== 'undefined') {
+        throw new Error("Can't define " + ident + " in scope where it is already defined: " + scope);
       } else {
-        throw new Error("Can't redifine " + this.name + " in scope where it is undefined: " + scope);
+        return scope[ident] = val;
       }
-    };
-    Identifier.prototype.def = function(val, scope) {
-      if (scope == null) {
-        scope = this.scope;
-      }
-      if ((scope.hasOwnProperty(this.name)) && typeof scope[this.name] !== 'undefined') {
-        throw new Error("Can't define " + this.name + " in scope where it is already defined: " + scope);
+    },
+    "set!": function(scope, ident, val) {
+      if ((scope.hasOwnProperty(ident)) && typeof scope[ident] !== 'undefined') {
+        return scope[ident] = val;
       } else {
-        return this.value = scope[this.name] = val;
+        throw new Error("Can't redifine " + ident + " in scope where it is not defined: " + scope);
       }
-    };
-    Identifier.test = function(s) {
-      return typeof s === "string" && !(types.String.test(s)) && !(types.Number.test(s)) && /^[^\s]+$/.test(s);
-    };
-    return Identifier;
-  })();
-  types.String = (function() {
-    function String(value) {
-      this.value = value.replace(/^"/, '').replace(/"$/, '');
     }
-    String.prototype.toString = function() {
-      return this.value;
-    };
-    String.test = function(s) {
+  };
+  types.string = {
+    test: function(s) {
       return typeof s === "string" && /^"[^"]*"$/.test(s);
-    };
-    return String;
-  })();
-  types.Number = (function() {
-    function Number(value) {
-      this.value = +value;
+    },
+    value: function(s) {
+      return (s.replace(/^"/, '')).replace(/"$/, '');
     }
-    Number.prototype.valueOf = function() {
-      return this.value;
-    };
-    Number.test = function(s) {
+  };
+  types.number = {
+    test: function(s) {
       return (typeof s === "string" && /^\d+$/.test(s)) || typeof s === "number";
-    };
-    return Number;
-  })();
-  types.NamedArgsList = (function() {
+    },
+    value: function(n) {
+      return +n;
+    }
+  };
+  NamedArgsList = (function() {
     __extends(NamedArgsList, types.List);
     function NamedArgsList() {
       NamedArgsList.__super__.constructor.apply(this, arguments);
@@ -121,6 +104,36 @@
     NamedArgsList.prototype.REST = '...';
     return NamedArgsList;
   })();
+  DeferredEval = (function() {
+    function DeferredEval(scope, toEval) {
+      this.scope = scope;
+      this.toEval = toEval;
+    }
+    DeferredEval.prototype.call = function() {
+      var _ref;
+      if ((_ref = this.result) == null) {
+        this.result = RT.eval(this.scope, this.toEval);
+      }
+      return this.result;
+    };
+    return DeferredEval;
+  })();
+  defer = function(scope, toEval) {
+    return new DeferredEval(scope, toEval);
+  };
+  getValue = function(x) {
+    var ret;
+    ret = x;
+    while (ret instanceof DeferredEval) {
+      ret = ret.call();
+    }
+    return ret;
+  };
+  getValues = function(x) {
+    return RT.map(x, function(item) {
+      return getValue(item);
+    });
+  };
   if ((_ref = (_base = g.Object).create) == null) {
     _base.create = (function() {
       var Noop;
@@ -155,13 +168,14 @@
     return ret;
   };
   RT = Object.create(g);
-  RT.types = types;
+  RT.global = g;
   RT["eval-js"] = g.eval;
   RT.eval = function(scope, x) {
-    var argNames, args, base, bindings, case_f, case_t, done, exp, expr, exprs, fn, i, ident, item, key, keys, len, names, newScope, o, prev, ret, rname, test, val, values, _0, __, _i, _j, _len, _len2, _len3, _ref2;
+    var argNames, args, base, bindings, case_f, case_t, done, exp, expr, exprs, fn, i, ident, item, key, keys, len, names, newScope, o, prev, ret, rname, test, val, values, _0, __, _i, _j, _len, _len2, _len3, _len4, _ref2;
     if (scope == null) {
-      scope = this === g ? RT : this;
+      scope = RT;
     }
+    x = getValue(x);
     _0 = (function() {
       try {
         return x[0];
@@ -173,27 +187,30 @@
       return true;
     } else if (x === '#f') {
       return false;
-    } else if (types.Identifier.test(x)) {
-      return new types.Identifier(x, scope);
-    } else if (types.Number.test(x)) {
-      return new types.Number(x);
-    } else if (types.String.test(x)) {
-      return new types.String(x);
+    } else if (types.identifier.test(x)) {
+      return types.identifier.value(scope, x);
+    } else if (types.number.test(x)) {
+      return types.number.value(x);
+    } else if (types.string.test(x)) {
+      return types.string.value(x);
     } else if (_0 === 'quote') {
       __ = x[0], exp = x[1];
       return exp;
     } else if (_0 === 'if') {
       __ = x[0], test = x[1], case_t = x[2], case_f = x[3];
-      if (this.eval(scope, test)) {
-        return this.eval(scope, case_t);
+      if (getValue(this.eval(scope, test))) {
+        return defer(scope, case_t);
       } else {
-        return this.eval(scope, case_f);
+        return defer(scope, case_f);
       }
     } else if (_0 === 'def') {
       __ = x[0], ident = x[1], exp = x[2];
-      return (this.eval(RT, ident)).def(this.eval(scope, exp));
+      return types.identifier.def(RT, ident, defer(scope, exp));
+    } else if (_0 === 'set!') {
+      __ = x[0], ident = x[1], exp = x[2];
+      return types.identifier["set!"](RT, ident, defer(scope, exp));
     } else if (_0 === 'let') {
-      if (types.Identifier.test(x[1])) {
+      if (types.identifier.test(x[1])) {
         __ = x[0], rname = x[1], bindings = x[2], exprs = 4 <= x.length ? __slice.call(x, 3) : [];
         names = [];
         values = [];
@@ -206,7 +223,7 @@
           }
         }
         bindings.push(rname, ['lambda', names].concat(__slice.call(exprs)));
-        return this.eval(scope, ['let', bindings, ['apply', rname, ['quote', values]]]);
+        return defer(scope, ['let', bindings, ['apply', rname, ['quote', values]]]);
       } else {
         __ = x[0], bindings = x[1], exprs = 3 <= x.length ? __slice.call(x, 2) : [];
         done = false;
@@ -217,30 +234,27 @@
           throw new Error("You must have an even number of 'let' bindings.");
         }
         while (i < len) {
-          ident = this.eval(newScope, bindings[i++]);
-          expr = this.eval(newScope, bindings[i++]);
-          ident.def(expr, newScope);
+          ident = bindings[i++];
+          expr = defer(newScope, bindings[i++]);
+          types.identifier.def(newScope, ident, expr);
         }
-        return this.eval(newScope, ['do'].concat(__slice.call(exprs)));
+        return defer(newScope, ['do'].concat(__slice.call(exprs)));
       }
-    } else if (_0 === 'set!') {
-      __ = x[0], ident = x[1], exp = x[2];
-      return (this.eval(scope, ident)).set(this.eval(scope, exp));
     } else if (_0 === 'defmacro') {
       __ = x[0], ident = x[1], argNames = x[2], exp = x[3];
       argNames = (function(func, args, ctor) {
         ctor.prototype = func.prototype;
         var child = new ctor, result = func.apply(child, args);
         return typeof result === "object" ? result : child;
-      })(types.NamedArgsList, argNames.slice(0), function() {});
+      })(NamedArgsList, argNames.slice(0), function() {});
       ret = function() {
         var args, toEval, val;
         args = {};
         argNames.format(arguments, args);
-        toEval = this.eval(scope, exp);
+        toEval = getValue(this.eval(scope, exp));
         if (toEval instanceof Array) {
           recursive_walk(toEval, __bind(function(item, i, ls) {
-            if (types.Identifier.test(item)) {
+            if (types.identifier.test(item)) {
               if (args.hasOwnProperty(item)) {
                 return ls[i] = args[item];
               }
@@ -257,7 +271,7 @@
         return toEval;
       };
       ret.is_macro = true;
-      return (this.eval(scope, ident)).def(ret);
+      return types.identifier.def(RT, ident, ret);
     } else if (_0 === 'lambda') {
       __ = x[0], argNames = x[1], exprs = 3 <= x.length ? __slice.call(x, 2) : [];
       ret = function() {
@@ -266,9 +280,9 @@
           ctor.prototype = func.prototype;
           var child = new ctor, result = func.apply(child, args);
           return typeof result === "object" ? result : child;
-        })(types.NamedArgsList, argNames.slice(0), function() {});
+        })(NamedArgsList, argNames.slice(0), function() {});
         argNames.format(arguments, newScope);
-        return RT.eval(newScope, ['do'].concat(__slice.call(exprs)));
+        return defer(newScope, ['do'].concat(__slice.call(exprs)));
       };
       ret.toString = function() {
         return "(lambda " + (exprs.join(' ')) + ")";
@@ -281,12 +295,12 @@
       _ref2 = x.slice(1);
       for (_i = 0, _len2 = _ref2.length; _i < _len2; _i++) {
         exp = _ref2[_i];
-        val = this.eval(scope, exp);
+        val = getValue(this.eval(scope, exp));
       }
       return val;
     } else if (_0 === '.') {
       __ = x[0], base = x[1], keys = 3 <= x.length ? __slice.call(x, 2) : [];
-      o = (this.eval(this, base)).value;
+      o = getValue(this.eval(scope, base));
       for (_j = 0, _len3 = keys.length; _j < _len3; _j++) {
         key = keys[_j];
         if (o != null) {
@@ -303,26 +317,17 @@
       }
     } else {
       fn = x[0], args = 2 <= x.length ? __slice.call(x, 1) : [];
-      fn = this.eval(scope, fn);
-      if (fn != null ? fn.hasOwnProperty('value') : void 0) {
-        fn = fn.value;
-      }
+      fn = getValue(this.eval(scope, fn));
       if (typeof fn !== 'function') {
         throw new Error("Tried to call non-callable: " + fn);
       }
       if (fn.is_macro) {
-        return this.eval(scope, fn.apply(scope, args));
+        return getValue(this.eval(scope, fn.apply(scope, args)));
       } else {
-        args = (function() {
-          var _k, _len4, _results;
-          _results = [];
-          for (_k = 0, _len4 = args.length; _k < _len4; _k++) {
-            exp = args[_k];
-            val = this.eval(scope, exp);
-            _results.push((val != null ? val.value : void 0) || val);
-          }
-          return _results;
-        }).call(this);
+        for (i = 0, _len4 = args.length; i < _len4; i++) {
+          item = args[i];
+          args[i] = defer(scope, item);
+        }
         if (fn === RT.eval) {
           args.unshift(scope);
         }
@@ -351,35 +356,35 @@
   RT.list = function() {
     var items;
     items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    return this.eval(this, ['quote', items]);
+    return defer(this, ['quote', items]);
   };
   RT.head = RT.first = function(ls) {
-    return ls[0];
+    return (getValue(ls))[0];
   };
   RT.second = function(ls) {
-    return ls[1];
+    return (getValue(ls))[1];
   };
   RT.nth = function(ls, n) {
+    ls = getValue(ls);
     if (n < 0) {
       n = ls.length + n;
     }
     return ls[n];
   };
   RT.last = function(ls) {
+    ls = getValue(ls);
     return ls[ls.length - 1];
   };
   RT.tail = RT.rest = function(ls) {
-    return new parser.List({
-      items: ls.slice(1)
-    });
+    return (getValue(ls)).slice(1);
   };
   RT.init = function(ls) {
-    return new parser.List({
-      items: ls.slice(0, ls.length - 1)
-    });
+    return (getValue(ls)).slice(0, -1);
   };
   RT.each = function(ls, fn) {
     var i, item, _len;
+    ls = getValue(ls);
+    fn = getValue(fn);
     if (Array.prototype.forEach != null) {
       return ls.forEach(fn);
     } else {
@@ -392,17 +397,21 @@
   };
   RT.map = function(ls, fn) {
     var ret;
+    ls = getValue(ls);
+    fn = getValue(fn);
     if (Array.prototype.map != null) {
       return ls.map(fn);
     } else {
       ret = [];
-      return RT.each(function(item, i, ls) {
+      return RT.each(ls, function() {
         return ret.push(fn.apply(null, arguments));
       });
     }
   };
   RT.reduce = function(ls, fn) {
     var start;
+    ls = getValue(ls);
+    fn = getValue(fn);
     if (Array.prototype.reduce != null) {
       return ls.reduce(fn);
     } else {
@@ -416,10 +425,11 @@
   RT.concat = function() {
     var args, _ref2;
     args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+    args = getValues(args);
     return (_ref2 = new types.List()).concat.apply(_ref2, args);
   };
   RT.count = function(ls) {
-    return ls.length;
+    return (getValue(ls)).length;
   };
   /*
   MATH
@@ -428,33 +438,35 @@
     var items;
     items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     return RT.reduce(items, function(a, b) {
-      return a + b;
+      return (getValue(a)) + (getValue(b));
     });
   };
   RT['-'] = function() {
     var items;
     items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     return RT.reduce(items, function(a, b) {
-      return a - b;
+      return (getValue(a)) - (getValue(b));
     });
   };
   RT['*'] = function() {
     var items;
     items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     return RT.reduce(items, function(a, b) {
-      return a * b;
+      return (getValue(a)) * (getValue(b));
     });
   };
-  RT['**'] = Math.pow;
+  RT['**'] = function(x) {
+    return Math.pow(getValue(x));
+  };
   RT['/'] = function() {
     var items;
     items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     return RT.reduce(items, function(a, b) {
-      return a / b;
+      return (getValue(a)) / (getValue(b));
     });
   };
   RT['sqrt'] = function(x) {
-    return g.Math.sqrt(x);
+    return Math.sqrt(getValue(x));
   };
   /*
   COMPARISONS
@@ -472,46 +484,46 @@
     return true;
   };
   RT['>'] = RT.curry(compare, function(a, b) {
-    return a > b;
+    return (getValue(a)) > (getValue(b));
   });
   RT['<'] = RT.curry(compare, function(a, b) {
-    return a < b;
+    return (getValue(a)) < (getValue(b));
   });
   RT['>='] = RT.curry(compare, function(a, b) {
-    return a >= b;
+    return (getValue(a)) >= (getValue(b));
   });
   RT['<='] = RT.curry(compare, function(a, b) {
-    return a <= b;
+    return (getValue(a)) <= (getValue(b));
   });
   RT['='] = RT.curry(compare, function(a, b) {
-    return a === b;
+    return (getValue(a)) === (getValue(b));
   });
   RT['not='] = RT.curry(compare, function(a, b) {
-    return a !== b;
+    return (getValue(a)) !== (getValue(b));
   });
   RT.or = RT.curry(compare, function(a, b) {
-    return !a || b;
+    return !(getValue(a)) || (getValue(b));
   });
   RT.and = RT.curry(compare, function(a, b) {
-    return a && b;
+    return (getValue(a)) && (getValue(b));
   });
   RT.not = function(a) {
-    return a === false || a === null;
+    return (a = getValue(a)) === false || a === null;
   };
   /*
   TYPE CHECKING
   */
   RT["string?"] = function(x) {
-    return typeof x === "string" || x instanceof types.String || x instanceof String;
+    return typeof (x = getValue(x)) === "string" || x instanceof String;
   };
   RT["list?"] = function(x) {
-    return x instanceof Array;
+    return (getValue(x)) instanceof Array;
   };
   RT["num?"] = function(x) {
-    return typeof x === "number" || x instanceof types.Number || x instanceof Number;
+    return typeof (x = getValue(x)) === "number" || x instanceof Number;
   };
   RT["nil?"] = function(x) {
-    return !(x != null);
+    return !((getValue(x)) != null);
   };
   /*
   MISC / INTEROP
@@ -519,23 +531,29 @@
   RT.print = function() {
     var items;
     items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+    items = getValues(items);
     return console.log.apply(console, items);
   };
   RT.repeat = function() {
-    var doBlock, exprs, times, _i, _results;
+    var doBlock, exprs, times, _i, _ref2, _results;
     times = arguments[0], exprs = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    exprs = getValues(exprs);
     doBlock = ['do'].concat(__slice.call(exprs));
     _results = [];
-    for (_i = 1; 1 <= times ? _i <= times : _i >= times; 1 <= times ? _i++ : _i--) {
+    for (_i = 1, _ref2 = getValue(times); 1 <= _ref2 ? _i <= _ref2 : _i >= _ref2; 1 <= _ref2 ? _i++ : _i--) {
       _results.push(this.eval(this, doBlock));
     }
     return _results;
   };
-  RT.global = g;
   /*
   ENVIRONMENT MACROS
   */
   RT.eval(null, parser.parse('(defmacro defn ($ident $arg-names ...$exprs)\n  \'(let (exprs (if (= (count \'$exprs) 1)\n                  (first \'$exprs)\n                  \'$exprs))\n    (def $ident (lambda $arg-names\n      (eval exprs)))))\n      \n(defmacro debug (& to-eval)\n  \'(let (result (eval to-eval))\n    (print result)\n    result))'));
+  evalProgram = function(program) {
+    var result;
+    result = RT.eval(RT, program);
+    return getValue(result);
+  };
   try {
     module.exports = RT;
   } catch (e) {

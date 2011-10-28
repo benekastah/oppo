@@ -12,52 +12,60 @@ types = {}
     
 types.List = parser.List
 
-class types.Identifier
-  constructor: (name, scope) ->
-    @name = name
-    @scope = scope
-    @value = @scope[name]
-  set: (val, scope=@scope) ->
-    if (scope.hasOwnProperty @name) and typeof scope[@name] isnt 'undefined'
-      @value = scope[@name] = val;
-    else
-      throw new Error "Can't redifine #{@name} in scope where it is undefined: #{scope}"
-  def: (val, scope=@scope) ->
-    if (scope.hasOwnProperty @name) and typeof scope[@name] isnt 'undefined'
-      throw new Error "Can't define #{@name} in scope where it is already defined: #{scope}"
-    else
-      @value = scope[@name] = val
-  @test: (s) ->
-    typeof s is "string" and not (types.String.test s) and not (types.Number.test s) and /^[^\s]+$/.test s
-    
-# types.identifier = 
-#   test: (s) ->
+# class types.Identifier
+#   constructor: (name, scope) ->
+#     @name = name
+#     @scope = scope
+#     @value = @scope[name]
+#   set: (val, scope=@scope) ->
+#     if (scope.hasOwnProperty @name) and typeof scope[@name] isnt 'undefined'
+#       @value = scope[@name] = val;
+#     else
+#       throw new Error "Can't redifine #{@name} in scope where it is undefined: #{scope}"
+#   def: (val, scope=@scope) ->
+#     if (scope.hasOwnProperty @name) and typeof scope[@name] isnt 'undefined'
+#       throw new Error "Can't define #{@name} in scope where it is already defined: #{scope}"
+#     else
+#       @value = scope[@name] = val
+#   @test: (s) ->
 #     typeof s is "string" and not (types.String.test s) and not (types.Number.test s) and /^[^\s]+$/.test s
-#   value: (scope, ident) -> scope[ident]
-#   def: (scope, ident, val) ->
-#     if (scope.hasOwnProperty ident) and typeof scope[ident] isnt 'undefined'
-#       throw new Error "Can't define #{ident} in scope where it is already defined: #{scope}"
-#     else
-#       scope[ident] = val
-#   "set!": (scope, ident, val) ->
-#     if (scope.hasOwnProperty ident) and typeof scope[ident] isnt 'undefined'
-#       scope[ident] = val;
-#     else
-#       throw new Error "Can't redifine #{ident} in scope where it is not defined: #{scope}"
     
-class types.String
-  constructor: (value) ->
-    @value = value.replace(/^"/, '').replace(/"$/, '')
-  toString: -> @value
-  @test: (s) -> typeof s is "string" and /^"[^"]*"$/.test s
+types.identifier = 
+  test: (s) ->
+    typeof s is "string" and not (types.string.test s) and not (types.number.test s) and /^[^\s]+$/.test s
+  value: (scope, ident) -> scope[ident]
+  def: (scope, ident, val) ->
+    if (scope.hasOwnProperty ident) and typeof scope[ident] isnt 'undefined'
+      throw new Error "Can't define #{ident} in scope where it is already defined: #{scope}"
+    else
+      scope[ident] = val
+  "set!": (scope, ident, val) ->
+    if (scope.hasOwnProperty ident) and typeof scope[ident] isnt 'undefined'
+      scope[ident] = val;
+    else
+      throw new Error "Can't redifine #{ident} in scope where it is not defined: #{scope}"
+    
+# class types.String
+#   constructor: (value) ->
+#     @value = value.replace(/^"/, '').replace(/"$/, '')
+#   toString: -> @value
+#   @test: (s) -> typeof s is "string" and /^"[^"]*"$/.test s
   
-class types.Number
-  constructor: (value) ->
-    @value = +value
-  valueOf: -> @value
-  @test: (s) -> (typeof s is "string" and /^\d+$/.test s) or typeof s is "number"
+types.string =
+  test: (s) -> typeof s is "string" and /^"[^"]*"$/.test s
+  value: (s) -> (s.replace /^"/, '').replace /"$/, ''
   
-class types.NamedArgsList extends types.List
+# class types.Number
+#   constructor: (value) ->
+#     @value = +value
+#   valueOf: -> @value
+#   @test: (s) -> (typeof s is "string" and /^\d+$/.test s) or typeof s is "number"
+  
+types.number =
+  test: (s) -> (typeof s is "string" and /^\d+$/.test s) or typeof s is "number"
+  value: (n) -> +n
+  
+class NamedArgsList extends types.List
   constructor: () ->
     super arguments...
   format: (argsList, scope) ->
@@ -82,9 +90,20 @@ class types.NamedArgsList extends types.List
   unnamedParam: (i) -> "%#{i+1}"
   REST: '...'
     
-
-  
-  
+class DeferredEval
+  constructor: (@scope, @toEval) ->
+  call: ->
+    @result ?= RT.eval @scope, @toEval
+    @result
+defer = (scope, toEval) -> new DeferredEval scope, toEval
+getValue = (x) ->
+  ret = x
+  while ret instanceof DeferredEval
+    ret = ret.call()
+  ret
+getValues = (x) ->
+  RT.map x, (item) ->
+    getValue item
 
 
 
@@ -110,12 +129,12 @@ getNewScope = (scope=RT) ->
 
 RT = Object.create g
 
-RT.types = types
+RT.global = g
 
 # Eval
 RT["eval-js"] = g.eval
-RT.eval = (scope, x) ->
-  scope ?= if this is g then RT else this
+RT.eval = (scope=RT, x) ->
+  x = getValue x
   _0 = try x[0]
   
   if x is 'nil' or not x?
@@ -127,19 +146,14 @@ RT.eval = (scope, x) ->
   else if x is '#f'
     false
   
-  else if types.Identifier.test x
-    new types.Identifier x, scope
+  else if types.identifier.test x
+    types.identifier.value scope, x
     
-  else if types.Number.test x
-    new types.Number x
+  else if types.number.test x
+    types.number.value x
     
-  else if types.String.test x
-    new types.String x
-  
-  # else if RestParameter.test x
-    # ???
-    # ret = []
-    # ret.rest = true
+  else if types.string.test x
+    types.string.value x
   
   else if _0 is 'quote'
     [__, exp] = x
@@ -147,17 +161,21 @@ RT.eval = (scope, x) ->
     
   else if _0 is 'if'
     [__, test, case_t, case_f] = x
-    if @eval scope, test
-      @eval scope, case_t
+    if getValue @eval scope, test
+      defer scope, case_t
     else
-      @eval scope, case_f
+      defer scope, case_f
       
   else if _0 is 'def'
     [__, ident, exp] = x
-    (@eval RT, ident).def (@eval scope, exp)
+    types.identifier.def RT, ident, defer scope, exp
+    
+  else if _0 is 'set!'
+    [__, ident, exp] = x
+    types.identifier["set!"] RT, ident, defer scope, exp
     
   else if _0 is 'let'
-    if types.Identifier.test x[1]
+    if types.identifier.test x[1]
       [__, rname, bindings, exprs...] = x
       names = []
       values = []
@@ -165,7 +183,7 @@ RT.eval = (scope, x) ->
         if i % 2 then values.push item
         else names.push item
       bindings.push rname, ['lambda', names, exprs...]
-      @eval scope, ['let', bindings, ['apply', rname, ['quote', values]]]
+      defer scope, ['let', bindings, ['apply', rname, ['quote', values]]]
     else
       [__, bindings, exprs...] = x
       done = false
@@ -174,27 +192,23 @@ RT.eval = (scope, x) ->
       newScope = getNewScope scope
       if bindings % 2 then throw new Error "You must have an even number of 'let' bindings."
       while i < len
-        ident = @eval newScope, bindings[i++]
-        expr = @eval newScope, bindings[i++]
-        ident.def expr, newScope
+        ident = bindings[i++]
+        expr = defer newScope, bindings[i++]
+        types.identifier.def newScope, ident, expr
       
-      @eval newScope, ['do', exprs...]
-      
-  else if _0 is 'set!'
-    [__, ident, exp] = x
-    (@eval scope, ident).set (@eval scope, exp)
+      defer newScope, ['do', exprs...]
     
   else if _0 is 'defmacro'
     [__, ident, argNames, exp] = x
-    argNames = new types.NamedArgsList argNames[0..]...
+    argNames = new NamedArgsList argNames[0..]...
     ret = ->
       args = {}
       argNames.format arguments, args
-      toEval = @eval scope, exp
+      toEval = getValue @eval scope, exp
       if toEval instanceof Array
         # Copy the exp array so we don't write over it
         recursive_walk toEval, (item, i, ls) =>
-          if types.Identifier.test item
+          if types.identifier.test item
             if args.hasOwnProperty item
               ls[i] = args[item]
       else
@@ -202,19 +216,18 @@ RT.eval = (scope, x) ->
         if (types.Itentifier.test toEval)
           if val = args[item]?
             toEval = item
-      # @eval this, toEval
       toEval
     ret.is_macro = true
     
-    (@eval scope, ident).def ret
+    types.identifier.def RT, ident, ret
     
   else if _0 is 'lambda'
     [__, argNames, exprs...] = x
     ret = ->
       newScope = getNewScope ret.scope
-      argNames =  new types.NamedArgsList argNames[0..]...
+      argNames =  new NamedArgsList argNames[0..]...
       argNames.format arguments, newScope
-      RT.eval newScope, ['do', exprs...]
+      defer newScope, ['do', exprs...]
     ret.toString = -> "(lambda #{exprs.join ' '})"
     ret.value = ret
     ret.arity = argNames.length
@@ -223,12 +236,12 @@ RT.eval = (scope, x) ->
     
   else if _0 is 'do'
     for exp in x[1..]
-      val = @eval scope, exp
+      val = getValue @eval scope, exp
     val
   
   else if _0 is '.'
     [__, base, keys...] = x
-    o = (@eval this, base).value
+    o = getValue @eval scope, base
     for key in keys
       if o?
         prev = o
@@ -242,22 +255,20 @@ RT.eval = (scope, x) ->
   
   else
     [fn, args...] = x
-    fn = @eval scope, fn
-    if fn?.hasOwnProperty 'value'
-      fn = fn.value
+    fn = getValue @eval scope, fn
       
     if typeof fn isnt 'function'
       throw new Error "Tried to call non-callable: #{fn}"
       
     if fn.is_macro
-      @eval scope, fn.apply scope, args
+      getValue @eval scope, fn.apply scope, args
     else
-      args = for exp in args
-        val = @eval scope, exp
-        val?.value or val
+      for item, i in args
+        args[i] = defer scope, item
       if fn is RT.eval
         args.unshift scope
       fn.apply scope, args
+
 
 
 
@@ -273,37 +284,41 @@ RT.curry = (fn, args...) ->
   fn.bind this, args...
 
 
+
 ###
 LISTS
 ###
-
 # Builder methods
 RT.list = (items...) ->
-  @eval this, ['quote', items]
+  defer this, ['quote', items]
 
 # Accessor methods
 RT.head = RT.first = (ls) ->
-  ls[0]
+  (getValue ls)[0]
   
 RT.second = (ls) ->
-  ls[1]
+  (getValue ls)[1]
   
 RT.nth = (ls, n) ->
+  ls = getValue ls
   if n < 0
     n = ls.length + n
   ls[n]
   
 RT.last = (ls) ->
+  ls = getValue ls
   ls[ls.length-1]
 
 RT.tail = RT.rest = (ls) ->
-  new parser.List items:ls.slice 1
+  (getValue ls)[1..]
   
 RT.init = (ls) ->
-  new parser.List items:ls.slice 0, ls.length-1
+  (getValue ls).slice 0, -1
 
 # Iteration and mutator methods
 RT.each = (ls, fn) ->
+  ls = getValue ls
+  fn = getValue fn
   if Array.prototype.forEach?
     ls.forEach fn
   else
@@ -312,14 +327,18 @@ RT.each = (ls, fn) ->
     null
 
 RT.map = (ls, fn) ->
+  ls = getValue ls
+  fn = getValue fn
   if Array.prototype.map?
     ls.map fn
   else
     ret = []
-    RT.each (item, i, ls) ->
+    RT.each ls, ->
       ret.push fn arguments...
       
 RT.reduce = (ls, fn) ->
+  ls = getValue ls
+  fn = getValue fn
   if Array.prototype.reduce?
     ls.reduce fn
   else
@@ -328,29 +347,33 @@ RT.reduce = (ls, fn) ->
       start = fn start, item, i, ls
     start
       
-RT.concat = (args...) -> new types.List().concat args...
+RT.concat = (args...) ->
+  args = getValues args
+  new types.List().concat args...
 
-RT.count = (ls) -> ls.length
+RT.count = (ls) -> (getValue ls).length
+
 
 
 ###
 MATH
 ###
 RT['+'] = (items...) ->
-  RT.reduce items, (a, b) -> a + b
+  RT.reduce items, (a, b) -> (getValue a) + (getValue b)
 
 RT['-'] = (items...) ->
-  RT.reduce items, (a, b) -> a - b
+  RT.reduce items, (a, b) -> (getValue a) - (getValue b)
   
 RT['*'] = (items...) ->
-  RT.reduce items, (a, b) -> a * b
+  RT.reduce items, (a, b) -> (getValue a) * (getValue b)
   
-RT['**'] = Math.pow
+RT['**'] = (x) -> Math.pow getValue x
   
 RT['/'] = (items...) ->
-  RT.reduce items, (a, b) -> a / b
+  RT.reduce items, (a, b) -> (getValue a) / (getValue b)
   
-RT['sqrt'] = (x) -> g.Math.sqrt x
+RT['sqrt'] = (x) -> Math.sqrt getValue x
+
 
 
 ###
@@ -363,46 +386,50 @@ compare = (test, prev, items...) ->
     prev = item
   true
 
-RT['>'] = RT.curry compare, (a, b) -> a > b
+RT['>'] = RT.curry compare, (a, b) -> (getValue a) > (getValue b)
 
-RT['<'] = RT.curry compare, (a, b) -> a < b
+RT['<'] = RT.curry compare, (a, b) -> (getValue a) < (getValue b)
   
-RT['>='] = RT.curry compare, (a, b) -> a >= b
+RT['>='] = RT.curry compare, (a, b) -> (getValue a) >= (getValue b)
   
-RT['<='] = RT.curry compare, (a, b) -> a <= b
+RT['<='] = RT.curry compare, (a, b) -> (getValue a) <= (getValue b)
 
-RT['='] = RT.curry compare, (a, b) -> a is b
+RT['='] = RT.curry compare, (a, b) -> (getValue a) is (getValue b)
 
-RT['not='] = RT.curry compare, (a, b) -> a isnt b
+RT['not='] = RT.curry compare, (a, b) -> (getValue a) isnt (getValue b)
 
-RT.or = RT.curry compare, (a, b) -> not a or b
+RT.or = RT.curry compare, (a, b) -> not (getValue a) or (getValue b)
 
-RT.and = RT.curry compare, (a, b) -> a and b
+RT.and = RT.curry compare, (a, b) -> (getValue a) and (getValue b)
 
-RT.not = (a) -> a is false or a is null
+RT.not = (a) -> (a = getValue a) is false or a is null
+
 
 
 ###
 TYPE CHECKING
 ###
-RT["string?"] = (x) -> typeof x is "string" or x instanceof types.String or x instanceof String
-RT["list?"] = (x) -> x instanceof Array
-RT["num?"] = (x) -> typeof x is "number" or x instanceof types.Number or x instanceof Number
-RT["nil?"] = (x) -> not x?
+RT["string?"] = (x) -> typeof (x = getValue x) is "string" or x instanceof String
+RT["list?"] = (x) -> (getValue x) instanceof Array
+RT["num?"] = (x) -> typeof (x = getValue x) is "number" or x instanceof Number
+RT["nil?"] = (x) -> not (getValue x)?
 
+  
   
 ###
 MISC / INTEROP
 ###
 RT.print = (items...) ->
+  items = getValues items
   console.log items...
 
 RT.repeat = (times, exprs...) ->
+  exprs = getValues exprs
   doBlock = ['do', exprs...]
-  for [1..times]
+  for [1..(getValue times)]
     @eval this, doBlock
 
-RT.global = g
+
 
 ###
 ENVIRONMENT MACROS
@@ -421,6 +448,10 @@ RT.eval null, parser.parse '''
     (print result)
     result))
 '''
+
+evalProgram = (program) ->
+  result = RT.eval RT, program
+  getValue result
 
 try module.exports = RT
 catch e then g.Runtime = RT
