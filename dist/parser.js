@@ -7,7 +7,7 @@
     child.prototype = new ctor;
     child.__super__ = parent.prototype;
     return child;
-  }, __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+  }, __slice = Array.prototype.slice, __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
   this.parser = (function() {
     try {
       return exports;
@@ -23,7 +23,7 @@
     }
   })();
   (function() {
-    var COMMENT_BEGIN, COMMENT_END, LIST_CLOSE, LIST_OPEN, List, QUOTE, SEP, Token, empty, head, inComment, inQuote, inString, listItem, parse, quoteShouldWaitForListEnd, quoteWaitForListEnd, recurse, resolveListItem, resolveQuote, runtime, tail;
+    var COMMENT_BEGIN, COMMENT_END, LIST_CLOSE, LIST_OPEN, QUOTE, SEP, Token, empty, head, inComment, inQuote, inString, listItem, parse, quoteShouldWaitForListEnd, quoteWaitForListEnd, recurse, resolveListItem, resolveQuote, runtime, tail;
     recurse = (function() {
       try {
         return require('./tco');
@@ -65,9 +65,22 @@
     /*
       DATA TYPES
       */
-    List = runtime.types.List;
+    this.List = (function() {
+      __extends(List, Array);
+      function List() {
+        var items;
+        items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+        if (items) {
+          this.push.apply(this, items);
+        }
+      }
+      List.prototype.toString = function() {
+        return "(" + ((this.join(' ')).replace(") (", ")\n  (")) + ")";
+      };
+      return List;
+    })();
     this.ProgramList = (function() {
-      __extends(ProgramList, List);
+      __extends(ProgramList, this.List);
       function ProgramList(config) {
         var items;
         if (config == null) {
@@ -77,7 +90,7 @@
         ProgramList.__super__.constructor.apply(this, items);
       }
       return ProgramList;
-    })();
+    }).call(this);
     /*
       LIST PROCESSING FUNCTIONS
       */

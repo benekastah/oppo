@@ -9,12 +9,8 @@ catch e then global
 
 
 types = {}
-
-class types.List extends Array
-  constructor: (items...) ->
-    if items then @push.apply @, items
-  toString: ->
-    "(#{(@join ' ').replace ") (", ")\n  ("})"
+    
+types.List = parser.List
 
 class types.Identifier
   constructor: (name, scope) ->
@@ -33,6 +29,21 @@ class types.Identifier
       @value = scope[@name] = val
   @test: (s) ->
     typeof s is "string" and not (types.String.test s) and not (types.Number.test s) and /^[^\s]+$/.test s
+    
+# types.identifier = 
+#   test: (s) ->
+#     typeof s is "string" and not (types.String.test s) and not (types.Number.test s) and /^[^\s]+$/.test s
+#   value: (scope, ident) -> scope[ident]
+#   def: (scope, ident, val) ->
+#     if (scope.hasOwnProperty ident) and typeof scope[ident] isnt 'undefined'
+#       throw new Error "Can't define #{ident} in scope where it is already defined: #{scope}"
+#     else
+#       scope[ident] = val
+#   "set!": (scope, ident, val) ->
+#     if (scope.hasOwnProperty ident) and typeof scope[ident] isnt 'undefined'
+#       scope[ident] = val;
+#     else
+#       throw new Error "Can't redifine #{ident} in scope where it is not defined: #{scope}"
     
 class types.String
   constructor: (value) ->
@@ -74,10 +85,6 @@ class types.NamedArgsList extends types.List
 
   
   
-# class RestParameter extends Array
-#   constructor: (@value) ->
-#   @test: (s) ->
-#     typeof s is "string" and (/^\.{3}/.test s) and Identifier.test s.substr 3
 
 
 
@@ -100,13 +107,15 @@ getNewScope = (scope=RT) ->
   ret
 
 
+
 RT = Object.create g
 
 RT.types = types
 
 # Eval
 RT["eval-js"] = g.eval
-RT.eval = (scope=RT, x) ->
+RT.eval = (scope, x) ->
+  scope ?= if this is g then RT else this
   _0 = try x[0]
   
   if x is 'nil' or not x?
@@ -145,11 +154,7 @@ RT.eval = (scope=RT, x) ->
       
   else if _0 is 'def'
     [__, ident, exp] = x
-    (@eval scope, ident).def (@eval scope, exp)
-    
-  else if _0 is 'defn'
-    [__, ident, argNames, exp] = x
-    @eval scope, (scope.list 'def', ident, (scope.list 'lambda', argNames, exp))
+    (@eval RT, ident).def (@eval scope, exp)
     
   else if _0 is 'let'
     if types.Identifier.test x[1]
@@ -168,18 +173,12 @@ RT.eval = (scope=RT, x) ->
       len = bindings.length
       newScope = getNewScope scope
       if bindings % 2 then throw new Error "You must have an even number of 'let' bindings."
-      while not done
+      while i < len
         ident = @eval newScope, bindings[i++]
         expr = @eval newScope, bindings[i++]
         ident.def expr, newScope
-        done = not (i < len)
       
       @eval newScope, ['do', exprs...]
-  
-  # else if _0 is 'loop'
-  #   [__, bindings, exprs...] = x
-  #   argNames = @eval scope, ['filter', ]
-  #   @eval scope, ['defn', 'loop', []]
       
   else if _0 is 'set!'
     [__, ident, exp] = x
@@ -187,27 +186,26 @@ RT.eval = (scope=RT, x) ->
     
   else if _0 is 'defmacro'
     [__, ident, argNames, exp] = x
-    exp = @eval scope, exp
-    ret = (args...) =>
-      if exp instanceof Array
-        toEval = exp[0..]
+    argNames = new types.NamedArgsList argNames[0..]...
+    ret = ->
+      args = {}
+      argNames.format arguments, args
+      toEval = @eval scope, exp
+      if toEval instanceof Array
+        # Copy the exp array so we don't write over it
         recursive_walk toEval, (item, i, ls) =>
           if types.Identifier.test item
-            name = (@eval scope, item).name
-            for argName, a in argNames
-              if argName is name
-                ls[i] = args[a]
-                break
+            if args.hasOwnProperty item
+              ls[i] = args[item]
       else
         toEval = exp
         if (types.Itentifier.test toEval)
-          name = (@eval scope, item).name
-          for argName, a in argNames
-            if argName is name
-              toEval = args[a]
-              break
+          if val = args[item]?
+            toEval = item
+      # @eval this, toEval
       toEval
     ret.is_macro = true
+    
     (@eval scope, ident).def ret
     
   else if _0 is 'lambda'
@@ -245,26 +243,34 @@ RT.eval = (scope=RT, x) ->
   else
     [fn, args...] = x
     fn = @eval scope, fn
-    if fn?.value?
+    if fn?.hasOwnProperty 'value'
       fn = fn.value
       
     if typeof fn isnt 'function'
       throw new Error "Tried to call non-callable: #{fn}"
       
     if fn.is_macro
-      @eval scope, fn args...
+      @eval scope, fn.apply scope, args
     else
       args = for exp in args
         val = @eval scope, exp
         val?.value or val
+      if fn is RT.eval
+        args.unshift scope
       fn.apply scope, args
 
 
-###
-RECURSION / LOOPING
-###
 
+###
+FUNCTIONS
+###
+RT.apply = (fn, args..., ls) ->
+  ls.unshift args...
+  lsCopy = ls[0..]
+  fn lsCopy...
 
+RT.curry = (fn, args...) ->
+  fn.bind this, args...
 
 
 ###
@@ -324,6 +330,8 @@ RT.reduce = (ls, fn) ->
       
 RT.concat = (args...) -> new types.List().concat args...
 
+RT.count = (ls) -> ls.length
+
 
 ###
 MATH
@@ -337,6 +345,8 @@ RT['-'] = (items...) ->
 RT['*'] = (items...) ->
   RT.reduce items, (a, b) -> a * b
   
+RT['**'] = Math.pow
+  
 RT['/'] = (items...) ->
   RT.reduce items, (a, b) -> a / b
   
@@ -346,38 +356,45 @@ RT['sqrt'] = (x) -> g.Math.sqrt x
 ###
 COMPARISONS
 ###
-RT['>'] = (items...) ->
-  RT.reduce items, (a, b) -> a > b
+compare = (test, prev, items...) ->
+  for item in items
+    if not test prev, item
+      return false
+    prev = item
+  true
 
-RT['<'] = (items...) ->
-  RT.reduce items, (a, b) -> a < b
+RT['>'] = RT.curry compare, (a, b) -> a > b
+
+RT['<'] = RT.curry compare, (a, b) -> a < b
   
-RT['>='] = (items...) ->
-  RT.reduce items, (a, b) -> a >= b
+RT['>='] = RT.curry compare, (a, b) -> a >= b
   
-RT['<='] = (items...) ->
-  RT.reduce items, (a, b) -> a <= b
-  
-# RT.not = (items...) ->
-#   RT.every items
+RT['<='] = RT.curry compare, (a, b) -> a <= b
+
+RT['='] = RT.curry compare, (a, b) -> a is b
+
+RT['not='] = RT.curry compare, (a, b) -> a isnt b
+
+RT.or = RT.curry compare, (a, b) -> not a or b
+
+RT.and = RT.curry compare, (a, b) -> a and b
+
+RT.not = (a) -> a is false or a is null
 
 
 ###
-FUNCTIONS
+TYPE CHECKING
 ###
-RT.apply = (fn, args..., ls) ->
-  ls.unshift args...
-  lsCopy = ls[0..]
-  fn lsCopy...
-  
-# RT.lambda = (fn)
-
+RT["string?"] = (x) -> typeof x is "string" or x instanceof types.String or x instanceof String
+RT["list?"] = (x) -> x instanceof Array
+RT["num?"] = (x) -> typeof x is "number" or x instanceof types.Number or x instanceof Number
+RT["nil?"] = (x) -> not x?
 
   
 ###
 MISC / INTEROP
 ###
-RT["print!"] = (items...) ->
+RT.print = (items...) ->
   console.log items...
 
 RT.repeat = (times, exprs...) ->
@@ -386,6 +403,24 @@ RT.repeat = (times, exprs...) ->
     @eval this, doBlock
 
 RT.global = g
+
+###
+ENVIRONMENT MACROS
+###
+
+RT.eval null, parser.parse '''
+(defmacro defn ($ident $arg-names ...$exprs)
+  '(let (exprs (if (= (count '$exprs) 1)
+                  (first '$exprs)
+                  '$exprs))
+    (def $ident (lambda $arg-names
+      (eval exprs)))))
+      
+(defmacro debug (& to-eval)
+  '(let (result (eval to-eval))
+    (print result)
+    result))
+'''
 
 try module.exports = RT
 catch e then g.Runtime = RT

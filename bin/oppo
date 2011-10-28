@@ -7,8 +7,12 @@ args = process.argv.slice 2
 rt = require '../dist/runtime'
 fs = require 'fs'
 
-fs.readFile args[0], 'utf8', (err, data) ->
-  program = parse data if data
-  console.log program.toString()
-  console.log rt.eval rt, program
+parseFile = (file, cb) ->
+  fs.readFile file, 'utf8', (err, data) ->
+    program = parse data if data
+    # program.toString()
+    (cb or ->) rt.eval rt, program
   
+;parseFile "../runtime.oppo", (result) ->
+parseFile args[0], (result) ->
+  console.log result

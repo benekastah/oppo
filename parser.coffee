@@ -37,8 +37,13 @@ catch e then global
   ###
   DATA TYPES
   ###
-  List = runtime.types.List
-  class @ProgramList extends List
+  class @List extends Array
+    constructor: (items...) ->
+      if items then @push.apply @, items
+    toString: ->
+      "(#{(@join ' ').replace ") (", ")\n  ("})"
+  
+  class @ProgramList extends @List
     constructor: (config={}) ->
       {@parent, items} = config
       super items...
@@ -140,5 +145,5 @@ catch e then global
       list.push listItem
       listItem = null
     list
-
+    
 ).call @parser

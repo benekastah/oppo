@@ -2,5 +2,7 @@
 ;  [__, ident, argNames, exp]
 ;  @eval scope, ['def', ident, ['lambda', argNames, exp]]
 
-(defmacro defn ($ident $arg-names $exprs)
+(print! "here")
+
+(defmacro defn ($ident $arg-names ...$exprs)
   '(def $ident (lambda $arg-names (concat 'do $exprs))))

@@ -3,23 +3,43 @@ s = parser.parse """
 (defn Y (le)
   ((lambda (f) (f f))
    (lambda (f)
-      (le (lambda (x) 
-        ((f f) x))))))
+    (le (lambda (x) 
+      ((f f) x))))))
 
 (def factorial
   (Y (lambda (fac)
-    (if (<= n 2)
-      n
-      (fac (- n 1))))))
+    (lambda (n)
+      (if (<= n 2)
+        n
+        (* n (fac (- n 1))))))))
       
-(print! (factorial 5))
+(print (factorial 5))
 """
 
+s = parser.parse """
+(defn a () "a")
+(print (a))
+"""
+
+# s = parser.parse '''
+# (print (not nil))
+# '''
+
 # s = parser.parse """
-# (if (< 1 2)
-#   (- "1" 1)
-#   (+ 1 1))
+# (defmacro p! (msg)
+#   '(print msg))
+#   
+# (p! "yo")
 # """
+
+s = parser.parse """
+(defn factorial (n)
+  (if (<= n 2)
+    n
+    (* n (factorial (- n 1)))))
+
+(print (factorial 5))
+"""
 
 console.log "#{s}"
 console.log Runtime.eval null, s

@@ -1,5 +1,5 @@
 (function() {
-  var RT, g, getNewScope, parser, recurse, recursive_walk, types, _base, _ref;
+  var RT, compare, g, getNewScope, parser, recurse, recursive_walk, types, _base, _ref;
   var __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -30,20 +30,7 @@
     }
   })();
   types = {};
-  types.List = (function() {
-    __extends(List, Array);
-    function List() {
-      var items;
-      items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-      if (items) {
-        this.push.apply(this, items);
-      }
-    }
-    List.prototype.toString = function() {
-      return "(" + ((this.join(' ')).replace(") (", ")\n  (")) + ")";
-    };
-    return List;
-  })();
+  types.List = parser.List;
   types.Identifier = (function() {
     function Identifier(name, scope) {
       this.name = name;
@@ -173,7 +160,7 @@
   RT.eval = function(scope, x) {
     var argNames, args, base, bindings, case_f, case_t, done, exp, expr, exprs, fn, i, ident, item, key, keys, len, names, newScope, o, prev, ret, rname, test, val, values, _0, __, _i, _j, _len, _len2, _len3, _ref2;
     if (scope == null) {
-      scope = RT;
+      scope = this === g ? RT : this;
     }
     _0 = (function() {
       try {
@@ -204,10 +191,7 @@
       }
     } else if (_0 === 'def') {
       __ = x[0], ident = x[1], exp = x[2];
-      return (this.eval(scope, ident)).def(this.eval(scope, exp));
-    } else if (_0 === 'defn') {
-      __ = x[0], ident = x[1], argNames = x[2], exp = x[3];
-      return this.eval(scope, scope.list('def', ident, scope.list('lambda', argNames, exp)));
+      return (this.eval(RT, ident)).def(this.eval(scope, exp));
     } else if (_0 === 'let') {
       if (types.Identifier.test(x[1])) {
         __ = x[0], rname = x[1], bindings = x[2], exprs = 4 <= x.length ? __slice.call(x, 3) : [];
@@ -232,11 +216,10 @@
         if (bindings % 2) {
           throw new Error("You must have an even number of 'let' bindings.");
         }
-        while (!done) {
+        while (i < len) {
           ident = this.eval(newScope, bindings[i++]);
           expr = this.eval(newScope, bindings[i++]);
           ident.def(expr, newScope);
-          done = !(i < len);
         }
         return this.eval(newScope, ['do'].concat(__slice.call(exprs)));
       }
@@ -245,42 +228,34 @@
       return (this.eval(scope, ident)).set(this.eval(scope, exp));
     } else if (_0 === 'defmacro') {
       __ = x[0], ident = x[1], argNames = x[2], exp = x[3];
-      exp = this.eval(scope, exp);
-      ret = __bind(function() {
-        var a, argName, args, name, toEval, _len2;
-        args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-        if (exp instanceof Array) {
-          toEval = exp.slice(0);
+      argNames = (function(func, args, ctor) {
+        ctor.prototype = func.prototype;
+        var child = new ctor, result = func.apply(child, args);
+        return typeof result === "object" ? result : child;
+      })(types.NamedArgsList, argNames.slice(0), function() {});
+      ret = function() {
+        var args, toEval, val;
+        args = {};
+        argNames.format(arguments, args);
+        toEval = this.eval(scope, exp);
+        if (toEval instanceof Array) {
           recursive_walk(toEval, __bind(function(item, i, ls) {
-            var a, argName, name, _len2, _results;
             if (types.Identifier.test(item)) {
-              name = (this.eval(scope, item)).name;
-              _results = [];
-              for (a = 0, _len2 = argNames.length; a < _len2; a++) {
-                argName = argNames[a];
-                if (argName === name) {
-                  ls[i] = args[a];
-                  break;
-                }
+              if (args.hasOwnProperty(item)) {
+                return ls[i] = args[item];
               }
-              return _results;
             }
           }, this));
         } else {
           toEval = exp;
           if (types.Itentifier.test(toEval)) {
-            name = (this.eval(scope, item)).name;
-            for (a = 0, _len2 = argNames.length; a < _len2; a++) {
-              argName = argNames[a];
-              if (argName === name) {
-                toEval = args[a];
-                break;
-              }
+            if (val = args[item] != null) {
+              toEval = item;
             }
           }
         }
         return toEval;
-      }, this);
+      };
       ret.is_macro = true;
       return (this.eval(scope, ident)).def(ret);
     } else if (_0 === 'lambda') {
@@ -329,14 +304,14 @@
     } else {
       fn = x[0], args = 2 <= x.length ? __slice.call(x, 1) : [];
       fn = this.eval(scope, fn);
-      if ((fn != null ? fn.value : void 0) != null) {
+      if (fn != null ? fn.hasOwnProperty('value') : void 0) {
         fn = fn.value;
       }
       if (typeof fn !== 'function') {
         throw new Error("Tried to call non-callable: " + fn);
       }
       if (fn.is_macro) {
-        return this.eval(scope, fn.apply(null, args));
+        return this.eval(scope, fn.apply(scope, args));
       } else {
         args = (function() {
           var _k, _len4, _results;
@@ -348,13 +323,28 @@
           }
           return _results;
         }).call(this);
+        if (fn === RT.eval) {
+          args.unshift(scope);
+        }
         return fn.apply(scope, args);
       }
     }
   };
   /*
-  RECURSION / LOOPING
+  FUNCTIONS
   */
+  RT.apply = function() {
+    var args, fn, ls, lsCopy, _i;
+    fn = arguments[0], args = 3 <= arguments.length ? __slice.call(arguments, 1, _i = arguments.length - 1) : (_i = 1, []), ls = arguments[_i++];
+    ls.unshift.apply(ls, args);
+    lsCopy = ls.slice(0);
+    return fn.apply(null, lsCopy);
+  };
+  RT.curry = function() {
+    var args, fn;
+    fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    return fn.bind.apply(fn, [this].concat(__slice.call(args)));
+  };
   /*
   LISTS
   */
@@ -428,6 +418,9 @@
     args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     return (_ref2 = new types.List()).concat.apply(_ref2, args);
   };
+  RT.count = function(ls) {
+    return ls.length;
+  };
   /*
   MATH
   */
@@ -452,6 +445,7 @@
       return a * b;
     });
   };
+  RT['**'] = Math.pow;
   RT['/'] = function() {
     var items;
     items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
@@ -465,48 +459,64 @@
   /*
   COMPARISONS
   */
-  RT['>'] = function() {
-    var items;
-    items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    return RT.reduce(items, function(a, b) {
-      return a > b;
-    });
+  compare = function() {
+    var item, items, prev, test, _i, _len;
+    test = arguments[0], prev = arguments[1], items = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
+    for (_i = 0, _len = items.length; _i < _len; _i++) {
+      item = items[_i];
+      if (!test(prev, item)) {
+        return false;
+      }
+      prev = item;
+    }
+    return true;
   };
-  RT['<'] = function() {
-    var items;
-    items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    return RT.reduce(items, function(a, b) {
-      return a < b;
-    });
-  };
-  RT['>='] = function() {
-    var items;
-    items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    return RT.reduce(items, function(a, b) {
-      return a >= b;
-    });
-  };
-  RT['<='] = function() {
-    var items;
-    items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    return RT.reduce(items, function(a, b) {
-      return a <= b;
-    });
+  RT['>'] = RT.curry(compare, function(a, b) {
+    return a > b;
+  });
+  RT['<'] = RT.curry(compare, function(a, b) {
+    return a < b;
+  });
+  RT['>='] = RT.curry(compare, function(a, b) {
+    return a >= b;
+  });
+  RT['<='] = RT.curry(compare, function(a, b) {
+    return a <= b;
+  });
+  RT['='] = RT.curry(compare, function(a, b) {
+    return a === b;
+  });
+  RT['not='] = RT.curry(compare, function(a, b) {
+    return a !== b;
+  });
+  RT.or = RT.curry(compare, function(a, b) {
+    return !a || b;
+  });
+  RT.and = RT.curry(compare, function(a, b) {
+    return a && b;
+  });
+  RT.not = function(a) {
+    return a === false || a === null;
   };
   /*
-  FUNCTIONS
+  TYPE CHECKING
   */
-  RT.apply = function() {
-    var args, fn, ls, lsCopy, _i;
-    fn = arguments[0], args = 3 <= arguments.length ? __slice.call(arguments, 1, _i = arguments.length - 1) : (_i = 1, []), ls = arguments[_i++];
-    ls.unshift.apply(ls, args);
-    lsCopy = ls.slice(0);
-    return fn.apply(null, lsCopy);
+  RT["string?"] = function(x) {
+    return typeof x === "string" || x instanceof types.String || x instanceof String;
+  };
+  RT["list?"] = function(x) {
+    return x instanceof Array;
+  };
+  RT["num?"] = function(x) {
+    return typeof x === "number" || x instanceof types.Number || x instanceof Number;
+  };
+  RT["nil?"] = function(x) {
+    return !(x != null);
   };
   /*
   MISC / INTEROP
   */
-  RT["print!"] = function() {
+  RT.print = function() {
     var items;
     items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     return console.log.apply(console, items);
@@ -522,6 +532,10 @@
     return _results;
   };
   RT.global = g;
+  /*
+  ENVIRONMENT MACROS
+  */
+  RT.eval(null, parser.parse('(defmacro defn ($ident $arg-names ...$exprs)\n  \'(let (exprs (if (= (count \'$exprs) 1)\n                  (first \'$exprs)\n                  \'$exprs))\n    (def $ident (lambda $arg-names\n      (eval exprs)))))\n      \n(defmacro debug (& to-eval)\n  \'(let (result (eval to-eval))\n    (print result)\n    result))'));
   try {
     module.exports = RT;
   } catch (e) {
