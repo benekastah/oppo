@@ -1,10 +1,25 @@
 <html>
 <head>
   <title>JSLisp</title>
-  <script src="../dist/tco.js"></script>
+  
+  <!-- Prerequisites -->
+  <script src="../dist/oppo.js"></script>
+  <script src="../dist/recurse.js"></script>
+  <script src="../dist/types.js"></script>
+  <script src="../dist/eval_helpers.js"></script>
+  <script src="../dist/mixins/compare.js"></script>
+  <script src="../dist/mixins/functions.js"></script>
+  <script src="../dist/mixins/lists.js"></script>
+  <script src="../dist/mixins/math.js"></script>
+  <script src="../dist/mixins/misc.js"></script>
+  
+  <!-- Load the meat of the language in -->
   <script src="../dist/parser.js"></script>
   <script src="../dist/runtime.js"></script>
-  <script src="../dist/test/test.js"></script>
+  <script src="../dist/runtime-oppo.js"></script>
+  
+  <!-- Tester -->
+  <script src="./test.js"></script>
 </head>
 <body>
 </body>

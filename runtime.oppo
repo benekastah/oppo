@@ -1,8 +1,0 @@
-;else if _0 is 'defn'
-;  [__, ident, argNames, exp]
-;  @eval scope, ['def', ident, ['lambda', argNames, exp]]
-
-(print! "here")
-
-(defmacro defn ($ident $arg-names ...$exprs)
-  '(def $ident (lambda $arg-names (concat 'do $exprs))))

@@ -10,8 +10,9 @@ fs = require 'fs'
 parseFile = (file, cb) ->
   fs.readFile file, 'utf8', (err, data) ->
     program = parse data if data
-    # program.toString()
-    (cb or ->) rt.eval rt, program
+    if args[1] is "#t"
+      console.log program.toString()
+    (cb or ->) rt.eval null, program
   
 ;parseFile "../runtime.oppo", (result) ->
 parseFile args[0], (result) ->

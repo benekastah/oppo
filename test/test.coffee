@@ -1,5 +1,7 @@
+parse = @oppo.parser.parse
+eval = @oppo.eval
 
-s = parser.parse """
+s = parse """
 (defn Y (le)
   ((lambda (f) (f f))
    (lambda (f)
@@ -16,33 +18,59 @@ s = parser.parse """
 (print (factorial 5))
 """
 
-s = parser.parse """
+s = parse """
 (defn a () "a")
 (print (a))
 """
 
-# s = parser.parse '''
+# s = parse '''
 # (print (not nil))
 # '''
 
-# s = parser.parse """
+# s = parse """
 # (defmacro p! (msg)
 #   '(print msg))
 #   
 # (p! "yo")
 # """
 
-s = parser.parse """
-(defn factorial (n)
-  (if (<= n 2)
-    n
-    (* n (factorial (- n 1)))))
+# s = parse """
+# (defn factorial (n)
+#   (if (<= n 2)
+#     n
+#     (* n (factorial (- n 1)))))
+# 
+# (print (factorial 5))
+# """
 
-(print (factorial 5))
-"""
+s = parse '''
+(def fib [1 1
+            (lambda (n, i, ls)
+              (+ n (nth ls (- i 2))))])
+            
+(nth fib 200)
+'''
+
+s = parse '''
+(defn factorial (n)
+  (reduce [n
+            (lambda (n) 
+              (if (> 0 n) (- n 1)))]
+          (lambda (a b) (* a b))))
+    
+(factorial 5)
+'''
 
 console.log "#{s}"
-console.log Runtime.eval null, s
+console.log eval '''
+(defn factorial (n)
+  (reduce [n
+            (lambda (n) 
+              (if (> 0 n) (- n 1)))]
+          (lambda (a b) (* a b))))
+    
+(factorial 5)
+'''
 
 ### IDEAS
 

@@ -30,6 +30,6 @@
   try {
     module.exports = recurse;
   } catch (e) {
-    this.recurse = recurse;
+    this.oppo.recurse = recurse;
   }
 }).call(this);

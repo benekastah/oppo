@@ -1,0 +1,2 @@
+* identifiers should be case-insensitive, unless accessing native JS stuff
+* when accessing native JS stuff directly, evaluation should be eager
