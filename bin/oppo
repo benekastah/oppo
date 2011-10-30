@@ -4,16 +4,26 @@
 args = process.argv.slice 2
 
 {parse} = require '../dist/parser'
-rt = require '../dist/runtime'
+{eval} = require '../dist/oppo'
 fs = require 'fs'
 
 parseFile = (file, cb) ->
   fs.readFile file, 'utf8', (err, data) ->
-    program = parse data if data
-    if args[1] is "#t"
-      console.log program.toString()
-    (cb or ->) rt.eval null, program
+    if err? or not data?
+      console.log "err", err, data
+      throw err or new Error "No data came from file #{file}"
+
+    if args[2] is "#t"
+      console.log (parse data).toString()
+    (cb or ->) eval data
   
-;parseFile "../runtime.oppo", (result) ->
-parseFile args[0], (result) ->
-  console.log result
+  
+if args[0] in ["-c", "--compile"]
+  parseFile args[1], (result) ->
+    console.log result
+    
+if args[0] in ["-e", "--eval"]
+  console.log eval args[1]
+  
+if args[0] in ["-t", "--tree"]
+  console.log "#{parse args[1]}"

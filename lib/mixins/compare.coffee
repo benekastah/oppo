@@ -1,12 +1,12 @@
 types = try require '../types'
 catch e then @oppo.types
 
-{getValue, getAllValues} = try require '../eval_helpers'
-catch e then @oppo.eval_helpers
-
 compare = ->
   RT = this
   
+  {getValue, getAllValues} = try (require '../eval_helpers') RT
+  catch e then @oppo.eval_helpers
+
   ###
   COMPARISONS
   ###

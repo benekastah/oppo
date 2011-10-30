@@ -1,5 +1,5 @@
 (function() {
-  var RT, getRT, types;
+  var RT, eval_helpers, getEvalHelpers, getRT, types;
   var __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -27,6 +27,20 @@
       }
     }
   };
+  eval_helpers = null;
+  getEvalHelpers = function() {
+    if (eval_helpers != null) {
+      return eval_helpers;
+    } else {
+      return eval_helpers = ((function() {
+        try {
+          return require('./eval_helpers');
+        } catch (e) {
+          return this.oppo.eval_helpers;
+        }
+      }).call(this))(getRT());
+    }
+  };
   types.List = (function() {
     __extends(List, Array);
     function List() {
@@ -51,11 +65,11 @@
     __extends(TypedList, types.List);
     function TypedList(items) {
       var i, item, itemType, last, _len, _ref;
-      items = getValue(items);
+      items = getEvalHelpers().getValue(items);
       last = items.length - 1;
       for (i = 0, _len = items.length; i < _len; i++) {
         item = items[i];
-        item = getValue(item);
+        item = getEvalHelpers().getValue(item);
         itemType = getRT()["typeof"](item);
         if ((_ref = this.type) == null) {
           this.type = itemType;
@@ -78,7 +92,7 @@
     }
     TypedList.prototype.get = function(i) {
       var j, val, _ref;
-      i = getValue(i);
+      i = getEvalHelpers().getValue(i);
       val = this[i];
       if (i < this.length) {
         val;
@@ -94,8 +108,21 @@
       }
       return val;
     };
+    TypedList.prototype.getAll = function() {
+      var i, val, _results;
+      i = 0;
+      _results = [];
+      while (val !== null) {
+        _results.push(val = get(i++));
+      }
+      return _results;
+    };
     TypedList.prototype.end = function() {
       return this.generator.enabled = false;
+    };
+    TypedList.prototype.reduce = function() {
+      getAll();
+      return this.reduce.apply(this, arguments);
     };
     TypedList.prototype.toString = function() {
       return "[ " + (this.join(" ")) + " ]";

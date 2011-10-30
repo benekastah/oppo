@@ -1,8 +1,13 @@
-{getValue, getAllValues} = try require '../eval_helpers'
-catch e then @oppo.eval_helpers
+
+types = try require '../types'
+catch e then @oppo.types
 
 lists = ->
   RT = this
+  
+  {getValue, getAllValues} = try (require '../eval_helpers') RT
+  catch e then @oppo.eval_helpers
+  
   ###
   LISTS
   ###
@@ -11,19 +16,19 @@ lists = ->
     @eval this, ['quote', items]
 
   RT["typed-list"] = (items...) ->
-    @eval this, [-> new TypedList items]
+    new types.TypedList items
 
   # Accessor methods
   RT.head = RT.first = (ls) ->
     ls = getValue ls
-    if ls instanceof TypedList
+    if ls instanceof types.TypedList
       ls.get 0
     else
       ls[0]
   
   RT.second = (ls) ->
     ls = getValue ls
-    if ls instanceof TypedList
+    if ls instanceof types.TypedList
       ls.get 1
     else
       ls[1]
@@ -33,7 +38,7 @@ lists = ->
     if n < 0
       n = ls.length + n
     
-    if ls instanceof TypedList
+    if ls instanceof types.TypedList
       ls.get n
     else
       ls[n]
@@ -58,7 +63,7 @@ lists = ->
       i = -1
       len = ls.length
       while ++i < len
-        if ls instanceof TypedList
+        if ls instanceof types.TypedList
           item = ls.get i
           len = ls.length
         else
@@ -81,7 +86,7 @@ lists = ->
   RT.reduce = (ls, fn) ->
     ls = getAllValues ls
     fn = getValue fn
-    if Array.prototype.reduce?
+    if ls.reduce?
       ls.reduce fn
     else
       start = ls.shift()
@@ -97,10 +102,14 @@ lists = ->
 
   RT.end = (ls) -> 
     ls = getValue ls
-    if ls not instanceof TypedList
+    if ls not instanceof types.TypedList
       throw new Error "Tried to terminate a #{RT['typeof'] ls} value. This only works with typed-lists"
     else
       ls.end()
+      
+  # RT.range = RT["r.."] = (start, end) ->
+  #   end ?= Infinity
+  #   RT['typed-list'] 
       
       
 try module.exports = lists

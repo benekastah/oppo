@@ -1,16 +1,16 @@
 (function() {
-  var getAllValues, getValue, misc, _ref;
+  var misc;
   var __slice = Array.prototype.slice;
-  _ref = (function() {
-    try {
-      return require('../eval_helpers');
-    } catch (e) {
-      return this.oppo.eval_helpers;
-    }
-  }).call(this), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
   misc = function() {
-    var RT;
+    var RT, getAllValues, getValue, _ref;
     RT = this;
+    _ref = (function() {
+      try {
+        return (require('../eval_helpers'))(RT);
+      } catch (e) {
+        return this.oppo.eval_helpers;
+      }
+    }).call(this), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
     /*
       MISC / INTEROP
       */

@@ -17,6 +17,7 @@ LIST_OPEN = new Token "("
 LIST_CLOSE = new Token ")"
 TYPED_LIST_OPEN = new Token "["
 TYPED_LIST_CLOSE = new Token "]"
+SPECIAL_OPEN = new Token "#"
 SEP = new Token /\s|,/
 QUOTE = new Token "'"
 COMMENT_BEGIN = new Token ";"
@@ -82,6 +83,10 @@ parser.parse = parse = (text, list, base) =>
       t = "(typed-list #{t}"
     else if (TYPED_LIST_CLOSE.test h) and not inString
       t = ") #{t}"
+    else if (SPECIAL_OPEN.test h) and not inString
+      if LIST_OPEN.test head t
+        t = "(fn () #{t}"
+        console.warn 'The #() syntax for lambda functions is incomplete. Do not use it.'
     else if not SEP.test h
       if (not listItem or inString) and h is '"'
         inString = not inString

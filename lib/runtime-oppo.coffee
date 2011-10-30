@@ -9,7 +9,7 @@ Here is the portion of the runtime that can be defined
 in oppo natively.
 ###
 
-evalProgram parser.parse '''
+runtime_oppo = '''
 (defmacro defn ($ident $arg-names ...$exprs)
   '(let (exprs (if (= (count '$exprs) 1)
                   (first '$exprs)
@@ -23,5 +23,14 @@ evalProgram parser.parse '''
     result))
 
 (defn print (...items)
-  (apply (. global console log) items))
+  (apply (. native console log) items))
+  
+(defn Y (func)
+  ((lambda (f) (f f))
+   (lambda (f)
+    (func (lambda (x) 
+      ((f f) x))))))
 '''
+
+try module.exports = runtime_oppo
+catch e then oppo.runtime_oppo = runtime_oppo

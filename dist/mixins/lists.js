@@ -1,16 +1,23 @@
 (function() {
-  var getAllValues, getValue, lists, _ref;
+  var lists, types;
   var __slice = Array.prototype.slice;
-  _ref = (function() {
+  types = (function() {
     try {
-      return require('../eval_helpers');
+      return require('../types');
     } catch (e) {
-      return this.oppo.eval_helpers;
+      return this.oppo.types;
     }
-  }).call(this), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
+  }).call(this);
   lists = function() {
-    var RT;
+    var RT, getAllValues, getValue, _ref;
     RT = this;
+    _ref = (function() {
+      try {
+        return (require('../eval_helpers'))(RT);
+      } catch (e) {
+        return this.oppo.eval_helpers;
+      }
+    }).call(this), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
     /*
       LISTS
       */
@@ -22,15 +29,11 @@
     RT["typed-list"] = function() {
       var items;
       items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-      return this.eval(this, [
-        function() {
-          return new TypedList(items);
-        }
-      ]);
+      return new types.TypedList(items);
     };
     RT.head = RT.first = function(ls) {
       ls = getValue(ls);
-      if (ls instanceof TypedList) {
+      if (ls instanceof types.TypedList) {
         return ls.get(0);
       } else {
         return ls[0];
@@ -38,7 +41,7 @@
     };
     RT.second = function(ls) {
       ls = getValue(ls);
-      if (ls instanceof TypedList) {
+      if (ls instanceof types.TypedList) {
         return ls.get(1);
       } else {
         return ls[1];
@@ -49,7 +52,7 @@
       if (n < 0) {
         n = ls.length + n;
       }
-      if (ls instanceof TypedList) {
+      if (ls instanceof types.TypedList) {
         return ls.get(n);
       } else {
         return ls[n];
@@ -76,7 +79,7 @@
         len = ls.length;
         _results = [];
         while (++i < len) {
-          if (ls instanceof TypedList) {
+          if (ls instanceof types.TypedList) {
             item = ls.get(i);
             len = ls.length;
           } else {
@@ -107,7 +110,7 @@
       var start;
       ls = getAllValues(ls);
       fn = getValue(fn);
-      if (Array.prototype.reduce != null) {
+      if (ls.reduce != null) {
         return ls.reduce(fn);
       } else {
         start = ls.shift();
@@ -128,7 +131,7 @@
     };
     return RT.end = function(ls) {
       ls = getValue(ls);
-      if (!(ls instanceof TypedList)) {
+      if (!(ls instanceof types.TypedList)) {
         throw new Error("Tried to terminate a " + (RT['typeof'](ls)) + " value. This only works with typed-lists");
       } else {
         return ls.end();

@@ -1,5 +1,5 @@
 (function() {
-  var COMMENT_BEGIN, COMMENT_END, LIST_CLOSE, LIST_OPEN, ProgramList, QUOTE, SEP, TYPED_LIST_CLOSE, TYPED_LIST_OPEN, Token, empty, g, head, inComment, inQuote, inString, listItem, parse, parser, quoteShouldWaitForListEnd, quoteWaitForListEnd, recurse, resolveListItem, resolveQuote, tail, _ref;
+  var COMMENT_BEGIN, COMMENT_END, LIST_CLOSE, LIST_OPEN, ProgramList, QUOTE, SEP, SPECIAL_OPEN, TYPED_LIST_CLOSE, TYPED_LIST_OPEN, Token, empty, g, head, inComment, inQuote, inString, listItem, parse, parser, quoteShouldWaitForListEnd, quoteWaitForListEnd, recurse, resolveListItem, resolveQuote, tail, _ref;
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
   parser = (function() {
     try {
@@ -36,6 +36,7 @@
   LIST_CLOSE = new Token(")");
   TYPED_LIST_OPEN = new Token("[");
   TYPED_LIST_CLOSE = new Token("]");
+  SPECIAL_OPEN = new Token("#");
   SEP = new Token(/\s|,/);
   QUOTE = new Token("'");
   COMMENT_BEGIN = new Token(";");
@@ -106,6 +107,11 @@
         t = "(typed-list " + t;
       } else if ((TYPED_LIST_CLOSE.test(h)) && !inString) {
         t = ") " + t;
+      } else if ((SPECIAL_OPEN.test(h)) && !inString) {
+        if (LIST_OPEN.test(head(t))) {
+          t = "(fn () " + t;
+          console.warn('The #() syntax for lambda functions is incomplete. Do not use it.');
+        }
       } else if (!SEP.test(h)) {
         if ((!listItem || inString) && h === '"') {
           inString = !inString;

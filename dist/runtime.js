@@ -1,5 +1,5 @@
 (function() {
-  var RT, eval_helpers, g, getAllValues, getValue, mixins, parser, recurse, types;
+  var RT, eval_helpers, eval_helpers_fn, g, getAllValues, getValue, mixins, parser, recurse, types;
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
   parser = (function() {
     try {
@@ -15,7 +15,7 @@
       return this.oppo.recurse;
     }
   }).call(this);
-  eval_helpers = (function() {
+  eval_helpers_fn = (function() {
     try {
       return require('./eval_helpers');
     } catch (e) {
@@ -73,13 +73,14 @@
       return global;
     }
   })();
-  getValue = eval_helpers.getValue;
-  getAllValues = eval_helpers.getAllValues;
   RT = {};
-  RT.global = g;
+  eval_helpers = eval_helpers_fn(RT);
+  getValue = eval_helpers.getValue, getAllValues = eval_helpers.getAllValues;
+  RT["native"] = g;
+  RT.global = RT;
   RT["eval-js"] = g.eval;
   RT.eval = function(scope, x) {
-    var has_side_affects, ret, _0;
+    var get_last_value, has_side_affects, ret, _0;
     if (scope == null) {
       scope = RT;
     }
@@ -90,6 +91,7 @@
       } catch (_e) {}
     })();
     has_side_affects = eval_helpers.has_side_affects(x, RT);
+    get_last_value = false;
     ret = __bind(function() {
       var exp;
       if (x === 'nil' || !(x != null)) {
@@ -119,6 +121,7 @@
       } else if (_0 === 'lambda' || _0 === 'fn') {
         return eval_helpers.lambda(scope, x);
       } else if (_0 === 'do') {
+        get_last_value = true;
         return eval_helpers["do"](scope, x);
       } else if (_0 === '.') {
         return eval_helpers.property_access(scope, x);
@@ -126,20 +129,17 @@
         return eval_helpers.func_call(scope, x, RT);
       }
     }, this)();
-    if (has_side_affects) {
-      return getAllValues(ret);
-    } else {
-      return ret;
+    ret = has_side_affects ? getAllValues(ret) : ret;
+    if (get_last_value) {
+      ret = RT.last(ret);
     }
+    return ret;
   };
   mixins.functions.call(RT);
   mixins.compare.call(RT);
   mixins.lists.call(RT);
   mixins.math.call(RT);
   mixins.misc.call(RT);
-  try {
-    require('./runtime-oppo');
-  } catch (_e) {}
   try {
     module.exports = RT;
   } catch (e) {

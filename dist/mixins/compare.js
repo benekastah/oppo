@@ -1,5 +1,5 @@
 (function() {
-  var compare, getAllValues, getValue, types, _ref;
+  var compare, types;
   var __slice = Array.prototype.slice;
   types = (function() {
     try {
@@ -8,16 +8,16 @@
       return this.oppo.types;
     }
   }).call(this);
-  _ref = (function() {
-    try {
-      return require('../eval_helpers');
-    } catch (e) {
-      return this.oppo.eval_helpers;
-    }
-  }).call(this), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
   compare = function() {
-    var RT;
+    var RT, getAllValues, getValue, _ref;
     RT = this;
+    _ref = (function() {
+      try {
+        return (require('../eval_helpers'))(RT);
+      } catch (e) {
+        return this.oppo.eval_helpers;
+      }
+    }).call(this), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
     /*
       COMPARISONS
       */

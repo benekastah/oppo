@@ -1,2 +1,7 @@
 * identifiers should be case-insensitive, unless accessing native JS stuff
 * when accessing native JS stuff directly, evaluation should be eager
+* memoization
+* implement new typed-list generator plan
+* implement paren-matching tokenizer for ease of syntax addition.
+  I'm thinking you define an open and a close token and the rest is automatic
+* implement tail-call optimization

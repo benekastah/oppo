@@ -4,6 +4,9 @@ catch e then @oppo.eval_helpers
 funcs = ->
   RT = this
   
+  {getValue, getAllValues} = try (require '../eval_helpers') RT
+  catch e then @oppo.eval_helpers
+
   ###
   FUNCTIONS
   ###

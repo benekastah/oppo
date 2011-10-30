@@ -9,8 +9,15 @@
     }
   }).call(this), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
   funcs = function() {
-    var RT;
+    var RT, _ref2;
     RT = this;
+    _ref2 = (function() {
+      try {
+        return (require('../eval_helpers'))(RT);
+      } catch (e) {
+        return this.oppo.eval_helpers;
+      }
+    }).call(this), getValue = _ref2.getValue, getAllValues = _ref2.getAllValues;
     /*
       FUNCTIONS
       */

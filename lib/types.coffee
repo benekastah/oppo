@@ -9,6 +9,14 @@ getRT = ->
     try require './runtime'
     catch e then @oppo.runtime
 
+eval_helpers = null
+getEvalHelpers = ->
+  if eval_helpers?
+    eval_helpers
+  else
+    eval_helpers = (try require './eval_helpers'
+    catch e then @oppo.eval_helpers) getRT()
+
 class types.List extends Array
   constructor: (items...) ->
     if items then @push.apply @, items
@@ -16,13 +24,33 @@ class types.List extends Array
   toArray: -> @[0..]
   toString: ->
     "(#{(@join ' ').replace ") (", ")\n  ("})"
-    
+
+
+
+
+
+
+
+
+
+# Examples of TypedList
+# [ '(1 2) '(#(inc a) #(dec b)) ]
+# ; -> ['(1 2) '(2 1) '(3 0) ...]
+# 
+# [ '(1 5)
+#   '(#(inc %1) #(dec %1))
+#   '(#(< 5) #(> 0)) ]
+# ; -> ['(1 5) '(2 4) '(3 3) '(4 2)]
+# 
+# [ 5 #(if (> %1 1) (dec %1)) ]
+# ; -> [5 4 3 2]
+
 class types.TypedList extends types.List
   constructor: (items) ->
-    items = getValue items
+    items = getEvalHelpers().getValue items
     last = items.length - 1
     for item, i in items
-      item = getValue item
+      item = getEvalHelpers().getValue item
       itemType =  getRT()["typeof"] item
       @type ?= itemType
       if i is last and itemType is "function" and @type isnt itemType
@@ -37,7 +65,7 @@ class types.TypedList extends types.List
     if @generator then @generator.enabled = true
 
   get: (i) ->
-    i = getValue i
+    i = getEvalHelpers().getValue i
     val = @[i]
     if i < @length
       val
@@ -49,10 +77,19 @@ class types.TypedList extends types.List
       if not val? and @type isnt "nil"
         @end()
     val
-
+    
+  getAll: ->
+    i = 0
+    until val is null
+      val = get i++
+    
   end: () ->
     @generator.enabled = false
-
+  
+  reduce: () ->
+    getAll()
+    this.reduce.apply this, arguments
+  
   toString: ->
     "[ #{@join " "} ]"
 

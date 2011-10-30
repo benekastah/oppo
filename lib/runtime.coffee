@@ -4,7 +4,7 @@ catch e then @oppo.parser
 recurse = try require './recurse'
 catch e then @oppo.recurse
 
-eval_helpers = try require './eval_helpers'
+eval_helpers_fn = try require './eval_helpers'
 catch e then @oppo.eval_helpers
 
 types = try require './types'
@@ -25,11 +25,15 @@ mixins =
 g = try window
 catch e then global
 
-getValue = eval_helpers.getValue
-getAllValues = eval_helpers.getAllValues
-
 RT = {}
-RT.global = g
+
+eval_helpers = eval_helpers_fn RT
+{getValue, getAllValues} = eval_helpers
+
+
+# Build R(un)T(ime) object
+RT.native = g
+RT.global = RT
 
 # Eval
 RT["eval-js"] = g.eval
@@ -38,6 +42,7 @@ RT.eval = (scope=RT, x) ->
   _0 = try x[0]
   
   has_side_affects = eval_helpers.has_side_affects x, RT
+  get_last_value = false
   
   ret = do =>
     if x is 'nil' or not x?
@@ -66,17 +71,22 @@ RT.eval = (scope=RT, x) ->
       eval_helpers.defmacro scope, x
     else if _0 in ['lambda', 'fn']
       eval_helpers.lambda scope, x
-    else if _0 is 'do'
+    else if _0 is 'do'  
+      get_last_value = true
       eval_helpers.do scope, x
     else if _0 is '.'
       eval_helpers.property_access scope, x
     else
       eval_helpers.func_call scope, x, RT
   
-  if has_side_affects
+  ret = if has_side_affects
     getAllValues ret
   else
     ret
+  
+  if get_last_value
+    ret = RT.last ret
+  ret
 
 # Add environment functions
 mixins.functions.call RT
@@ -84,8 +94,6 @@ mixins.compare.call RT
 mixins.lists.call RT
 mixins.math.call RT
 mixins.misc.call RT
-
-try require './runtime-oppo'
 
 try module.exports = RT
 catch e then @oppo.runtime = RT

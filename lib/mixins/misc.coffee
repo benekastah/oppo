@@ -1,9 +1,10 @@
-{getValue, getAllValues} = try require '../eval_helpers'
-catch e then @oppo.eval_helpers
 
 misc = ->
   RT = this
   
+  {getValue, getAllValues} = try (require '../eval_helpers') RT
+  catch e then @oppo.eval_helpers
+
   ###
   MISC / INTEROP
   ###
