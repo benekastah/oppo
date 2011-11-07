@@ -1,15 +1,15 @@
 evalProgram = (try require './oppo'
-catch e then @oppo).eval
+catch e then oppo).eval
 
 parser = try require './parser'
-catch e then @oppo.parser
+catch e then oppo.parser
 
 ###
 Here is the portion of the runtime that can be defined
 in oppo natively.
 ###
 
-runtime_oppo = '''
+evalProgram runtime_oppo = '''
 (defmacro defn ($ident $arg-names ...$exprs)
   '(let (exprs (if (= (count '$exprs) 1)
                   (first '$exprs)

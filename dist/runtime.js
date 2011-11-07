@@ -5,66 +5,66 @@
     try {
       return (require('./parser')).parser;
     } catch (e) {
-      return this.oppo.parser;
+      return oppo.parser;
     }
-  }).call(this);
+  })();
   recurse = (function() {
     try {
       return require('./recurse');
     } catch (e) {
-      return this.oppo.recurse;
+      return oppo.recurse;
     }
-  }).call(this);
+  })();
   eval_helpers_fn = (function() {
     try {
       return require('./eval_helpers');
     } catch (e) {
-      return this.oppo.eval_helpers;
+      return oppo.eval_helpers;
     }
-  }).call(this);
+  })();
   types = (function() {
     try {
       return require('./types');
     } catch (e) {
-      return this.oppo.types;
+      return oppo.types;
     }
-  }).call(this);
+  })();
   mixins = {
     compare: (function() {
       try {
         return require('./mixins/compare');
       } catch (e) {
-        return this.oppo.mixins.compare;
+        return oppo.mixins.compare;
       }
-    }).call(this),
+    })(),
     functions: (function() {
       try {
         return require('./mixins/functions');
       } catch (e) {
-        return this.oppo.mixins.functions;
+        return oppo.mixins.functions;
       }
-    }).call(this),
+    })(),
     lists: (function() {
       try {
         return require('./mixins/lists');
       } catch (e) {
-        return this.oppo.mixins.lists;
+        return oppo.mixins.lists;
       }
-    }).call(this),
+    })(),
     math: (function() {
       try {
         return require('./mixins/math');
       } catch (e) {
-        return this.oppo.mixins.math;
+        return oppo.mixins.math;
       }
-    }).call(this),
+    })(),
     misc: (function() {
       try {
         return require('./mixins/misc');
       } catch (e) {
-        return this.oppo.mixins.misc;
+        return oppo.mixins.misc;
       }
-    }).call(this)
+    })()
   };
   g = (function() {
     try {
@@ -143,6 +143,6 @@
   try {
     module.exports = RT;
   } catch (e) {
-    this.oppo.runtime = RT;
+    oppo.runtime = RT;
   }
 }).call(this);

@@ -12,9 +12,9 @@
     try {
       return exports;
     } catch (e) {
-      return this.oppo.types = {};
+      return oppo.types = {};
     }
-  }).call(this);
+  })();
   RT = null;
   getRT = function() {
     if (RT != null) {
@@ -23,7 +23,7 @@
       try {
         return require('./runtime');
       } catch (e) {
-        return this.oppo.runtime;
+        return oppo.runtime;
       }
     }
   };
@@ -36,9 +36,9 @@
         try {
           return require('./eval_helpers');
         } catch (e) {
-          return this.oppo.eval_helpers;
+          return oppo.eval_helpers;
         }
-      }).call(this))(getRT());
+      })())(getRT());
     }
   };
   types.List = (function() {
@@ -140,21 +140,6 @@
       ProgramList.__super__.constructor.apply(this, items);
     }
     return ProgramList;
-  })();
-  types.Token = (function() {
-    function Token(descriptor) {
-      this.descriptor = descriptor;
-      if (this.descriptor instanceof RegExp) {
-        this.test = this.descriptor.test.bind(this.descriptor);
-      } else if (typeof this.descriptor === "string") {
-        this.test = function(s) {
-          return s === this.descriptor;
-        };
-      } else {
-        throw new Error("Token: Descriptor must be string or regexp");
-      }
-    }
-    return Token;
   })();
   types.NamedArgsList = (function() {
     __extends(NamedArgsList, types.List);

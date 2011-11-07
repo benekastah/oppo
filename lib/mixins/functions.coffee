@@ -1,11 +1,12 @@
-{getValue, getAllValues} = try require '../eval_helpers'
-catch e then @oppo.eval_helpers
+
+types = try require '../types'
+catch e then oppo.types
 
 funcs = ->
   RT = this
   
-  {getValue, getAllValues} = try (require '../eval_helpers') RT
-  catch e then @oppo.eval_helpers
+  {getValue, getAllValues} = ((try (require '../eval_helpers')
+  catch e then oppo.eval_helpers) RT)
 
   ###
   FUNCTIONS
@@ -19,4 +20,4 @@ funcs = ->
     fn.bind this, args...
   
 try module.exports = funcs
-catch e then @oppo.mixins.functions = funcs
+catch e then oppo.mixins.functions = funcs

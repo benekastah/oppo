@@ -1,16 +1,23 @@
 (function() {
-  var misc;
+  var misc, types;
   var __slice = Array.prototype.slice;
+  types = (function() {
+    try {
+      return require('../types');
+    } catch (e) {
+      return oppo.types;
+    }
+  })();
   misc = function() {
     var RT, getAllValues, getValue, _ref;
     RT = this;
-    _ref = (function() {
+    _ref = ((function() {
       try {
-        return (require('../eval_helpers'))(RT);
+        return require('../eval_helpers');
       } catch (e) {
-        return this.oppo.eval_helpers;
+        return oppo.eval_helpers;
       }
-    }).call(this), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
+    })())(RT), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
     /*
       MISC / INTEROP
       */
@@ -29,6 +36,6 @@
   try {
     module.exports = misc;
   } catch (e) {
-    this.oppo.mixins.misc = misc;
+    oppo.mixins.misc = misc;
   }
 }).call(this);

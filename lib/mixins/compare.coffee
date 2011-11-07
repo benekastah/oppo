@@ -1,11 +1,12 @@
+
 types = try require '../types'
-catch e then @oppo.types
+catch e then oppo.types
 
 compare = ->
   RT = this
   
-  {getValue, getAllValues} = try (require '../eval_helpers') RT
-  catch e then @oppo.eval_helpers
+  {getValue, getAllValues} = ((try (require '../eval_helpers')
+  catch e then oppo.eval_helpers) RT)
 
   ###
   COMPARISONS
@@ -55,4 +56,4 @@ compare = ->
     
     
 try module.exports = compare
-catch e then @oppo.mixins.compare = compare
+catch e then oppo.mixins.compare = compare

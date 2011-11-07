@@ -5,19 +5,19 @@
     try {
       return require('../types');
     } catch (e) {
-      return this.oppo.types;
+      return oppo.types;
     }
-  }).call(this);
+  })();
   lists = function() {
     var RT, getAllValues, getValue, _ref;
     RT = this;
-    _ref = (function() {
+    _ref = ((function() {
       try {
-        return (require('../eval_helpers'))(RT);
+        return require('../eval_helpers');
       } catch (e) {
-        return this.oppo.eval_helpers;
+        return oppo.eval_helpers;
       }
-    }).call(this), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
+    })())(RT), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
     /*
       LISTS
       */
@@ -137,10 +137,22 @@
         return ls.end();
       }
     };
+    /*
+      pluck = (a, i) ->
+        a[...i].concat a[(i + 1)..]
+    
+      insert = (a, i, item) ->
+        a[...i].concat item, a[i..]
+    
+      move = (a, old_i, new_i) ->
+        val = a[old_i]
+        a = pluck a, old_i
+        a = insert a, new_i, val
+      */
   };
   try {
     module.exports = lists;
   } catch (e) {
-    this.oppo.mixins.lists = lists;
+    oppo.mixins.lists = lists;
   }
 }).call(this);

@@ -1,9 +1,12 @@
 
+types = try require '../types'
+catch e then oppo.types
+
 misc = ->
   RT = this
   
-  {getValue, getAllValues} = try (require '../eval_helpers') RT
-  catch e then @oppo.eval_helpers
+  {getValue, getAllValues} = ((try (require '../eval_helpers')
+  catch e then oppo.eval_helpers) RT)
 
   ###
   MISC / INTEROP
@@ -20,4 +23,4 @@ misc = ->
       
 
 try module.exports = misc
-catch e then @oppo.mixins.misc = misc
+catch e then oppo.mixins.misc = misc

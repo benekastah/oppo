@@ -4,12 +4,10 @@ catch e
   @oppo.mixins = {}
   @oppo
 
-try oppo.runtime = require './runtime'
-try 
-  if require?
-    oppo.runtime_oppo = require './runtime-oppo'
-
-try oppo.parser = require './parser'
+try
+  oppo.runtime = require './runtime'
+  oppo.parser = require './parser'
+  require './runtime_oppo'
 
 ###
 This is the access point for a program to the runtime
@@ -23,7 +21,3 @@ oppo.eval = (program) ->
     program = oppo.parser.parse program
   result = oppo.runtime.eval oppo.runtime, program
   result = getAllValues result
-  # result = try RT.last result
-  # catch e then result
-
-oppo.eval oppo.runtime_oppo

@@ -1,26 +1,26 @@
 parser = try (require './parser').parser
-catch e then @oppo.parser
+catch e then oppo.parser
 
 recurse = try require './recurse'
-catch e then @oppo.recurse
+catch e then oppo.recurse
 
 eval_helpers_fn = try require './eval_helpers'
-catch e then @oppo.eval_helpers
+catch e then oppo.eval_helpers
 
 types = try require './types'
-catch e then @oppo.types
+catch e then oppo.types
 
 mixins =
   compare: try require './mixins/compare'
-  catch e then @oppo.mixins.compare
+  catch e then oppo.mixins.compare
   functions: try require './mixins/functions'
-  catch e then @oppo.mixins.functions
+  catch e then oppo.mixins.functions
   lists: try require './mixins/lists'
-  catch e then @oppo.mixins.lists
+  catch e then oppo.mixins.lists
   math: try require './mixins/math'
-  catch e then @oppo.mixins.math
+  catch e then oppo.mixins.math
   misc: try require './mixins/misc'
-  catch e then @oppo.mixins.misc
+  catch e then oppo.mixins.misc
 
 g = try window
 catch e then global
@@ -96,4 +96,4 @@ mixins.math.call RT
 mixins.misc.call RT
 
 try module.exports = RT
-catch e then @oppo.runtime = RT
+catch e then oppo.runtime = RT

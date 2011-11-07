@@ -15,4 +15,4 @@ recurse = (fn, args...) ->
   else tc
   
 try module.exports = recurse
-catch e then @oppo.recurse = recurse
+catch e then oppo.recurse = recurse

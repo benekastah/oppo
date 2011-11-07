@@ -11,14 +11,8 @@
   }).call(this);
   try {
     oppo.runtime = require('./runtime');
-  } catch (_e) {}
-  try {
-    if (typeof require !== "undefined" && require !== null) {
-      oppo.runtime_oppo = require('./runtime-oppo');
-    }
-  } catch (_e) {}
-  try {
     oppo.parser = require('./parser');
+    require('./runtime_oppo');
   } catch (_e) {}
   /*
   This is the access point for a program to the runtime
@@ -39,5 +33,4 @@
     result = oppo.runtime.eval(oppo.runtime, program);
     return result = getAllValues(result);
   };
-  oppo.eval(oppo.runtime_oppo);
 }).call(this);

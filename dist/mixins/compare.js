@@ -5,19 +5,19 @@
     try {
       return require('../types');
     } catch (e) {
-      return this.oppo.types;
+      return oppo.types;
     }
-  }).call(this);
+  })();
   compare = function() {
     var RT, getAllValues, getValue, _ref;
     RT = this;
-    _ref = (function() {
+    _ref = ((function() {
       try {
-        return (require('../eval_helpers'))(RT);
+        return require('../eval_helpers');
       } catch (e) {
-        return this.oppo.eval_helpers;
+        return oppo.eval_helpers;
       }
-    }).call(this), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
+    })())(RT), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
     /*
       COMPARISONS
       */
@@ -97,6 +97,6 @@
   try {
     module.exports = compare;
   } catch (e) {
-    this.oppo.mixins.compare = compare;
+    oppo.mixins.compare = compare;
   }
 }).call(this);

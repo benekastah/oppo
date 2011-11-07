@@ -8,7 +8,7 @@ eval_helpers = (RT) ->
   eval = {}
 
   types = try require './types'
-  catch e then @oppo.types
+  catch e then oppo.types
 
   ###
   DEALING WITH THUNKS
@@ -175,4 +175,4 @@ eval_helpers = (RT) ->
   eval
     
 try module.exports = eval_helpers
-catch e then @oppo.eval_helpers = eval_helpers
+catch e then oppo.eval_helpers = eval_helpers

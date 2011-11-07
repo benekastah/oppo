@@ -1,5 +1,5 @@
 types = try exports
-catch e then @oppo.types = {}
+catch e then oppo.types = {}
 
 RT = null
 getRT = ->
@@ -7,7 +7,7 @@ getRT = ->
     RT
   else
     try require './runtime'
-    catch e then @oppo.runtime
+    catch e then oppo.runtime
 
 eval_helpers = null
 getEvalHelpers = ->
@@ -15,7 +15,7 @@ getEvalHelpers = ->
     eval_helpers
   else
     eval_helpers = (try require './eval_helpers'
-    catch e then @oppo.eval_helpers) getRT()
+    catch e then oppo.eval_helpers) getRT()
 
 class types.List extends Array
   constructor: (items...) ->
@@ -97,15 +97,6 @@ class types.ProgramList extends types.List
   constructor: (config={}) ->
     {@parent, items} = config
     super items...
-
-class types.Token
-  constructor: (@descriptor) ->
-    if @descriptor instanceof RegExp
-      @test = @descriptor.test.bind @descriptor
-    else if typeof @descriptor is "string"
-      @test = (s) -> s is @descriptor
-    else
-      throw new Error "Token: Descriptor must be string or regexp"
 
 class types.NamedArgsList extends types.List
   constructor: () ->

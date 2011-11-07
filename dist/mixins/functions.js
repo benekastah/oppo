@@ -1,23 +1,23 @@
 (function() {
-  var funcs, getAllValues, getValue, _ref;
+  var funcs, types;
   var __slice = Array.prototype.slice;
-  _ref = (function() {
+  types = (function() {
     try {
-      return require('../eval_helpers');
+      return require('../types');
     } catch (e) {
-      return this.oppo.eval_helpers;
+      return oppo.types;
     }
-  }).call(this), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
+  })();
   funcs = function() {
-    var RT, _ref2;
+    var RT, getAllValues, getValue, _ref;
     RT = this;
-    _ref2 = (function() {
+    _ref = ((function() {
       try {
-        return (require('../eval_helpers'))(RT);
+        return require('../eval_helpers');
       } catch (e) {
-        return this.oppo.eval_helpers;
+        return oppo.eval_helpers;
       }
-    }).call(this), getValue = _ref2.getValue, getAllValues = _ref2.getAllValues;
+    })())(RT), getValue = _ref.getValue, getAllValues = _ref.getAllValues;
     /*
       FUNCTIONS
       */
@@ -37,6 +37,6 @@
   try {
     module.exports = funcs;
   } catch (e) {
-    this.oppo.mixins.functions = funcs;
+    oppo.mixins.functions = funcs;
   }
 }).call(this);

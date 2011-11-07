@@ -12,9 +12,9 @@
       try {
         return require('./types');
       } catch (e) {
-        return this.oppo.types;
+        return oppo.types;
       }
-    }).call(this);
+    })();
     /*
       DEALING WITH THUNKS
       */
@@ -251,6 +251,6 @@
   try {
     module.exports = eval_helpers;
   } catch (e) {
-    this.oppo.eval_helpers = eval_helpers;
+    oppo.eval_helpers = eval_helpers;
   }
 }).call(this);

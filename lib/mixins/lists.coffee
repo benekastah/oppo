@@ -1,12 +1,12 @@
 
 types = try require '../types'
-catch e then @oppo.types
+catch e then oppo.types
 
 lists = ->
   RT = this
   
-  {getValue, getAllValues} = try (require '../eval_helpers') RT
-  catch e then @oppo.eval_helpers
+  {getValue, getAllValues} = ((try (require '../eval_helpers')
+  catch e then oppo.eval_helpers) RT)
   
   ###
   LISTS
@@ -110,7 +110,19 @@ lists = ->
   # RT.range = RT["r.."] = (start, end) ->
   #   end ?= Infinity
   #   RT['typed-list'] 
-      
+  
+  ###
+  pluck = (a, i) ->
+    a[...i].concat a[(i + 1)..]
+
+  insert = (a, i, item) ->
+    a[...i].concat item, a[i..]
+
+  move = (a, old_i, new_i) ->
+    val = a[old_i]
+    a = pluck a, old_i
+    a = insert a, new_i, val
+  ###
       
 try module.exports = lists
-catch e then @oppo.mixins.lists = lists
+catch e then oppo.mixins.lists = lists

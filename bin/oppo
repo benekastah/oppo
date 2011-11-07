@@ -27,3 +27,14 @@ if args[0] in ["-e", "--eval"]
   
 if args[0] in ["-t", "--tree"]
   console.log "#{parse args[1]}"
+  
+if args[0] in ["-p", "--profile"]
+  start = Date.now()
+  result = eval args[1]
+  end = Date.now()
+  console.log """
+  parse tree : #{parse args[1]}
+  result     : #{result}
+  time (ms)  : #{end - start}
+  
+  """
