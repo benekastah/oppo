@@ -1,7 +1,5 @@
 
-ast = parser.parse '''
-a
-;( a b c d )
+ast = oppo.parse '''
+(a b)
 
 '''
-console.log "ast:", ast

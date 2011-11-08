@@ -37,14 +37,14 @@
 
 program
   : s_expression_list EOF
-    {{ return $s_expression_list; }}
+    {{ return ['do', $s_expression_list]; }}
   ;
 
 s_expression_list
   : s_expression
-    { $$ = [$1]; console.log("dbg:", "s_expression_list", $$); }
+    { $$ = [$1]; }
   | s_expression_list s_expression
-    { $$ = $1; $$.push($2); console.log("dbg:", "s_expression_list", $$); }
+    { $$ = $1; $$.push($2); }
   ;
 
 s_expression
@@ -56,37 +56,37 @@ s_expression
   ;
 
 list
-  : basic_list
+  : callable_list
   | typed_list
   | hash_map
   ;
 
-basic_list
+callable_list
   : '(' element_list ')'
-    { $$ = $2; console.log("dbg:", "list", $$); }
+    { $$ = $2; }
   | '(' ')'
-    { $$ = []; console.log("dbg:", "list", $$); }
+    { $$ = []; }
   ;
 
 typed_list
   : '[' element_list ']'
-    { $$ = ["typed-list", $2]; console.log("dbg:", "typed_list", $$); }
+    { $$ = ["typed-list", $2]; }
   | '[' ']'
-    { $$ = ["typed-list", []]; console.log("dbg:", "typed_list", $$); }
+    { $$ = ["typed-list", []]; }
   ;
   
 hash_map
   : HASH_MAP_START element_list HASH_MAP_END
-    { $$ = ["hash-map", $2]; console.log("dbg:", "hash_map", $$); }
+    { $$ = ["hash-map", $2]; }
   | HASH_MAP_START HASH_MAP_END
-    { $$ = ["hash-map", []]; console.log("dbg:", "hash_map", $$); }
+    { $$ = ["hash-map", []]; }
   ;
 
 element_list
   : element
-    { $$ = [$1]; console.log("dbg:", "element_list", $$); }
+    { $$ = [$1]; }
   | element_list element
-    { $$ = $1; $$.push($2); console.log("dbg:", "element_list", $$); }
+    { $$ = $1; $$.push($2); }
   ;
 
 element
@@ -102,31 +102,31 @@ special_form
 
 atom
   : NIL
-    { $$ = null; console.log("dbg:", "nil", $$); }
+    { $$ = null; }
   | BOOLEAN_TRUE
-    { $$ = true; console.log("dbg:", "true", $$); }
+    { $$ = true; }
   | BOOLEAN_FALSE
-    { $$ = false; console.log("dbg:", "false", $$); }
+    { $$ = false; }
   ;
 
 literal
   : STRING
-    { $$ = yytext; "a".replace(/^"/, "").replace(/"$/, ""); console.log("dbg:", "string", $$); }
+    { $$ = yytext; }
   | number
   ;
   
 number
   : DECIMAL_NUMBER
-    { $$ = Number(yytext, 10); console.log("dbg:", "decimal", $$); }
+    { $$ = Number(yytext, 10); }
   | OCTAL_NUMBER
-    { $$ = parseInt(yytext.replace(/^#/, ''), 8); console.log("dbg:", "octal", $$); }
+    { $$ = parseInt(yytext.replace(/^#/, ''), 8); }
   | HEXIDECIMAL_NUMBER
-    { $$ = parseInt(yytext.replace(/^#/, ''), 16); console.log("dbg:", "hexidecimal", $$); }
+    { $$ = parseInt(yytext.replace(/^#/, ''), 16); }
   ;
   
 symbol
   : IDENTIFIER
-    { $$ = yytext; console.log("dbg:", "ident", $$); }
+    { $$ = yytext; }
   ;
   
 %%
