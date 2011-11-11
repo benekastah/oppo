@@ -15,6 +15,7 @@
 
 "'"                                 { return 'QUOTE'; }
 "#("                                { return 'FUNCTION'; }
+"~("                                { return 'INFIX'; }
 
 \"[^\"]*\"\b                        { return 'STRING'; }    \\"
 [0-9]+("."[0-9]+)?\b                { return 'DECIMAL_NUMBER'; }
@@ -25,7 +26,7 @@
 "#t"\b                              { return 'BOOLEAN_TRUE'; }
 "#f"\b                              { return 'BOOLEAN_FALSE'; }
 
-[^\s]+\b                            { return 'IDENTIFIER'; }
+[^#\s]{1}[^\s]*\b                   { return 'IDENTIFIER'; }
 
 <<EOF>>                             { return 'EOF'; }
 .                                   { return 'INVALID'; }
@@ -37,7 +38,13 @@
 
 program
   : s_expression_list EOF
-    {{ return ['do', $s_expression_list]; }}
+    {{
+      if ($1.length > 1) {
+        return ["do", $1];
+      } else {
+        return $1[0];
+      }
+    }}
   ;
 
 s_expression_list
@@ -98,6 +105,8 @@ special_form
     { $$ = ["quote", $2]; }
   | FUNCTION element_list ')'
     { $$ = ["fn", $2]; }
+  | INFIX element_list ')'
+    { $$ = ["infix", $2]; }
   ;
 
 atom
@@ -111,7 +120,7 @@ atom
 
 literal
   : STRING
-    { $$ = yytext; }
+    { $$ = "\"" + yytext.substr(1, yytext.length-2).replace(/"/g, '\\"') + "\""; }
   | number
   ;
   

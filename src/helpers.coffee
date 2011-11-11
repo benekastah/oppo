@@ -1,6 +1,6 @@
 
-oppo.module "helpers", ->
-  self = {}
+oppo.module "compiler.helpers", ->
+  self = this
   
   self.thunk = do ->
     class Thunk
@@ -28,6 +28,15 @@ oppo.module "helpers", ->
         self.thunk.resolveMany item
     else x
 
+  self.identity = (x) -> x
+    
+  self.recursive_map = (ls, fn) ->
+    ls.map (item, i, ls) ->
+      if item instanceof Array
+        self.recursive_map item, fn
+      else
+        fn item, i, ls
+
   self.recursive_walk = (ls, fn) ->
     for item, i in ls
       if item instanceof Array
@@ -37,5 +46,24 @@ oppo.module "helpers", ->
     
       return result if result?
     null
+  
+  self.gensym = do ->
+    num = 0
+    (name) ->
+      "_#{name}_#{num++}"
+      
+  self.stringify =
+    to_js: (x) ->
+      if x instanceof Array
+        contents = x.map self.stringify.to_js
+        "[#{contents.join ', '}]"
+      else
+        "#{x}"
+    to_oppo: (x) ->
+      if x instanceof Array
+        contents = x.map self.stringify.to_oppo
+        "(#{contents.join ' '})"
+      else
+        "#{x}"
     
   self

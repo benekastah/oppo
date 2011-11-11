@@ -1,50 +1,53 @@
 
-oppo.module "compiler", ["lang.core", "lang.arithmetic"], ->
-  self = {}
-  
-  stringify = (x) ->
-    if x instanceof Array
-      contents = x.map stringify
-      "(#{contents.join ' '})"
-    else
-      "#{x}"
-  
-  self.compilers = []
-  self.greedy_compilers = []
-  
-  # Each module will register its own components through this function
-  self.register = (name, type, test, action) ->
-    self.compilers.push {name, type, test, action}
-    
-  self.register_greedy = (name, type, test, action) ->
-    self.greedy_compilers.push {name, type, test, action}
+oppo.module "compiler", ["module"], ({require_group}) ->
+  self = this
 
-  class self.CompileError extends Error
+  self.CompileError = class CompileError extends Error
     constructor: (@message) ->
     name: "CompileError"
-    type: "CompileError"
+  
+  group = null
+  get_group = -> group ?= require_group self.name
+   
+  self.globals = []
     
-  run_compiler = (program, first, compiler) ->
-    {name, test, action} = compiler
-    if test program, first
-      result = action program, self.compile
+  self.compile = compile = (s_expr, top_level) ->
+    self = get_group()
+    ret = if typeof s_expr is "string"
+      if /^".*"$/.test s_expr
+        self.core.string s_expr
+      else
+        self.core.identifier s_expr
+    else
+      [fn, args...] = s_expr
+      [first] = args
+      switch fn
+        when "string"
+          self.core.string first
+        when "identifier"
+          self.core.identifier first
+        when "do"
+          self.core.do args
+        when "quote"
+          self.core.quote first
+        when "defmacro"
+          self.macro.defmacro args
+        when "infix"
+          self.core.infix first
+        else
+          # It is an ordinary function call
+          self.core.funcall s_expr
     
-  self.compile = (program) ->
-    compiled = false
-    first = try program[0]
-    
-    if self.greedy_compilers.length
-      self.compilers.push.apply self.greedy_compilers
-      self.greedy_compilers = []
-    
-    console.log self.compilers
-    
-    # We have two classes of compilers.
-    for compiler in self.compilers
-      {name, test, action} = compiler
-      if test program, first
-        return action program, self.compile
-      
-    throw new self.CompileError "Unable to compile #{stringify program} because no compiler action recognized it."
+    if top_level
+      globals = if self.globals.length
+        "var #{self.globals.join ', '};\n"
+      else
+        ''
+      """
+      (function () {
+        #{globals}#{ret}
+      }).call(this);
+      """
+    else ret
     
   self

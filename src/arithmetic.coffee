@@ -1,6 +1,6 @@
 
-oppo.module "lang.arithmetic", ["compiler"], (compiler) ->
-  self = {}
+oppo.module "x_compiler.arithmetic", ["compiler"], (compiler) ->
+  self = this
   
   arithmetic_row = (nums, base, operation) ->
     ret = ''

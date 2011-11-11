@@ -1,0 +1,121 @@
+;;  Notes
+;;  This document attempts to understand the transformation that should take
+;;  place for code to be translated from direct style to continutation-passing
+;;  style. Let sys.out represent the system-generated return function that
+;;  delivers a response from the program as a whole. If function is looking for
+;;  a continuation it first finds the code that needs to be executed next. Once
+;;  that runs out, it then looks for a _return function in its scope. Failing
+;;  that, it will use sys.out. sys.out will gather values for the duration of
+;;  the program and return the last one (although in theory I believe it will)
+;;  only ever get one value.
+;;
+;;  Following are some example transformations.
+
+;;  Direct style
+
+(defn circumference (r)
+  (* math.pi (** r 2)))
+  
+(let (r 2)
+  (circumference r))
+
+;;  Continuation-passing style
+
+(defn circumference (r _return)
+  (** r 2 (fn (r2) (* math.pi r2 _return))))
+    
+(let (r 2)
+  (circumference r sys.out))
+  
+  
+  
+;;  Direct
+
+(let (c1 (circumference 3)
+      c2 (circumference 4))
+  (+ c1 c2))
+  
+;;  Continuation
+
+(call lambda ()
+  (circumference 3 (fn (c1)
+    (circumference 4 (fn (c2)
+      (+ c1 c2 sys.out))))))
+      
+      
+;;  Attempt to describe the transformation
+;;
+;;  Let the term "complex" refer to items that require transformation
+;;  Complex items include:
+;;    Function/macro definitions - explicitly return result in continuation
+;;    Function/macro calls - find appropriate continuation and pass it in
+;;    thunks
+;;
+;;  For a function/macro call:
+;;  (+ a b)
+;;  ->
+;;  (+ continuation a b)
+;;
+;;  For a function definition:
+;;  (defn +++ (a b c)
+;;    (+ a b c))
+;;  ->
+;;  (defn +++ (k a b c)
+;;    (k (+ a b c)))
+;;
+;;  So, when compiling an item of code to continuation style, we need to have:
+;;  1. The item of code itself
+;;  2. The item's parent expression
+;;  3. The index of the item in its parent expression
+;;
+;;  With this information, we can do the following for each item:
+;;    If item is complex:
+;;      If item has parent and item isn't last:
+;;        Replace parent with code that evaluates the item with a continuation
+;;          that evaluates the parent, replacing the item with its computed
+;;          value.
+;;      Else if _return:
+;;        Evaluate the item with _return as the continuation.
+;;      Else:
+;;        Evaluate the item with sys.out as the continuation.
+;;    Else:
+;;      Return item unchanged.
+
+
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn a (b c)
+  (+ b c))
+  
+(a (+ 1 2) 3)
+
+;; ->
+
+(defn + (k & args)
+  (thunk.resolve-many args (fn (args)
+    (js-add args k))))
+
+(defn a (k b c)
+  (+ k b c))
+  
+(a sys.out (thunk + 1 2) 3)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+
+
+
+
+
+
+
+
+
+
