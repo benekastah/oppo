@@ -1,3 +1,5 @@
+global ?= window
+oppo_global = Object.create global
 oppo = {}
 
 oppo.module = do ->
@@ -15,6 +17,7 @@ oppo.module = do ->
   
   _module_list = {}
   _requiring = {}
+  _requiring_submodules = {}
   
   _module_list_traverse = (name, eachback) ->
     namespace = name.split '.'
@@ -28,7 +31,12 @@ oppo.module = do ->
     scope = _module_list
     _module_list_traverse name, (item, i, last, ns) ->
       scope = if i is last
-        scope[item] = value
+        cur_value = scope[item]
+        scope[item] = if cur_value
+          cur_value[prop] = val for own prop, val of value
+          cur_value
+        else
+          value
       else
         (scope[item] ?= {}).submodules ?= {}
         
@@ -45,7 +53,7 @@ oppo.module = do ->
         
     scope
   
-  _module = (name, deps, fn) ->
+  _module = (name, deps=[], fn) ->
     mod = _module_get name
     if mod?.fn?
       console.warn "Redefining module #{name}"
@@ -61,10 +69,16 @@ oppo.module = do ->
     _module_set name, {deps, fn}
     _module
   
-  _module.require = _require = (name, force) ->
+  _require_one = (name, force) ->
     mod = _module_get name
     if not mod? then throw new ModuleNotFound name
     {fn, deps} = mod
+    
+    if not fn
+      console.warn "Module #{name} is not defined."
+      return
+    if not deps then deps = []
+    
     if force then mod.cache = null
     if mod.cache?
       return mod.cache
@@ -74,29 +88,34 @@ oppo.module = do ->
     args = for dep in deps
       throw new CircularDependency name, dep if _requiring[dep]
       _require dep
-  
-    context = { name: name }
+    
+    # Make our context
+    context = Object.create oppo_global
+    context.name = name
+    
     mod.cache = fn.apply context, args
     _requiring[name] = no
     
     mod.cache
     
-  _module.require_group = _require_group = (name, recursive, force) ->
+  _module.require = _require = (name, force) ->
     {submodules} = _module_get name
-    modules = _require name
-    if submodules
+    modules = _require_one name
+    
+    if submodules and not _requiring_submodules[name]
+      _requiring_submodules[name] = true
       for own item of submodules
         new_name = "#{name}.#{item}"
-        modules[item] = if recursive
-          _require_group new_name, recursive, force
-        else
-          _require new_name, force
+        modules[item] = _require new_name, force
+      _requiring_submodules[name] = false
 
     modules
     
   _module.load = _load = (name) -> _require name, yes
-  _module.load_group =  (name, r) -> _require_group name, r, yes
   
   _module "module", -> _module
+  _module "require", -> _module.require
+  _module "load", -> _module.load
+  _module "global", -> oppo_global
   
   _module

@@ -2,6 +2,8 @@
 
 process.chdir __dirname
 exec = (require 'child_process').exec
+try oppo = require "#{__dirname}/dist/oppo"
+fs = require 'fs'
 
 post_exec = (success, error) ->
   (err, stdout, stderr) ->
@@ -13,27 +15,53 @@ post_exec = (success, error) ->
 option '-o', '--output [DIR]', 'where the parser.js file should live'
 
 task "build:parser", "rebuild the Jison parser", (options) ->
-  dir = options.output or "dist"
+  dir = options.output ? "dist"
   exec "jison src/grammar.jison -o #{dir}/parser.js", post_exec()
     
+# task "build:runtime", "build the Oppo runtime"
+    
 task "build", "build the Oppo runtime into a single output file", (options) ->
-  dir = "dist"
+  dir = options.output ? "dist"
   jdir = "src"
   scripts = [
     # module must come first
     "module"
-    # don't worry about order here...
-    "macro"
-    # "type-checker"
-    "compiler"
-    "helpers"
-    "core"
-    "arithmetic"
-    # oppo must come last
-    "oppo"
+    # compiler stuff
+    "compiler/compiler"
+    "compiler/helpers"
+    "compiler/core"
+    "compiler/function"
+    "compiler/macro"
+    "compiler/arithmetic"
+    # runtime stuff
+    "oppo/core"
+    "oppo/list"
+    "oppo/string"
+    # oppo must come after all the compiler stuff
+    "oppo.coffee"
   ].map (x) -> "#{jdir}/#{x}"
   
-  options.output = dir
-  
-  exec "coffee -cj #{dir}/oppo.js #{scripts.join ' '}", post_exec()
   invoke 'build:parser'
+  command = "coffee -cj #{dir}/oppo.js #{scripts.join ' '}"
+  console.log command
+  exec command, post_exec
+  
+task "compile", "compile oppo file(s)", (options) ->
+  {output} = options
+  [__, files...] = options.arguments
+  output ?= process.cwd()
+  
+  oppo = 
+  
+  for file in files
+    if not /\.oppo$/.test file
+      file = "#{file}.oppo"
+    jsfile = file.replace /\.oppo$/, '.js'
+    jsfile = "#{output}/#{jsfile}"
+    
+    fs.readFile file, 'utf8', (err, code) ->
+      console.log code
+      fs.writeFile jsfile, oppo.eval code
+      console.log "hasdf"
+    
+    

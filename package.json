@@ -1,7 +1,7 @@
 {
-    "name": "opposcheme"
+    "name": "oppo"
   , "version": "0.0.1"
   , "dependencies": {
-      "hashtable": ">= 0.0.4"
+      "underscore": "> 1.0.0"
   }
 }

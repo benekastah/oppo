@@ -3,7 +3,7 @@
 %lex
 %%
 
-";".*                           { /* comment */ }
+";".*                               { /* comment */ }
 [\s,]+                              { /* ignore */ }
 
 "("                                 { return '('; }
@@ -14,19 +14,22 @@
 "}"                                 { return 'HASH_MAP_END'; }
 
 "'"                                 { return 'QUOTE'; }
+"`"                                 { return 'SYNTAX_QUOTE'; }
 "#("                                { return 'FUNCTION'; }
 "~("                                { return 'INFIX'; }
+"..."                               { return 'SPLAT'; }
+":"                                 { return ':'; }
 
-\"[^\"]*\"\b                        { return 'STRING'; }    \\"
-[0-9]+("."[0-9]+)?\b                { return 'DECIMAL_NUMBER'; }
-"#0"[0-9]+\b                        { return 'OCTAL_NUMBER'; }
-"#0x"[0-9]+\b                       { return 'HEXIDECIMAL_NUMBER'}
+\"[^\"]*\"                          { return 'STRING'; }    //"
+[+-]?[0-9]+("."[0-9]+)?\b           { return 'DECIMAL_NUMBER'; }
+[+-]?"#0"[0-9]+\b                   { return 'OCTAL_NUMBER'; }
+[+-]?"#0x"[0-9]+\b                  { return 'HEXIDECIMAL_NUMBER'}
 
 "nil"\b                             { return 'NIL'; }
 "#t"\b                              { return 'BOOLEAN_TRUE'; }
 "#f"\b                              { return 'BOOLEAN_FALSE'; }
 
-[^#\s]{1}[^\s]*\b                   { return 'IDENTIFIER'; }
+.+?(?=[)}\]\s]+)                    { return 'IDENTIFIER'; }
 
 <<EOF>>                             { return 'EOF'; }
 .                                   { return 'INVALID'; }
@@ -36,15 +39,11 @@
 %start program
 %%
 
+//[^#:\s]{1}[!@#\$%\^&\*\-\+=\|\\:'"\/\?\.,<>\w]*   { return 'IDENTIFIER'; } //'
+
 program
   : s_expression_list EOF
-    {{
-      if ($1.length > 1) {
-        return ["do", $1];
-      } else {
-        return $1[0];
-      }
-    }}
+    { return ["program"].concat($1); }
   ;
 
 s_expression_list
@@ -58,6 +57,7 @@ s_expression
   : special_form
   | list
   | symbol
+  | splat
   | literal
   | atom
   ;
@@ -99,12 +99,19 @@ element_list
 element
   : s_expression
   ;
+  
+splat
+  : SPLAT symbol
+    { $$ = ["splat", $2]; }
+  ;
 
 special_form
   : QUOTE s_expression
     { $$ = ["quote", $2]; }
+  | SYNTAX_QUOTE s_expression
+    { $$ = ["syntax-quote", $2]; }
   | FUNCTION element_list ')'
-    { $$ = ["fn", $2]; }
+    { $$ = ["lambda", [], $2]; }
   | INFIX element_list ')'
     { $$ = ["infix", $2]; }
   ;
@@ -136,6 +143,8 @@ number
 symbol
   : IDENTIFIER
     { $$ = yytext; }
+  | ':' IDENTIFIER
+    { $$ = ["keyword", $2]}
   ;
   
 %%

@@ -1,9 +1,10 @@
 (function() {
   oppo.module("test", ["oppo"], function(oppo) {
-    var ast;
-    ast = oppo.read('\n(defmacro a (a) a)\n(a b)\n');
+    var ast, evald;
+    ast = oppo.read('(def a \'(1 2 3 4 5 6 7 8 9))\n(nth a -4)');
     console.log(ast);
-    return console.log(oppo.eval_program(ast));
+    evald = oppo.eval(ast);
+    return console.log(evald);
   });
   oppo.module.require("test");
 }).call(this);

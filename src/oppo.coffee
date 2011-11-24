@@ -1,28 +1,21 @@
-global ?= window
-exports ?= global.oppo = oppo
+global.oppo = oppo
+
 
 # Wrap the parser in a module
 oppo.module "parser", -> parser ?= require './parser'
 
 oppo.module "oppo", ["parser", "compiler"], (parser, compiler) ->
-  self = this
+  oppo.compile = compiler.compile.bind compiler
   
-  self.eval = (input) ->
-    program = if typeof input is "string"
-      self.read input
-    else
-      input
-    eval compiler.compile program
-    
-  self.eval_program = (input) ->
-    compiler.compile input, true
+  oppo.eval = (oppo_data) ->
+    js = oppo.compile oppo_data
+    eval js
   
-  self.read = (txt) ->
-    parser.parse txt
+  oppo.read = (oppo_txt) ->
+    parser.parse oppo_txt
   
-  exports.eval = self.eval
-  exports.read = self.read
+  oppo
   
-  self
-  
-oppo.module.require "oppo"
+result = oppo.module.require "oppo"
+if module?.exports?
+  module.exports = result

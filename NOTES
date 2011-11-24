@@ -1,5 +1,0 @@
-
-Each oppo command should compile down to pure JS. Inside JS functions compiled
-from oppo, `this` refers to the runtime. Therefore, `this` should never
-change. There should be full runtime access to the compiler, as well as full
-compiler access to the runtime.
