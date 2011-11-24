@@ -71,6 +71,10 @@ oppo.module "oppo.core", [
   
   ## Stuff from Underscore.js
   do ->
+    if not _ and _.noConflict then return
+    
+    global.underscore = _.noConflict()
+    
     dasherize = string.dasherize
     
     _list_proxy = (fn) ->
