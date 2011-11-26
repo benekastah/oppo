@@ -2,8 +2,7 @@
 oppo.module "test", ["oppo"], (oppo) ->
 
   ast = oppo.read '''
-  (def a '(1 2 3 4 5 6 7 8 9))
-  (nth a -4)
+  (first '(1 2 3 4))
   '''
 
   console.log ast

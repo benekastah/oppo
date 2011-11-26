@@ -26,18 +26,11 @@ task "build", "build the Oppo runtime into a single output file", (options) ->
   scripts = [
     # module must come first
     "module"
-    # compiler stuff
-    "compiler/compiler"
-    "compiler/helpers"
-    "compiler/core"
-    "compiler/function"
-    "compiler/macro"
-    "compiler/arithmetic"
-    # runtime stuff
-    "oppo/core"
-    "oppo/list"
-    "oppo/string"
-    # oppo must come after all the compiler stuff
+    # compiler stuff - everything in the compiler folder
+    "compiler"
+    # runtime stuff - everything in the oppo folder
+    "oppo"
+    # oppo must come last
     "oppo.coffee"
   ].map (x) -> "#{jdir}/#{x}"
   

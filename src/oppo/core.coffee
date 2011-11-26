@@ -3,9 +3,10 @@ oppo.module "oppo.core", [
   "oppo"
   "oppo.list"
   "oppo.string"
+  "oppo.math"
   "global"
   "compiler"
-], (oppo, list, string, global, {compile}) ->
+], (oppo, list, string, math, global, {compile}) ->
   self = this
   
   global_method_set = (nm, fn) ->
@@ -57,6 +58,7 @@ oppo.module "oppo.core", [
       keywords[word] ?= new Keyword word
   
   ## Lists
+  global_method_set "list", list.list
   global_method_set "typed-list", list.typed_list
   global_method_set "hash-map", list.hash_map
   global_method_set "concat", list.concat
@@ -67,13 +69,23 @@ oppo.module "oppo.core", [
   global_method_set "uppercase", string.uppercase
   global_method_set "lowercase", string.lowercase
   
+  ## Math
+  global_method_set "+", math['+']
+  global_method_set "-", math['-']
+  global_method_set "*", math['*']
+  global_method_set "**", math['**']
+  global_method_set "/", math['/']
+  global_method_set "%", math['%']
   
   
   ## Stuff from Underscore.js
-  do ->
-    if not _ and _.noConflict then return
+  do (_) ->
+    _ ?= try require 'underscore'
+    if not _? and _.noConflict
+      throw new Error "Underscore dependency not fulfilled."
     
-    global.underscore = _.noConflict()
+    oppo.module "underscore", -> _
+    _ = oppo.module.require "underscore"
     
     dasherize = string.dasherize
     
@@ -88,35 +100,96 @@ oppo.module "oppo.core", [
         #   result = result.join ''
         result
       
+    ## Set forth the underscore methods.
+    ## Methods on the same line are aliases to the same function.
+    ## Entries that are commented out are entries that exist in underscore,
+    ## but we're modifying the name, functionality or are leaving out.
     methods =
       collections: [
-        "each", "map", "reduce", "reduceRight", "find", "filter", "all",
-        "any", "include", "invoke", "pluck", "max", "min", "sortBy", "groupBy",
-        "sortedIndex", "shuffle", "toArray", "size"
+        "each", # "forEach"
+        "map"
+        # "reduce", "inject", "foldl",
+        # "reduceRight", "foldr"
+        "find", "detect"
+        "filter", "select"
+        "all", "every"
+        "any", "some"
+        "include", "contains"
+        "invoke"
+        "pluck"
+        # "max"
+        # "min"
+        "sortBy"
+        "groupBy"
+        "sortedIndex"
+        "shuffle"
+        "toArray"
+        "size"
       ]
       arrays: [
-        "first", "initial", "last", "rest", "compact", "flatten", "without",
-        "union", "intersection", "difference", "uniq", "zip", "indexOf", "lastIndexOf",
+        "first", "head"
+        "initial"
+        "last"
+        "rest", "tail"
+        "compact"
+        "flatten"
+        "without"
+        "union"
+        "intersection"
+        "difference"
+        "uniq", "unique"
+        "zip"
+        # "indexOf"
+        # "lastIndexOf"
         # "range"
       ]
       functions: [
-        # "bind", "bindAll",
-        "memoize", "delay", "defer", "throttle", "debounce", "once",
-        "after", "wrap", "compose"
+        # "bind"
+        # "bindAll"
+        "memoize"
+        "delay"
+        "defer"
+        "throttle"
+        "debounce"
+        "once"
+        "after"
+        "wrap"
+        "compose"
       ]
       objects: [
-        "keys", "values", "functions", "extend", "defaults", "clone", "tap", "isEqual",
-        "isEmpty", "isElement", "isArray", "isArguments", "isFunction", "isString",
-        "isNumber", "isBoolean", "isDate",
-        # "isRegExp", "isNaN", "isNull", 
+        "keys"
+        "values"
+        "functions", "methods"
+        "extend"
+        "defaults"
+        "clone"
+        "tap"
+        "isEqual"
+        "isEmpty"
+        "isElement"
+        "isArray"
+        "isArguments"
+        "isFunction"
+        "isString"
+        "isNumber"
+        "isBoolean"
+        "isDate"
+        # "isRegExp"
+        # "isNaN"
+        # "isNull"
         "isUndefined"
       ]
       utility: [
-        # "noConflict", 
-        "identity", "times", "mixin", "uniqueId", "escape", "template"
+        # "noConflict"
+        "identity"
+        "times"
+        "mixin"
+        # "uniqueId"
+        "escape"
+        "template"
       ]
       chaining: [
-        "chain",
+        # "chain"
         # "value"
       ]
       
@@ -124,10 +197,21 @@ oppo.module "oppo.core", [
       global_method_set (dasherize method), _list_proxy _[method]
     for method in methods.functions.concat methods.objects, methods.utility, methods.chaining
       global_method_set (dasherize method), _[method]
+    
     global_method_set "is-nil", _.isNull
-    global_method_set "is-non-number", _.isNaN
+    global_method_set "is-nan", _.isNaN
     global_method_set "curry", (fn, args...) -> _.bind fn, null, args
     global_method_set "is-regexp", _.isRegExp
-  
+    global_method_set "unique-id", _.uniqueId
+    
+    global_method_set "reduce", ([start, ls...], fn) -> _.reduce ls, fn, start
+    global_method_set "inject", global.reduce
+    global_method_set "foldl", global.reduce
+    global_method_set "reduce-right", ([start, ls...], fn) -> _.reduceRight ls, fn, start
+    global_method_set "foldr", global['reduce-right']
+    
+    global_method_set "index", _.indexOf
+    global_method_set "last-index", _.lastIndexOf
+    
   self
   

@@ -99,7 +99,7 @@ oppo.module = do ->
     mod.cache
     
   _module.require = _require = (name, force) ->
-    {submodules} = _module_get name
+    {submodules} = (_module_get name) ? {}
     modules = _require_one name
     
     if submodules and not _requiring_submodules[name]
