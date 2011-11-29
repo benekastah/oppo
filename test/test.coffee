@@ -1,8 +1,40 @@
 
 oppo.module "test", ["oppo"], (oppo) ->
 
+  # ast = oppo.read '''
+  # (defn Y (le)
+  #   (call
+  #     (lambda (f) (f f))
+  #     (lambda (f) (le
+  #       (lambda (x) (call (f f) x))))))
+  # 
+  # (defn fact (n)
+  #   (if ~(n <= 2)
+  #     n
+  #     ~(n * (fact ~(n - 1)))))
+  #     
+  # (def y-fact
+  #   (Y (lambda (fact)
+  #     (lambda (n)
+  #       (if ~(n <= 2)
+  #         n
+  #         ~(n * (fact ~(n - 1))))))))
+  #     
+  # (fact 5)
+  # (y-fact 5)
+  # '''
+  
   ast = oppo.read '''
-  (first '(1 2 3 4))
+  
+  (defn fact (n)
+    (if ~(n <= 2)
+      n
+      ~(n * (fact ~(n - 1)))))
+
+  (fact 5)
+  
+  (print (macroexpand-1 `(defn a () (+ 1 1))))
+
   '''
 
   console.log ast

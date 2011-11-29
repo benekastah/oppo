@@ -10,8 +10,9 @@
 ")"                                 { return ')'; }
 "["                                 { return '['; }
 "]"                                 { return ']'; }
-"{"                                 { return 'HASH_MAP_START'; }
-"}"                                 { return 'HASH_MAP_END'; }
+"#{"                                { return 'HASH_MAP_START'; }
+"{"                                 { return 'JS_MAP_START'; }
+"}"                                 { return 'MAP_END'; }
 
 "'"                                 { return 'QUOTE'; }
 "`"                                 { return 'SYNTAX_QUOTE'; }
@@ -29,7 +30,8 @@
 "#t"\b                              { return 'BOOLEAN_TRUE'; }
 "#f"\b                              { return 'BOOLEAN_FALSE'; }
 
-.+?(?=[)}\]\s]+)                    { return 'IDENTIFIER'; }
+"@"                                 { return '@'; }
+.+?(?=[)}\]\s]+)                 { return 'IDENTIFIER'; }
 
 <<EOF>>                             { return 'EOF'; }
 .                                   { return 'INVALID'; }
@@ -38,8 +40,6 @@
 
 %start program
 %%
-
-//[^#:\s]{1}[!@#\$%\^&\*\-\+=\|\\:'"\/\?\.,<>\w]*   { return 'IDENTIFIER'; } //'
 
 program
   : s_expression_list EOF
@@ -56,6 +56,7 @@ s_expression_list
 s_expression
   : special_form
   | list
+  | js_map
   | symbol
   | splat
   | literal
@@ -77,16 +78,23 @@ callable_list
 
 typed_list
   : '[' element_list ']'
-    { $$ = ["typed-list", $2]; }
+    { $$ = ["typed-list"].concat($2); }
   | '[' ']'
-    { $$ = ["typed-list", []]; }
+    { $$ = ["typed-list"]; }
   ;
   
 hash_map
-  : HASH_MAP_START element_list HASH_MAP_END
-    { $$ = ["hash-map", $2]; }
-  | HASH_MAP_START HASH_MAP_END
-    { $$ = ["hash-map", []]; }
+  : HASH_MAP_START element_list MAP_END
+    { $$ = ["hash-map"].concat($2); }
+  | HASH_MAP_START MAP_END
+    { $$ = ["hash-map"]; }
+  ;
+  
+js_map
+  : JS_MAP_START element_list MAP_END
+    { $$ = ["js-map"].concat($2); }
+  | JS_MAP_START MAP_END
+    {$$ = ["js-map"]}
   ;
 
 element_list
@@ -145,6 +153,8 @@ symbol
     { $$ = yytext; }
   | ':' IDENTIFIER
     { $$ = ["keyword", $2]}
+  | '@' IDENTIFIER
+    { $$ = [".", "self", $2]; }
   ;
   
 %%

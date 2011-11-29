@@ -8,30 +8,12 @@ oppo.module "compiler.core", ["compiler", "compiler.helpers"], ({compile}, helpe
       ident = if ident is keyword then "_#{ident}_" else ident
     
     # Sanitize special characters
-    ident = ident
-    .replace(/\./g, "_dot_")
-    .replace(/\-/g, "_")
-    .replace(/\+/g, "_plus_")
-    .replace(/\*/g, "_star_")
-    .replace(/\=/g, "_eq_")
-    .replace(/</g, "_lt_")
-    .replace(/>/g, "_gt_")
-    .replace(/%/g, "_percent_")
-    .replace(/#/g, "_pound_")
-    .replace(/\^/g, "_carat_")
-    .replace(/'/g, "_squote_")
-    .replace(/"/g, "_dquote_")
-    .replace(/&/g, "_amp_")
-    .replace(/\|/g, "_pipe_")
-    .replace(/@/g, "_at_")
-    .replace(/!/g, "_exclmark_")
-    .replace(/\?/g, "_qmark_")
-    .replace(/,/g, "_comma_")
-    .replace(/\//g, "_fslash_")
-    .replace(/\\/g, "_bslash_")
-    .replace(/~/g, "_tilde_")
-    .replace(/`/g, "_backtick_")
-    .replace(/:/g, "_colon_")
+    # Simply convert dashes to underscores (unless ident could potentially be a single dash)
+    if ident.length > 1
+      ident = ident.replace /\-/g, '_'
+    for own _char, replaced of helpers.js_illegal_identifiers
+      while (ident.indexOf _char) >= 0
+        ident = ident.replace _char, "_#{replaced}_"
     
     ident
   
@@ -47,13 +29,13 @@ oppo.module "compiler.core", ["compiler", "compiler.helpers"], ({compile}, helpe
       name = helpers.gensym "anonymous"
       args.push ["set!", "self", args.pop()]
       program = [
-        ["module", name, base_deps, args...],
+        ["module", name, base_deps, ["js-eval", "self = global"], args...],
         [[".", "oppo", "module", "require"], "\"#{name}\""]
       ].map (item) -> compile item
       "#{program.join ",\n"};"
   
-  self.do = (body) ->
-    compile [["lambda", [], body...]]
+  # self.do = (body) ->
+  #   compile [["lambda", [], body...]]
       
   self.quote = (code) ->
     if code instanceof Array
@@ -62,9 +44,9 @@ oppo.module "compiler.core", ["compiler", "compiler.helpers"], ({compile}, helpe
     
   self.if = (cond, t_action, f_action) ->
     """
-    #{compile cond} ?
-      #{compile t_action} :
-      #{compile f_action or null}
+    /* if */ #{compile ["->bool", cond]} ?
+      /* then */ #{compile t_action} :
+      /* else */ #{compile f_action ? null}
     """
     
   # Working with variables
@@ -105,25 +87,25 @@ oppo.module "compiler.core", ["compiler", "compiler.helpers"], ({compile}, helpe
       compile [["lambda", [], vars..., body...]]
     
   # Module functions
-  self.def = (ident, val) ->
+  self.defm = (ident, val) ->
     err = compile ["def-error", "\"#{ident}\""]
-    ident = if ident is "self" then ident else compile [".", "self", ident]
+    ident = if ident is "self" then ident else "self['#{compile ident}']"
     val = compile val
     helpers.def ident, val, err
     
-  self.set = (ident, val) ->
+  self.setm = (ident, val) ->
     err = compile ["set-error", "\"#{ident}\""]
-    ident = if ident is "self" then ident else compile [".", "self", ident]
+    ident = if ident is "self" then ident else "self['#{compile ident}']"
     val = compile val
     helpers.set ident, val, err
     
-  self.defp = (ident, val) ->
+  self.def = (ident, val) ->
     err = compile ["def-error", "\"#{ident}\""]
     ident = compile [".", "_private", ident]
     val = compile val
     helpers.set ident, val, err
     
-  self.setp = (ident, val) ->
+  self.set = (ident, val) ->
     err = compile ["set-error", "\"#{ident}\""]
     ident = compile [".", "_private", ident]
     val = compile val
@@ -133,7 +115,8 @@ oppo.module "compiler.core", ["compiler", "compiler.helpers"], ({compile}, helpe
     name = "\"#{name}\""
     
     vars = [
-      new helpers.Var "_private", "{}"
+      new helpers.Var "self", "this"
+      new helpers.Var "_private", "Object.create(global)"
     ]
     
     body = body.map (item) -> compile item
@@ -141,32 +124,26 @@ oppo.module "compiler.core", ["compiler", "compiler.helpers"], ({compile}, helpe
     fn = """
     (function (#{deps.join ', '}) {
       #{vars.join '\n  '}
-      this.self = this;
-      with (this) {
+      with (_private) {
         #{body.join ',\n  '};
       }
       return this.self;
     })
     """
     
-    
     deps = helpers.stringify.to_js deps.map (dep) -> "\"#{dep}\""
-    "oppo.module(#{name}, #{deps}, #{fn})"
+    "(oppo || require('oppo')).module(#{name}, #{deps}, #{fn})"
     
   # javascript interop helpers
   self.member_access = (items...) ->
     items = items.map (item) ->
-      compile if typeof item is "string" and /^".*"$/.test item
+      item = if helpers.is_string item
         helpers.trim_quotes item
       else
         item
+      compile item
     base = items.shift()
     
-    # Only supporting simple mode at the moment
-    simple = true
-    if simple
-      "#{base}.#{items.join '.'}"
-    else
-      "#{base}[\"#{items.join '"]["'}\"]"
+    "#{base}.#{items.join '.'}"
     
   self

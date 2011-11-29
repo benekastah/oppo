@@ -2,15 +2,15 @@
 
 process.chdir __dirname
 exec = (require 'child_process').exec
-try oppo = require "#{__dirname}/dist/oppo"
+# try oppo = require "#{__dirname}/dist/oppo"
 fs = require 'fs'
 
 post_exec = (success, error) ->
   (err, stdout, stderr) ->
     console.log stdout if stdout.trim()
     console.error stderr if stderr.trim()
-    if err and error then error err
-    else if success then success stdout
+    if err? and error? then error err
+    else if success? then success stdout
 
 option '-o', '--output [DIR]', 'where the parser.js file should live'
 
@@ -37,24 +37,6 @@ task "build", "build the Oppo runtime into a single output file", (options) ->
   invoke 'build:parser'
   command = "coffee -cj #{dir}/oppo.js #{scripts.join ' '}"
   console.log command
-  exec command, post_exec
-  
-task "compile", "compile oppo file(s)", (options) ->
-  {output} = options
-  [__, files...] = options.arguments
-  output ?= process.cwd()
-  
-  oppo = 
-  
-  for file in files
-    if not /\.oppo$/.test file
-      file = "#{file}.oppo"
-    jsfile = file.replace /\.oppo$/, '.js'
-    jsfile = "#{output}/#{jsfile}"
-    
-    fs.readFile file, 'utf8', (err, code) ->
-      console.log code
-      fs.writeFile jsfile, oppo.eval code
-      console.log "hasdf"
+  exec command, post_exec()
     
     

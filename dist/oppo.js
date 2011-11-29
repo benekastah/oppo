@@ -8,10 +8,33 @@
     child.__super__ = parent.prototype;
     return child;
   }, __slice = Array.prototype.slice;
+  if (typeof _ === "undefined" || _ === null) {
+    _ = typeof require === "function" ? require("underscore") : void 0;
+  }
+  if (!(typeof _ !== "undefined" && _ !== null)) {
+    throw new Error("Unmet dependency: underscore.js");
+  }
+  _.mixin({
+    create: (function() {
+      var _create, _ref;
+      _create = (_ref = Object.create) != null ? _ref : function(o) {
+        var noop;
+        noop = function() {};
+        noop.prototype = o;
+        return new noop;
+      };
+      return function(o) {
+        if (o == null) {
+          o = null;
+        }
+        return _create(o);
+      };
+    })()
+  });
   if (typeof global === "undefined" || global === null) {
     global = window;
   }
-  oppo_global = Object.create(global);
+  oppo_global = _.create(global);
   oppo = {};
   oppo.module = (function() {
     var CircularDependency, ModuleNotFound, _load, _module, _module_get, _module_list, _module_list_traverse, _module_set, _require, _require_one, _requiring, _requiring_submodules;
@@ -71,19 +94,11 @@
       var scope;
       scope = _module_list;
       _module_list_traverse(name, function(item, i, last, ns) {
+        var _ref;
         if (!(scope != null)) {
           return false;
         }
-        return scope = (function() {
-          var _ref;
-          if (i === last) {
-            return scope = scope[item];
-          } else {
-            try {
-              return (_ref = scope[item]) != null ? _ref.submodules : void 0;
-            } catch (_e) {}
-          }
-        })();
+        return scope = i === last ? scope[item] : scope != null ? (_ref = scope[item]) != null ? _ref.submodules : void 0 : void 0;
       });
       return scope;
     };
@@ -125,6 +140,9 @@
       if (!deps) {
         deps = [];
       }
+      if (_requiring[name]) {
+        throw new Error("Already requiring " + name);
+      }
       if (force) {
         mod.cache = null;
       }
@@ -144,7 +162,7 @@
         }
         return _results;
       })();
-      context = Object.create(oppo_global);
+      context = _.create(oppo_global);
       context.name = name;
       mod.cache = fn.apply(context, args);
       _requiring[name] = false;
@@ -179,6 +197,9 @@
     });
     _module("global", function() {
       return oppo_global;
+    });
+    _module("underscore", function() {
+      return _;
     });
     return _module;
   })();
@@ -287,8 +308,6 @@
           switch (fn) {
             case "program":
               return self.core.program(first, args);
-            case "do":
-              return self.core["do"](args);
             case "module":
               return (_ref = self.core).module.apply(_ref, args);
             case "quote":
@@ -297,8 +316,8 @@
               return self.macro.syntax_quote(first);
             case "defmacro":
               return (_ref2 = self.macro).defmacro.apply(_ref2, args);
-            case "eval":
-              return compile(["oppo.eval"].concat(__slice.call(args)));
+            case "macroexpand-1":
+              return self.macro.macroexpand_1(self.compile(first));
             case "if":
               return (_ref3 = self.core)["if"].apply(_ref3, args);
             case "def":
@@ -311,8 +330,6 @@
               return (_ref7 = self.core).setg.apply(_ref7, args);
             case "let":
               return self.core["let"](args);
-            case "keyword":
-              return self.types.keyword(first);
             case ".":
               return (_ref8 = self.core).member_access.apply(_ref8, args);
             case "js-eval":
@@ -341,13 +358,23 @@
     compile = _arg.compile;
     self = this;
     self.identifier = function(ident) {
-      var keyword, _i, _len, _ref;
+      var keyword, replaced, _char, _i, _len, _ref, _ref2;
       _ref = helpers.js_keywords;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         keyword = _ref[_i];
         ident = ident === keyword ? "_" + ident + "_" : ident;
       }
-      ident = ident.replace(/\./g, "_dot_").replace(/\-/g, "_").replace(/\+/g, "_plus_").replace(/\*/g, "_star_").replace(/\=/g, "_eq_").replace(/</g, "_lt_").replace(/>/g, "_gt_").replace(/%/g, "_percent_").replace(/#/g, "_pound_").replace(/\^/g, "_carat_").replace(/'/g, "_squote_").replace(/"/g, "_dquote_").replace(/&/g, "_amp_").replace(/\|/g, "_pipe_").replace(/@/g, "_at_").replace(/!/g, "_exclmark_").replace(/\?/g, "_qmark_").replace(/,/g, "_comma_").replace(/\//g, "_fslash_").replace(/\\/g, "_bslash_").replace(/~/g, "_tilde_").replace(/`/g, "_backtick_").replace(/:/g, "_colon_");
+      if (ident.length > 1) {
+        ident = ident.replace(/\-/g, '_');
+      }
+      _ref2 = helpers.js_illegal_identifiers;
+      for (_char in _ref2) {
+        if (!__hasProp.call(_ref2, _char)) continue;
+        replaced = _ref2[_char];
+        while ((ident.indexOf(_char)) >= 0) {
+          ident = ident.replace(_char, "_" + replaced + "_");
+        }
+      }
       return ident;
     };
     self.string = helpers.identity;
@@ -363,14 +390,11 @@
       } else {
         name = helpers.gensym("anonymous");
         args.push(["set!", "self", args.pop()]);
-        program = [["module", name, base_deps].concat(__slice.call(args)), [[".", "oppo", "module", "require"], "\"" + name + "\""]].map(function(item) {
+        program = [["module", name, base_deps, ["js-eval", "self = global"]].concat(__slice.call(args)), [[".", "oppo", "module", "require"], "\"" + name + "\""]].map(function(item) {
           return compile(item);
         });
         return "" + (program.join(",\n")) + ";";
       }
-    };
-    self["do"] = function(body) {
-      return compile([["lambda", []].concat(__slice.call(body))]);
     };
     self.quote = function(code) {
       if (code instanceof Array) {
@@ -381,7 +405,7 @@
       return helpers.stringify.to_js(code);
     };
     self["if"] = function(cond, t_action, f_action) {
-      return "" + (compile(cond)) + " ?\n  " + (compile(t_action)) + " :\n  " + (compile(f_action || null));
+      return "/* if */ " + (compile(["->bool", cond])) + " ?\n  /* then */ " + (compile(t_action)) + " :\n  /* else */ " + (compile(f_action != null ? f_action : null));
     };
     self.defg = function(ident, val) {
       var err;
@@ -422,28 +446,28 @@
         return compile([["lambda", []].concat(__slice.call(vars), __slice.call(body))]);
       }
     };
-    self.def = function(ident, val) {
+    self.defm = function(ident, val) {
       var err;
       err = compile(["def-error", "\"" + ident + "\""]);
-      ident = ident === "self" ? ident : compile([".", "self", ident]);
+      ident = ident === "self" ? ident : "self['" + (compile(ident)) + "']";
       val = compile(val);
       return helpers.def(ident, val, err);
     };
-    self.set = function(ident, val) {
+    self.setm = function(ident, val) {
       var err;
       err = compile(["set-error", "\"" + ident + "\""]);
-      ident = ident === "self" ? ident : compile([".", "self", ident]);
+      ident = ident === "self" ? ident : "self['" + (compile(ident)) + "']";
       val = compile(val);
       return helpers.set(ident, val, err);
     };
-    self.defp = function(ident, val) {
+    self.def = function(ident, val) {
       var err;
       err = compile(["def-error", "\"" + ident + "\""]);
       ident = compile([".", "_private", ident]);
       val = compile(val);
       return helpers.set(ident, val, err);
     };
-    self.setp = function(ident, val) {
+    self.set = function(ident, val) {
       var err;
       err = compile(["set-error", "\"" + ident + "\""]);
       ident = compile([".", "_private", ident]);
@@ -454,29 +478,25 @@
       var body, deps, fn, name, vars;
       name = arguments[0], deps = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
       name = "\"" + name + "\"";
-      vars = [new helpers.Var("_private", "{}")];
+      vars = [new helpers.Var("self", "this"), new helpers.Var("_private", "Object.create(global)")];
       body = body.map(function(item) {
         return compile(item);
       });
-      fn = "(function (" + (deps.join(', ')) + ") {\n  " + (vars.join('\n  ')) + "\n  this.self = this;\n  with (this) {\n    " + (body.join(',\n  ')) + ";\n  }\n  return this.self;\n})";
+      fn = "(function (" + (deps.join(', ')) + ") {\n  " + (vars.join('\n  ')) + "\n  with (_private) {\n    " + (body.join(',\n  ')) + ";\n  }\n  return this.self;\n})";
       deps = helpers.stringify.to_js(deps.map(function(dep) {
         return "\"" + dep + "\"";
       }));
-      return "oppo.module(" + name + ", " + deps + ", " + fn + ")";
+      return "(oppo || require('oppo')).module(" + name + ", " + deps + ", " + fn + ")";
     };
     self.member_access = function() {
-      var base, items, simple;
+      var base, items;
       items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       items = items.map(function(item) {
-        return compile(typeof item === "string" && /^".*"$/.test(item) ? helpers.trim_quotes(item) : item);
+        item = helpers.is_string(item) ? helpers.trim_quotes(item) : item;
+        return compile(item);
       });
       base = items.shift();
-      simple = true;
-      if (simple) {
-        return "" + base + "." + (items.join('.'));
-      } else {
-        return "" + base + "[\"" + (items.join('"]["')) + "\"]";
-      }
+      return "" + base + "." + (items.join('.'));
     };
     return self;
   });
@@ -592,6 +612,44 @@
       });
     };
     self.js_keywords = ["break", "class", "const", "continue", "default", "delete", "do", "enum", "export", "extends", "finally", "for", "function", "implements", "import", "in", "instanceof", "interface", "label", "new", "package", "private", "protected", "public", "static", "return", "switch", "super", "this", "try", "catch", "typeof", "var", "void", "while", "with", "yield"];
+    self.js_illegal_identifiers = {
+      "~": "tilde",
+      "`": "backtick",
+      "!": "exclmark",
+      "@": "at",
+      "#": "pound",
+      "%": "percent",
+      "^": "carat",
+      "&": "amperstand",
+      "*": "star",
+      "(": "oparen",
+      ")": "cparen",
+      "-": "dash",
+      "+": "plus",
+      "=": "equals",
+      "{": "ocurly",
+      "}": "ccurly",
+      "[": "osquare",
+      "]": "csquare",
+      "|": "pipe",
+      "\\": "bslash",
+      "\"": "dblquote",
+      "'": "snglquote",
+      ":": "colon",
+      ";": "semicolon",
+      "<": "oangle",
+      ">": "rangle",
+      ",": "comma",
+      ".": "dot",
+      "?": "qmark",
+      "/": "fslash",
+      " ": "space",
+      "\t": "tab",
+      "\n": "newline",
+      "\r": "return",
+      "\v": "vertical",
+      "\0": "null"
+    };
     self.gensym = (function() {
       var num;
       num = 0;
@@ -761,10 +819,10 @@
     };
     self.defmacro = function(name, argnames, template) {
       macros[compile(name)] = function() {
-        var arg_map, args, replaced;
+        var arg_map, args, replaced, _argnames;
         args = arguments;
         arg_map = helpers.destructure_list(argnames, "args");
-        argnames = arg_map.map(function(item) {
+        _argnames = arg_map.map(function(item) {
           return item[0];
         });
         args = arg_map.map(function(item) {
@@ -780,7 +838,7 @@
               item = helpers.splat(item);
               splat = true;
             }
-            result = macro_replace(argnames, args, item);
+            result = macro_replace(_argnames, args, item);
             if (splat) {
               return ["...", result];
             } else {
@@ -789,12 +847,11 @@
           });
           return replaced = helpers.restructure_list(replaced);
         } else {
-          return replaced = macro_replace(argnames, args, template);
+          return replaced = macro_replace(_argnames, args, template);
         }
       };
       return "null /* macro: " + name + " */";
     };
-    self.is_macro;
     self.call = function(fn, s_exp) {
       var mc;
       mc = macros[fn];
@@ -805,21 +862,51 @@
       }
     };
     self.syntax_quote = helpers.identity;
-    self.macroexpand = function(ls) {};
+    self.macroexpand_1 = function(ls) {
+      var result;
+      try {
+        result = self.call(ls[0], ls.slice(1));
+      } catch (e) {
+        result = ls;
+      }
+      return result;
+    };
     return self;
   });
-  oppo.module("oppo.core", ["oppo", "oppo.list", "oppo.string", "oppo.math", "global", "compiler"], function(oppo, list, string, math, global, _arg) {
-    var compile, global_method_get, global_method_set, oppo_data, self;
+  oppo.module("oppo.classes", function() {
+    var Keyword, TypedList, self;
+    self = this;
+    Keyword = (function() {
+      function Keyword(name) {
+        this.name = name;
+      }
+      Keyword.prototype.toString = function() {
+        return ":" + this.name;
+      };
+      return Keyword;
+    })();
+    TypedList = (function() {
+      function TypedList() {
+        var arg, type, _i, _len;
+        this.type = helpers["typeof"](arguments[0]);
+        for (_i = 0, _len = arguments.length; _i < _len; _i++) {
+          arg = arguments[_i];
+          if ((type = helpers["typeof"](arg)) !== this.type) {
+            throw new TypeError("Can't add item of type " + type + " to typed-list of type " + this.type);
+          }
+          this.push(arg);
+        }
+      }
+      return TypedList;
+    })();
+    return self;
+  });
+  oppo.module("oppo.core", ["oppo", "oppo.helpers", "oppo.classes", "oppo.list", "oppo.string", "oppo.math", "global", "compiler", "underscore"], function(oppo, helpers, classes, list, string, math, global, _arg, _) {
+    var bind_method, compile, global_method_get, global_method_set, make_prototype_method, name, oppo_data, self, _ref;
     compile = _arg.compile;
     self = this;
-    global_method_set = function(nm, fn) {
-      nm = compile(nm);
-      return global[nm] = self[nm] = fn;
-    };
-    global_method_get = function(nm) {
-      return global[compile(nm)];
-    };
-    oppo_data = oppo.read('(defmacro defn (fname args ...body)\n  `(def fname\n    (lambda args\n      ...body)))\n  \n(defmacro apply (fn ...args ls)\n  `((. fn apply) fn (concat args ls)))\n  \n(defmacro call (fn ...args)\n  `(apply fn args))');
+    _ref = helpers.get_runtime_builders(self), global_method_set = _ref.global_method_set, global_method_get = _ref.global_method_get, make_prototype_method = _ref.make_prototype_method;
+    oppo_data = oppo.read('(defmacro defn (fname args ...body)\n  `(def fname\n    (lambda args\n      ...body)))\n  \n(defmacro apply (fn ...args ls)\n  `((. fn apply) fn (concat args ls)))\n  \n(defmacro call (fn ...args)\n  `(apply fn args))\n  \n(defmacro do (...body)\n  `(call (lambda () (...body))))\n  \n(defmacro not= (...args)\n  `(not (= ...args)))\n  \n(defmacro not== (...args)\n  `(not (== ...args)))\n  \n(defmacro not=== (...args)\n  `(not (=== ...args)))');
     oppo.eval(oppo_data);
     global_method_set("throw", (function() {
       var toString;
@@ -845,52 +932,132 @@
     global_method_set("set-error", function(nm) {
       return (global_method_get("throw"))("set-error", "Can't redefine variable that has not yet been defined: " + nm);
     });
+    bind_method = function(o, method) {
+      return _.bind(o[method], o);
+    };
+    global_method_set("print", bind_method(console, "log"));
+    global_method_set("print-error", bind_method(console, "error"));
+    global_method_set("print-warning", bind_method(console, "warn"));
+    name = global_method_set("name", function(x) {
+      return x.name;
+    });
     global_method_set("keyword", (function() {
-      var Keyword, keywords;
+      var keywords;
       keywords = {};
-      Keyword = (function() {
-        function Keyword(name) {
-          this.name = name;
-        }
-        Keyword.prototype.type = "keyword";
-        return Keyword;
-      })();
       return function(word) {
-        var _ref;
-        return (_ref = keywords[word]) != null ? _ref : keywords[word] = new Keyword(word);
+        var _ref2;
+        return (_ref2 = keywords[word]) != null ? _ref2 : keywords[word] = new classes.Keyword(word);
       };
     })());
-    global_method_set("list", list.list);
-    global_method_set("typed-list", list.typed_list);
-    global_method_set("hash-map", list.hash_map);
-    global_method_set("concat", list.concat);
-    global_method_set("slice", list.slice);
-    global_method_set("nth", list.nth);
-    global_method_set("uppercase", string.uppercase);
-    global_method_set("lowercase", string.lowercase);
-    global_method_set("+", math['+']);
-    global_method_set("-", math['-']);
-    global_method_set("*", math['*']);
-    global_method_set("**", math['**']);
-    global_method_set("/", math['/']);
-    global_method_set("%", math['%']);
-    (function(_) {
-      var dasherize, method, methods, _i, _j, _len, _len2, _list_proxy, _ref, _ref2;
-      if (_ == null) {
-        _ = (function() {
-          try {
-            return require('underscore');
-          } catch (_e) {}
-        })();
+    global_method_set("js-map", function() {
+      var arg, i, key, ret, _len, _results;
+      if (arguments.length % 2 !== 0) {
+        throw new TypeError("Can't make a js-map with an odd number of arguments");
       }
-      if (!(_ != null) && _.noConflict) {
-        throw new Error("Underscore dependency not fulfilled.");
+      ret = {};
+      _results = [];
+      for (i = 0, _len = arguments.length; i < _len; i++) {
+        arg = arguments[i];
+        _results.push(i % 2 === 0 ? (arg instanceof classes.Keyword ? arg = name(arg) : (helpers["typeof"](arg)) !== string ? console.warn("Making js-map with non-string key " + arg + " or type " + (helpers["typeof"](arg))) : void 0, key = arg) : ret[key] = arg);
       }
-      oppo.module("underscore", function() {
-        return _;
+      return _results;
+    });
+    global_method_set("typeof", function(x) {
+      var _ref2, _ref3;
+      if (x === null) {
+        return "null";
+      } else if (!(x instanceof Object)) {
+        return typeof x;
+      } else {
+        return (_ref2 = (_ref3 = x.constructor) != null ? _ref3.name : void 0) != null ? _ref2 : (Object.prototype.toString.call(x)).match(/\s(\w+)/)[1];
+      }
+    });
+    global_method_set("concat", function() {
+      var base;
+      base = arguments[0];
+      if (_.isString(base)) {
+        return string.concat.apply(string, arguments);
+      } else {
+        return list.concat.apply(list, arguments);
+      }
+    });
+    (function() {
+      var make_compare_fn, to_bool;
+      make_compare_fn = function(action) {
+        return function() {
+          var arg, args, val, _i, _len;
+          val = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+          for (_i = 0, _len = args.length; _i < _len; _i++) {
+            arg = args[_i];
+            if (action(val, arg)) {
+              val = arg;
+            } else {
+              return false;
+            }
+          }
+          return true;
+        };
+      };
+      to_bool = global_method_set("->bool", function(x) {
+        if (x != null) {
+          return x !== false;
+        } else {
+          return false;
+        }
       });
-      _ = oppo.module.require("underscore");
+      global_method_set("or", function() {
+        return _.reduce(arguments, (function(a, b) {
+          if (to_bool(a)) {
+            return a;
+          } else {
+            return b;
+          }
+        }), null);
+      });
+      global_method_set("and", function() {
+        var first, rest;
+        first = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+        return _.reduce(rest, (function(a, b) {
+          if (!(to_bool(a))) {
+            return a;
+          } else {
+            return b;
+          }
+        }), first);
+      });
+      global_method_set("not", function(x) {
+        return !to_bool(x);
+      });
+      global_method_set(["==", "like?"], make_compare_fn(function(a, b) {
+        return a == b;
+      }));
+      global_method_set(["===", "is?"], make_compare_fn(function(a, b) {
+        return a === b;
+      }));
+      global_method_set(["=", "eq?"], make_compare_fn(function(a, b) {
+        return _.isEqual(a, b);
+      }));
+      global_method_set("<", make_compare_fn(function(a, b) {
+        return a < b;
+      }));
+      global_method_set(">", make_compare_fn(function(a, b) {
+        return a > b;
+      }));
+      global_method_set("<=", make_compare_fn(function(a, b) {
+        return a <= b;
+      }));
+      return global_method_set(">=", make_compare_fn(function(a, b) {
+        return a >= b;
+      }));
+    })();
+    (function(_) {
+      var dasherize, general_methods, list_methods, method, method_name, methods, _i, _j, _len, _len2, _list_proxy;
       dasherize = string.dasherize;
+      method_name = function(str) {
+        var nm;
+        nm = dasherize(str);
+        return nm = nm.replace(/^is\-(.*)/, "$1?");
+      };
       _list_proxy = function(fn) {
         return function() {
           var args, ls, result;
@@ -909,78 +1076,142 @@
         collections: ["each", "map", "find", "detect", "filter", "select", "all", "every", "any", "some", "include", "contains", "invoke", "pluck", "sortBy", "groupBy", "sortedIndex", "shuffle", "toArray", "size"],
         arrays: ["first", "head", "initial", "last", "rest", "tail", "compact", "flatten", "without", "union", "intersection", "difference", "uniq", "unique", "zip"],
         functions: ["memoize", "delay", "defer", "throttle", "debounce", "once", "after", "wrap", "compose"],
-        objects: ["keys", "values", "functions", "methods", "extend", "defaults", "clone", "tap", "isEqual", "isEmpty", "isElement", "isArray", "isArguments", "isFunction", "isString", "isNumber", "isBoolean", "isDate", "isUndefined"],
+        objects: ["keys", "values", "functions", "methods", "extend", "defaults", "clone", "create", "tap", "isEmpty", "isElement", "isArray", "isArguments", "isFunction", "isString", "isNumber", "isBoolean", "isDate", "isUndefined"],
         utility: ["identity", "times", "mixin", "escape", "template"],
         chaining: []
       };
-      _ref = methods.collections.concat(methods.arrays);
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        method = _ref[_i];
-        global_method_set(dasherize(method), _list_proxy(_[method]));
+      list_methods = methods.collections.concat(methods.arrays);
+      general_methods = methods.functions.concat(methods.objects, methods.utility, methods.chaining);
+      console.log(general_methods);
+      for (_i = 0, _len = list_methods.length; _i < _len; _i++) {
+        method = list_methods[_i];
+        global_method_set(method_name(method), _list_proxy(_[method]));
       }
-      _ref2 = methods.functions.concat(methods.objects, methods.utility, methods.chaining);
-      for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
-        method = _ref2[_j];
-        global_method_set(dasherize(method), _[method]);
+      for (_j = 0, _len2 = general_methods.length; _j < _len2; _j++) {
+        method = general_methods[_j];
+        global_method_set(method_name(method), _[method]);
       }
-      global_method_set("is-nil", _.isNull);
-      global_method_set("is-nan", _.isNaN);
+      global_method_set("nil?", _.isNull);
+      global_method_set("nan?", _.isNaN);
       global_method_set("curry", function() {
         var args, fn;
         fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
         return _.bind(fn, null, args);
       });
-      global_method_set("is-regexp", _.isRegExp);
+      global_method_set(["regexp?", "regex?"], _.isRegExp);
       global_method_set("unique-id", _.uniqueId);
-      global_method_set("reduce", function(_arg2, fn) {
+      global_method_set(["reduce", "inject", "foldl"], function(_arg2, fn) {
         var ls, start;
         start = _arg2[0], ls = 2 <= _arg2.length ? __slice.call(_arg2, 1) : [];
         return _.reduce(ls, fn, start);
       });
-      global_method_set("inject", global.reduce);
-      global_method_set("foldl", global.reduce);
-      global_method_set("reduce-right", function(_arg2, fn) {
+      global_method_set(["reduce-right", "foldr"], function(_arg2, fn) {
         var ls, start;
         start = _arg2[0], ls = 2 <= _arg2.length ? __slice.call(_arg2, 1) : [];
         return _.reduceRight(ls, fn, start);
       });
-      global_method_set("foldr", global['reduce-right']);
       global_method_set("index", _.indexOf);
       return global_method_set("last-index", _.lastIndexOf);
     })(_);
     return self;
   });
-  oppo.module("oppo.list", ["oppo", "compiler"], function(oppo, _arg) {
-    var compile, helpers, self;
-    compile = _arg.compile, helpers = _arg.helpers;
+  oppo.module("oppo.helpers", ["compiler"], function(_arg) {
+    var compile, self;
+    compile = _arg.compile;
     self = this;
-    self.list = function() {
+    self.global_method_set = function(names, fn) {
+      var nm, _i, _len, _results;
+      if (!(names instanceof Array)) {
+        names = [names];
+      }
+      _results = [];
+      for (_i = 0, _len = names.length; _i < _len; _i++) {
+        nm = names[_i];
+        nm = compile(nm);
+        _results.push(global[nm] = this[nm] = fn);
+      }
+      return _results;
+    };
+    self.global_method_get = function(nm) {
+      return global[compile(nm)];
+    };
+    self.make_prototype_method = function(nm) {
+      return function() {
+        var args, base;
+        base = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+        return base[nm].apply(base, args);
+      };
+    };
+    self.get_runtime_builders = function(scope) {
+      var global_method_get, global_method_set, make_prototype_method;
+      global_method_set = self.global_method_set, make_prototype_method = self.make_prototype_method;
+      global_method_set = _.bind(global_method_set, scope);
+      global_method_get = self.global_method_get;
+      make_prototype_method = _.bind(make_prototype_method, scope);
+      return {
+        global_method_set: global_method_set,
+        global_method_get: global_method_get,
+        make_prototype_method: make_prototype_method
+      };
+    };
+    self["typeof"] = function(x) {
+      var _ref, _ref2;
+      if (x === null) {
+        return "null";
+      } else if (!(x instanceof Object)) {
+        return typeof x;
+      } else {
+        return (_ref = (_ref2 = x.constructor) != null ? _ref2.name : void 0) != null ? _ref : (Object.prototype.toString.call(x)).match(/\s(\w+)/)[1];
+      }
+    };
+    return self;
+  });
+  oppo.module("oppo.list", ["oppo", "oppo.helpers", "oppo.classes", "compiler"], function(oppo, helpers, classes, _arg) {
+    var compile, global_method_set, make_prototype_method, self, _ref;
+    compile = _arg.compile;
+    self = this;
+    _ref = helpers.get_runtime_builders(self), global_method_set = _ref.global_method_set, make_prototype_method = _ref.make_prototype_method;
+    global_method_set(["list", "->list"], function() {
       var items;
       items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       return items;
-    };
-    self.typed_list = function(items) {
-      return items.type = typed_list;
-    };
-    self.hash_map = function(items) {
+    });
+    global_method_set("join", function(ls, joiner) {
+      if (joiner == null) {
+        joiner = '';
+      }
+      return ls.join(joiner);
+    });
+    global_method_set("typed-list", function() {
+      var items;
+      items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      return (function(func, args, ctor) {
+        ctor.prototype = func.prototype;
+        var child = new ctor, result = func.apply(child, args);
+        return typeof result === "object" ? result : child;
+      })(classes.TypedList, items, function() {});
+    });
+    global_method_set("hash-map", function(items) {
       items.type = hash_map;
       if (items.length % 2 > 0) {
         throw new TypeError("Can't make a hash-map with an odd number of arguments");
       }
+    });
+    self.concat = function() {
+      var a;
+      a = [];
+      return a.concat.apply(a, arguments);
     };
-    self.concat = function(ls, items) {
-      return ls.concat.apply(ls, items);
-    };
-    self.slice = function(ls, start, end) {
+    global_method_set("slice", function(ls, start, end) {
       return ls.slice(start, end);
-    };
+    });
     self.max = function(ls) {
       return Math.max.apply(Math, ls);
     };
     self.min = function(ls) {
       return Math.min.apply(Math, ls);
     };
-    self.nth = function(ls, i) {
+    global_method_set("nth", function(ls, i) {
       if (i === 0) {
         console.warn("Warning: Use nth0 for 0-based access to lists.");
         return null;
@@ -991,7 +1222,10 @@
         i -= 1;
       }
       return ls[i];
-    };
+    });
+    global_method_set("second", function(ls) {
+      return ls[1];
+    });
     self.nth0 = function(ls, i) {
       if (i < 0) {
         i = ls.length + i;
@@ -1000,41 +1234,42 @@
     };
     return self;
   });
-  oppo.module("oppo.math", ["oppo", "compiler"], function(oppo, _arg) {
-    var compile, helpers, self;
-    compile = _arg.compile, helpers = _arg.helpers;
+  oppo.module("oppo.math", ["oppo", "oppo.helpers", "compiler"], function(oppo, helpers, _arg) {
+    var compile, global_method_set, make_prototype_method, self, _ref;
+    compile = _arg.compile;
     self = this;
-    self.to_num = function(x) {
+    _ref = helpers.get_runtime_builders(self), global_method_set = _ref.global_method_set, make_prototype_method = _ref.make_prototype_method;
+    global_method_set("->num", function(x) {
       return Number(x);
-    };
-    self['+'] = function() {
+    });
+    global_method_set("+", function() {
       return _.reduce(arguments, (function(a, b) {
         return a + b;
       }), 0);
-    };
-    self['-'] = function() {
+    });
+    global_method_set('-', function() {
       var nums, start;
       start = arguments[0], nums = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       return _.reduce(nums, (function(a, b) {
         return a - b;
       }), start);
-    };
-    self['/'] = function() {
+    });
+    global_method_set('/', function() {
       var nums, start;
       start = arguments[0], nums = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       return _.reduce(nums, (function(a, b) {
         return a / b;
       }), start);
-    };
-    self['*'] = function() {
+    });
+    global_method_set('*', function() {
       return _.reduce(arguments, (function(a, b) {
         return a * b;
       }), 1);
-    };
-    self.mod = self['%'] = function(a, b) {
+    });
+    global_method_set(['%', 'mod'], function(a, b) {
       return a % b;
-    };
-    self.pow = self['**'] = Math.pow;
+    });
+    global_method_set(['**', 'pow'], Math.pow);
     (function() {
       var prop, properties, _i, _len;
       properties = ["E", "LN2", "LN10", "LOG2E", "LOG10E", "PI", "SQRT2", "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log", "max", "min", "pow", "round", "sin", "sqrt", "tan"];
@@ -1064,19 +1299,23 @@
     })();
     return self;
   });
-  oppo.module("oppo.string", ["oppo", "compiler"], function(oppo, _arg) {
-    var compile, helpers, self;
-    compile = _arg.compile, helpers = _arg.helpers;
+  oppo.module("oppo.string", ["oppo", "oppo.helpers", "compiler"], function(oppo, helpers, _arg) {
+    var compile, global_method_set, make_prototype_method, self, _ref;
+    compile = _arg.compile;
     self = this;
-    self.to_string = function(s) {
+    _ref = helpers.get_runtime_builders(self), global_method_set = _ref.global_method_set, make_prototype_method = _ref.make_prototype_method;
+    global_method_set("->string", function(s) {
       return s.toString();
-    };
-    self.uppercase = function(str) {
+    });
+    global_method_set("uppercase", function(str) {
       return str.toUpperCase();
-    };
-    self.lowercase = function(str) {
+    });
+    global_method_set("lowercase", function(str) {
       return str.toLowerCase();
-    };
+    });
+    global_method_set("split", function(str, splitter) {
+      return str.split(splitter);
+    });
     self.capitalize = function(str) {
       return (self.uppercase(str.substr(0, 1))) + str.substr(1);
     };
@@ -1090,19 +1329,12 @@
       return result = ls.join('-');
     };
     (function() {
-      var prop, properties, string_method, _i, _len, _results;
-      string_method = function(name) {
-        return function() {
-          var str, things;
-          str = arguments[0], things = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-          return str[name].apply(str, things);
-        };
-      };
+      var prop, properties, _i, _len, _results;
       properties = ["charAt", "charCodeAt", "concat", "indexOf", "lastIndexOf", "localeCompare"];
       _results = [];
       for (_i = 0, _len = properties.length; _i < _len; _i++) {
         prop = properties[_i];
-        _results.push(self[prop] = string_method(prop));
+        _results.push(self[prop] = make_prototype_method(prop));
       }
       return _results;
     })();
@@ -1115,8 +1347,8 @@
   oppo.module("parser", function() {
     return typeof parser !== "undefined" && parser !== null ? parser : parser = require('./parser');
   });
-  oppo.module("oppo", ["parser", "compiler"], function(parser, compiler) {
-    oppo.compile = compiler.compile.bind(compiler);
+  oppo.module("oppo", ["parser", "compiler", "underscore"], function(parser, compiler, _) {
+    oppo.compile = _.bind(compiler.compile, compiler);
     oppo.eval = function(oppo_data) {
       var js;
       js = oppo.compile(oppo_data);

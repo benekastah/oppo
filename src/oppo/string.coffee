@@ -1,11 +1,13 @@
-oppo.module "oppo.string", ["oppo", "compiler"], (oppo, {compile, helpers}) ->
+oppo.module "oppo.string", ["oppo", "oppo.helpers", "compiler"], (oppo, helpers, {compile}) ->
   self = this
   
-  self.to_string = (s) -> s.toString()
+  {global_method_set, make_prototype_method} = helpers.get_runtime_builders self
   
-  self.uppercase = (str) -> str.toUpperCase()
-
-  self.lowercase = (str) -> str.toLowerCase()
+  global_method_set "->string", (s) -> s.toString()
+  global_method_set "uppercase", (str) -> str.toUpperCase()
+  global_method_set "lowercase", (str) -> str.toLowerCase()
+  
+  global_method_set "split", (str, splitter) -> str.split splitter
 
   self.capitalize = (str) ->
     (self.uppercase str.substr(0,1)) + str.substr 1
@@ -18,12 +20,8 @@ oppo.module "oppo.string", ["oppo", "compiler"], (oppo, {compile, helpers}) ->
     ls = _.map ls, self.uncapitalize
     result = ls.join '-'
     
-    
   do ->
     ## From String prototype
-    
-    string_method = (name) ->
-      (str, things...) -> str[name] things...
   
     properties = [
       "charAt"
@@ -35,7 +33,7 @@ oppo.module "oppo.string", ["oppo", "compiler"], (oppo, {compile, helpers}) ->
     ]
     
     for prop in properties
-      self[prop] = string_method prop
+      self[prop] = make_prototype_method prop
   
   self.remove = (str, search) -> self.replace str, search, ''
     

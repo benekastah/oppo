@@ -1,5 +1,19 @@
+
+_ ?= require? "underscore"
+if not _?
+  throw new Error "Unmet dependency: underscore.js"
+  
+_.mixin
+  create: do ->
+    _create = Object.create ? (o) ->
+      noop = ->
+      noop:: = o
+      new noop
+    (o = null) ->
+      _create o
+
 global ?= window
-oppo_global = Object.create global
+oppo_global = _.create global
 oppo = {}
 
 oppo.module = do ->
@@ -47,9 +61,9 @@ oppo.module = do ->
     _module_list_traverse name, (item, i, last, ns) ->
       if not scope? then return false
       scope = if i is last
-        scope = scope[item]
+        scope[item]
       else
-        try scope[item]?.submodules
+        scope?[item]?.submodules
         
     scope
   
@@ -79,6 +93,9 @@ oppo.module = do ->
       return
     if not deps then deps = []
     
+    if _requiring[name]
+      throw new Error "Already requiring #{name}"
+    
     if force then mod.cache = null
     if mod.cache?
       return mod.cache
@@ -90,7 +107,7 @@ oppo.module = do ->
       _require dep
     
     # Make our context
-    context = Object.create oppo_global
+    context = _.create oppo_global
     context.name = name
     
     mod.cache = fn.apply context, args
@@ -117,5 +134,6 @@ oppo.module = do ->
   _module "require", -> _module.require
   _module "load", -> _module.load
   _module "global", -> oppo_global
+  _module "underscore", -> _
   
   _module

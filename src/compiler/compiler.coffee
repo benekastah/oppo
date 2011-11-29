@@ -27,8 +27,8 @@ oppo.module "compiler", ["module"], ({require_group}) ->
         # General
         when "program"
           self.core.program first, args
-        when "do"
-          self.core.do args
+        # when "do"
+        #   self.core.do args
         when "module"
           self.core.module args...
         when "quote"
@@ -37,8 +37,8 @@ oppo.module "compiler", ["module"], ({require_group}) ->
           self.macro.syntax_quote first
         when "defmacro"
           self.macro.defmacro args...
-        when "eval"
-          compile ["oppo.eval", args...]
+        when "macroexpand-1"
+          self.macro.macroexpand_1 self.compile first
         when "if"
           self.core.if args...
         
@@ -53,18 +53,12 @@ oppo.module "compiler", ["module"], ({require_group}) ->
           self.core.setg args...
         when "let"
           self.core.let args
-        
-        # Data types
-        when "keyword"
-          self.types.keyword first
           
         # Javascript interop
         when "."
           self.core.member_access args...
         when "js-eval"
           args.join ",\n"
-        # when "throw"
-        #   self.core.throw args...
           
         # Functions
         when "infix"

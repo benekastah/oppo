@@ -1,20 +1,18 @@
 
 oppo.module "oppo.core", [
   "oppo"
+  "oppo.helpers"
+  "oppo.classes"
   "oppo.list"
   "oppo.string"
   "oppo.math"
   "global"
   "compiler"
-], (oppo, list, string, math, global, {compile}) ->
+  "underscore"
+], (oppo, helpers, classes, list, string, math, global, {compile}, _) ->
   self = this
   
-  global_method_set = (nm, fn) ->
-    nm = compile nm
-    global[nm] = self[nm] = fn
-    
-  global_method_get = (nm) ->
-    global[compile nm]
+  {global_method_set, global_method_get, make_prototype_method} = helpers.get_runtime_builders self
   
   ## Some basic macros
   oppo_data = oppo.read '''
@@ -28,6 +26,18 @@ oppo.module "oppo.core", [
     
   (defmacro call (fn ...args)
     `(apply fn args))
+    
+  (defmacro do (...body)
+    `(call (lambda () (...body))))
+    
+  (defmacro not= (...args)
+    `(not (= ...args)))
+    
+  (defmacro not== (...args)
+    `(not (== ...args)))
+    
+  (defmacro not=== (...args)
+    `(not (=== ...args)))
   '''
   oppo.eval oppo_data
   
@@ -44,50 +54,92 @@ oppo.module "oppo.core", [
     
   global_method_set "set-error", (nm) ->
     (global_method_get "throw") "set-error", "Can't redefine variable that has not yet been defined: #{nm}"
+    
+  
+  ## Console
+  bind_method = (o, method) -> _.bind o[method], o
+  global_method_set "print", bind_method console, "log"
+  global_method_set "print-error", bind_method console, "error"
+  global_method_set "print-warning", bind_method console, "warn"
   
   
   ## Types
+  name = global_method_set "name", (x) -> x.name
+  
   global_method_set "keyword", do ->
-    keywords = {}
-    
-    class Keyword
-      constructor: (@name) ->
-      type: "keyword"
-      
+    keywords = {} 
     (word) ->
-      keywords[word] ?= new Keyword word
+      keywords[word] ?= new classes.Keyword word
+      
+  global_method_set "js-map", ->
+    if arguments.length % 2 isnt 0
+      throw new TypeError "Can't make a js-map with an odd number of arguments"
+    ret = {}
+    for arg, i in arguments
+      if i % 2 is 0
+        if arg instanceof classes.Keyword
+          arg = name arg
+        else if (helpers.typeof arg) isnt string
+          console.warn "Making js-map with non-string key #{arg} or type #{helpers.typeof arg}"
+        key = arg
+      else
+        ret[key] = arg
+      
+  global_method_set "typeof", (x) ->
+    if x is null
+      "null"
+    else if x not instanceof Object
+      typeof x
+    else
+      x.constructor?.name ? (Object::toString.call x).match(/\s(\w+)/)[1]
+      
+    
   
   ## Lists
-  global_method_set "list", list.list
-  global_method_set "typed-list", list.typed_list
-  global_method_set "hash-map", list.hash_map
-  global_method_set "concat", list.concat
-  global_method_set "slice", list.slice
-  global_method_set "nth", list.nth
+  global_method_set "concat", ->
+    base = arguments[0]
+    if _.isString base
+      string.concat arguments...
+    else
+      list.concat arguments...
   
-  ## Strings
-  global_method_set "uppercase", string.uppercase
-  global_method_set "lowercase", string.lowercase
+  ## Comparisons
+  do ->
+    make_compare_fn = (action) ->
+      (val, args...) ->
+        for arg in args
+          if action val, arg
+            val = arg
+          else
+            return no
+        yes
   
-  ## Math
-  global_method_set "+", math['+']
-  global_method_set "-", math['-']
-  global_method_set "*", math['*']
-  global_method_set "**", math['**']
-  global_method_set "/", math['/']
-  global_method_set "%", math['%']
+    to_bool = global_method_set "->bool", (x) -> if x? then x isnt false else false
   
+    global_method_set "or", ->
+      _.reduce arguments, ((a, b) -> if (to_bool a) then a else b), null
+    
+    global_method_set "and", (first, rest...) ->
+      _.reduce rest, ((a, b) -> if not (to_bool a) then a else b), first
+    
+    global_method_set "not", (x) -> not to_bool x
+    
+    global_method_set ["==", "like?"], make_compare_fn (a, b) -> `a == b`
+    global_method_set ["===", "is?"], make_compare_fn (a, b) -> a is b
+    global_method_set ["=", "eq?"], make_compare_fn (a, b) -> _.isEqual a, b
+    
+    global_method_set "<", make_compare_fn (a, b) -> a < b
+    global_method_set ">", make_compare_fn (a, b) -> a > b
+    global_method_set "<=", make_compare_fn (a, b) -> a <= b
+    global_method_set ">=", make_compare_fn (a, b) -> a >= b
+      
   
   ## Stuff from Underscore.js
   do (_) ->
-    _ ?= try require 'underscore'
-    if not _? and _.noConflict
-      throw new Error "Underscore dependency not fulfilled."
-    
-    oppo.module "underscore", -> _
-    _ = oppo.module.require "underscore"
-    
     dasherize = string.dasherize
+    method_name = (str) ->
+      nm = dasherize str
+      nm = nm.replace /^is\-(.*)/, "$1?"
     
     _list_proxy = (fn) ->
       (ls, args...) ->
@@ -163,8 +215,9 @@ oppo.module "oppo.core", [
         "extend"
         "defaults"
         "clone"
+        "create" # our own function, added in module
         "tap"
-        "isEqual"
+        # "isEqual"
         "isEmpty"
         "isElement"
         "isArray"
@@ -193,22 +246,24 @@ oppo.module "oppo.core", [
         # "value"
       ]
       
-    for method in methods.collections.concat methods.arrays
-      global_method_set (dasherize method), _list_proxy _[method]
-    for method in methods.functions.concat methods.objects, methods.utility, methods.chaining
-      global_method_set (dasherize method), _[method]
+    list_methods = methods.collections.concat methods.arrays
+    general_methods = methods.functions.concat methods.objects, methods.utility, methods.chaining
     
-    global_method_set "is-nil", _.isNull
-    global_method_set "is-nan", _.isNaN
+    console.log general_methods
+      
+    for method in list_methods
+      global_method_set (method_name method), _list_proxy _[method]
+    for method in general_methods
+      global_method_set (method_name method), _[method]
+    
+    global_method_set "nil?", _.isNull
+    global_method_set "nan?", _.isNaN
     global_method_set "curry", (fn, args...) -> _.bind fn, null, args
-    global_method_set "is-regexp", _.isRegExp
+    global_method_set ["regexp?", "regex?"], _.isRegExp
     global_method_set "unique-id", _.uniqueId
     
-    global_method_set "reduce", ([start, ls...], fn) -> _.reduce ls, fn, start
-    global_method_set "inject", global.reduce
-    global_method_set "foldl", global.reduce
-    global_method_set "reduce-right", ([start, ls...], fn) -> _.reduceRight ls, fn, start
-    global_method_set "foldr", global['reduce-right']
+    global_method_set ["reduce", "inject", "foldl"], ([start, ls...], fn) -> _.reduce ls, fn, start
+    global_method_set ["reduce-right", "foldr"], ([start, ls...], fn) -> _.reduceRight ls, fn, start
     
     global_method_set "index", _.indexOf
     global_method_set "last-index", _.lastIndexOf

@@ -15,7 +15,7 @@ oppo.module "compiler.macro", ["compiler", "compiler.helpers"], ({compile}, help
     macros[compile name] = ->
       args = arguments
       arg_map = helpers.destructure_list argnames, "args"
-      argnames = arg_map.map (item) -> item[0]
+      _argnames = arg_map.map (item) -> item[0]
       args = arg_map.map (item) ->
         item1 = item[1]
         js = compile ["js-eval", item1]
@@ -27,7 +27,7 @@ oppo.module "compiler.macro", ["compiler", "compiler.helpers"], ({compile}, help
             item = helpers.splat item
             splat = true
             
-          result = macro_replace argnames, args, item
+          result = macro_replace _argnames, args, item
           if splat
             ["...", result]
           else
@@ -35,11 +35,9 @@ oppo.module "compiler.macro", ["compiler", "compiler.helpers"], ({compile}, help
             
         replaced = helpers.restructure_list replaced
       else
-        replaced = macro_replace argnames, args, template
+        replaced = macro_replace _argnames, args, template
     # Let a macro definition return "null" for the compiler
     "null /* macro: #{name} */"
-    
-  self.is_macro
     
   self.call = (fn, s_exp) ->
     mc = macros[fn]
@@ -50,6 +48,11 @@ oppo.module "compiler.macro", ["compiler", "compiler.helpers"], ({compile}, help
     
   self.syntax_quote = helpers.identity
     
-  self.macroexpand = (ls) -> # TODO
+  self.macroexpand_1 = (ls) ->
+    try
+      result = self.call ls[0], ls[1..]
+    catch e
+      result = ls
+    return result
     
   self

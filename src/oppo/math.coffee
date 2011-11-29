@@ -1,25 +1,27 @@
-oppo.module "oppo.math", ["oppo", "compiler"], (oppo, {compile, helpers}) ->
+oppo.module "oppo.math", ["oppo", "oppo.helpers", "compiler"], (oppo, helpers, {compile}) ->
   self = this
   
-  self.to_num = (x) -> Number x
+  {global_method_set, make_prototype_method} = helpers.get_runtime_builders self
+  
+  global_method_set "->num", (x) -> Number x
   
   ## Operators
-  self['+'] = ->
+  global_method_set "+", ->
     _.reduce arguments, ((a, b) -> a + b), 0
     
-  self['-'] = (start, nums...) ->
+  global_method_set '-', (start, nums...) ->
     _.reduce nums, ((a, b) -> a - b), start
     
-  self['/'] = (start, nums...) ->
+  global_method_set '/', (start, nums...) ->
     _.reduce nums, ((a, b) -> a / b), start
     
-  self['*'] = ->
+  global_method_set '*', ->
     _.reduce arguments, ((a, b) -> a * b), 1
     
-  self.mod = self['%'] = (a, b) -> a % b
+  global_method_set ['%', 'mod'], (a, b) -> a % b
     
   ## Math object
-  self.pow = self['**'] = Math.pow
+  global_method_set ['**', 'pow'],Math.pow
     
   do ->
     properties = [
