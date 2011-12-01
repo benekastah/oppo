@@ -148,6 +148,15 @@ oppo.module "compiler.helpers", ["compiler"], ({compile}) ->
     constructor: (@name, @value) ->
     toString: -> "var #{@name} = #{@value};"
     
+    tracker = []
+    @new_set: -> tracker.push []
+    @track: ->
+      for _var in arguments
+        set = tracker[tracker.length - 1]
+        if set?
+          set.push _var
+    @grab: -> tracker.pop()
+    
   self.splat = (x) -> x[1]
       
   self.destructure_list = (pattern, sourceName) ->
@@ -240,6 +249,12 @@ oppo.module "compiler.helpers", ["compiler"], ({compile}) ->
         no
     else
       no
+      
+  self.is_js_identifier = (i) ->
+    for own _char of self.js_illegal_identifiers
+      if i.indexOf _char >= 0
+        return no
+    yes
       
   self.is_list = (a) -> a instanceof Array and not a.type?
   

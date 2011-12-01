@@ -24,28 +24,32 @@ oppo.module "compiler.function", ["compiler", "compiler.macro", "compiler.helper
     
     if (destructure)
       vars = helpers.destructure_list args, "arguments"
-      vars = vars.map (item) -> new helpers.Var item...
+      for _var in vars
+        helpers.Var.track new helpers.Var _var...
       args = []
     else
-      vars = []
       args = args.map (arg) -> compile arg
       
-    {vars, args}
+    args
       
   self.lambda = (args=[], body...) ->
-    {vars, args} = get_args args
+    args = get_args args
+    
+    Var = helpers.Var
+    Var.new_set()
     
     for item, i in body
       if item instanceof helpers.Var
-        vars.push item
+        Var.track item
       else
         body = (body.slice i).map (item) -> compile item
         break
     
+    vars = Var.grab()
     vars = if vars.length then (vars.join '\n  ') + '\n' else ''
     """
     (function (#{args.join ', '}) {
-      #{vars}return #{body.join ',\n  '};
+      #{vars}return #{body.join ',\n    '};
     })
     """
     

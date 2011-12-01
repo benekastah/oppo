@@ -37,7 +37,7 @@
   oppo_global = _.create(global);
   oppo = {};
   oppo.module = (function() {
-    var CircularDependency, ModuleNotFound, _load, _module, _module_get, _module_list, _module_list_traverse, _module_set, _require, _require_one, _requiring, _requiring_submodules;
+    var CircularDependency, ModuleNotFound, _load, _module, _module_get, _module_list, _module_list_traverse, _module_set, _require, _require_one, _requiring, _requiring_submodules, _waiting;
     ModuleNotFound = (function() {
       __extends(ModuleNotFound, Error);
       function ModuleNotFound(module) {
@@ -57,6 +57,7 @@
     _module_list = {};
     _requiring = {};
     _requiring_submodules = {};
+    _waiting = {};
     _module_list_traverse = function(name, eachback) {
       var i, item, namespace, result, _len, _results;
       namespace = name.split('.');
@@ -353,7 +354,7 @@
     };
     return self;
   });
-  oppo.module("compiler.core", ["compiler", "compiler.helpers"], function(_arg, helpers) {
+  oppo.module("compiler.core", ["compiler", "compiler.helpers", "underscore"], function(_arg, helpers, _) {
     var compile, self;
     compile = _arg.compile;
     self = this;
@@ -381,7 +382,7 @@
     self.program = function(first, args) {
       var base_deps, name, program, _ref;
       base_deps = ["global", "require", "load"];
-      if (((first != null ? first[0] : void 0) != null) === "module") {
+      if ((first != null ? first[0] : void 0) === "module") {
         if ((_ref = first[2]) == null) {
           first[2] = [];
         }
@@ -446,44 +447,39 @@
         return compile([["lambda", []].concat(__slice.call(vars), __slice.call(body))]);
       }
     };
-    self.defm = function(ident, val) {
-      var err;
-      err = compile(["def-error", "\"" + ident + "\""]);
-      ident = ident === "self" ? ident : "self['" + (compile(ident)) + "']";
-      val = compile(val);
-      return helpers.def(ident, val, err);
-    };
-    self.setm = function(ident, val) {
-      var err;
-      err = compile(["set-error", "\"" + ident + "\""]);
-      ident = ident === "self" ? ident : "self['" + (compile(ident)) + "']";
-      val = compile(val);
-      return helpers.set(ident, val, err);
-    };
     self.def = function(ident, val) {
       var err;
       err = compile(["def-error", "\"" + ident + "\""]);
-      ident = compile([".", "_private", ident]);
+      ident = compile(ident);
       val = compile(val);
-      return helpers.set(ident, val, err);
+      if (helpers.is_js_identifier(ident)) {
+        helpers.Var.track(new helpers.Var(ident));
+      }
+      return helpers.def(ident, val, err);
     };
     self.set = function(ident, val) {
       var err;
       err = compile(["set-error", "\"" + ident + "\""]);
-      ident = compile([".", "_private", ident]);
+      ident = compile(ident);
       val = compile(val);
       return helpers.set(ident, val, err);
     };
     self.module = function() {
-      var body, deps, fn, name, vars;
+      var Var, args, body, deps, fn, name, vars;
       name = arguments[0], deps = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
       name = "\"" + name + "\"";
-      vars = [new helpers.Var("self", "this"), new helpers.Var("_private", "Object.create(global)")];
+      Var = helpers.Var;
+      Var.new_set();
+      Var.track(new Var("self", "this"));
       body = body.map(function(item) {
         return compile(item);
       });
-      fn = "(function (" + (deps.join(', ')) + ") {\n  " + (vars.join('\n  ')) + "\n  with (_private) {\n    " + (body.join(',\n  ')) + ";\n  }\n  return this.self;\n})";
-      deps = helpers.stringify.to_js(deps.map(function(dep) {
+      args = _.map(deps, function(item) {
+        return compile(item);
+      });
+      vars = Var.grab();
+      fn = "(function (" + (args.join(', ')) + ") {\n  " + (vars.join('\n  ')) + "\n  with (this) {\n    " + (body.join(',\n    ')) + ";\n  }\n  return self;\n})";
+      deps = helpers.stringify.to_js(_.map(deps || [], function(dep) {
         return "\"" + dep + "\"";
       }));
       return "(oppo || require('oppo')).module(" + name + ", " + deps + ", " + fn + ")";
@@ -530,7 +526,7 @@
       }
     };
     get_args = function(args) {
-      var arg, destructure, vars, _i, _len;
+      var arg, destructure, vars, _i, _j, _len, _len2, _var;
       destructure = false;
       for (_i = 0, _len = args.length; _i < _len; _i++) {
         arg = args[_i];
@@ -541,36 +537,35 @@
       }
       if (destructure) {
         vars = helpers.destructure_list(args, "arguments");
-        vars = vars.map(function(item) {
-          return (function(func, args, ctor) {
+        for (_j = 0, _len2 = vars.length; _j < _len2; _j++) {
+          _var = vars[_j];
+          helpers.Var.track((function(func, args, ctor) {
             ctor.prototype = func.prototype;
             var child = new ctor, result = func.apply(child, args);
             return typeof result === "object" ? result : child;
-          })(helpers.Var, item, function() {});
-        });
+          })(helpers.Var, _var, function() {}));
+        }
         args = [];
       } else {
-        vars = [];
         args = args.map(function(arg) {
           return compile(arg);
         });
       }
-      return {
-        vars: vars,
-        args: args
-      };
+      return args;
     };
     self.lambda = function() {
-      var args, body, i, item, vars, _len, _ref;
+      var Var, args, body, i, item, vars, _len;
       args = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       if (args == null) {
         args = [];
       }
-      _ref = get_args(args), vars = _ref.vars, args = _ref.args;
+      args = get_args(args);
+      Var = helpers.Var;
+      Var.new_set();
       for (i = 0, _len = body.length; i < _len; i++) {
         item = body[i];
         if (item instanceof helpers.Var) {
-          vars.push(item);
+          Var.track(item);
         } else {
           body = (body.slice(i)).map(function(item) {
             return compile(item);
@@ -578,8 +573,9 @@
           break;
         }
       }
+      vars = Var.grab();
       vars = vars.length ? (vars.join('\n  ')) + '\n' : '';
-      return "(function (" + (args.join(', ')) + ") {\n  " + vars + "return " + (body.join(',\n  ')) + ";\n})";
+      return "(function (" + (args.join(', ')) + ") {\n  " + vars + "return " + (body.join(',\n    ')) + ";\n})";
     };
     self.infix = function(call) {
       return compile([call.shift(), call.shift()].reverse().concat(call));
@@ -669,12 +665,30 @@
       return "(typeof " + ident + " !== \"undefined\" ?\n  " + ident + " = " + value + " :\n  " + error + ")";
     };
     self.Var = (function() {
+      var tracker;
       function Var(name, value) {
         this.name = name;
         this.value = value;
       }
       Var.prototype.toString = function() {
         return "var " + this.name + " = " + this.value + ";";
+      };
+      tracker = [];
+      Var.new_set = function() {
+        return tracker.push([]);
+      };
+      Var.track = function() {
+        var set, _i, _len, _results, _var;
+        _results = [];
+        for (_i = 0, _len = arguments.length; _i < _len; _i++) {
+          _var = arguments[_i];
+          set = tracker[tracker.length - 1];
+          _results.push(set != null ? set.push(_var) : void 0);
+        }
+        return _results;
+      };
+      Var.grab = function() {
+        return tracker.pop();
       };
       return Var;
     })();
@@ -795,6 +809,17 @@
         return false;
       }
     };
+    self.is_js_identifier = function(i) {
+      var _char, _ref;
+      _ref = self.js_illegal_identifiers;
+      for (_char in _ref) {
+        if (!__hasProp.call(_ref, _char)) continue;
+        if (i.indexOf(_char >= 0)) {
+          return false;
+        }
+      }
+      return true;
+    };
     self.is_list = function(a) {
       return a instanceof Array && !(a.type != null);
     };
@@ -906,13 +931,11 @@
     compile = _arg.compile;
     self = this;
     _ref = helpers.get_runtime_builders(self), global_method_set = _ref.global_method_set, global_method_get = _ref.global_method_get, make_prototype_method = _ref.make_prototype_method;
-    oppo_data = oppo.read('(defmacro defn (fname args ...body)\n  `(def fname\n    (lambda args\n      ...body)))\n  \n(defmacro apply (fn ...args ls)\n  `((. fn apply) fn (concat args ls)))\n  \n(defmacro call (fn ...args)\n  `(apply fn args))\n  \n(defmacro do (...body)\n  `(call (lambda () (...body))))\n  \n(defmacro not= (...args)\n  `(not (= ...args)))\n  \n(defmacro not== (...args)\n  `(not (== ...args)))\n  \n(defmacro not=== (...args)\n  `(not (=== ...args)))');
-    oppo.eval(oppo_data);
     global_method_set("throw", (function() {
       var toString;
       toString = function() {
         var info;
-        info = this.info != null ? "\n\n  Additional Info: " + (this.info.join(', ')) : "";
+        info = this.info != null ? "\n  Additional Info: " + (this.info.join(', ').trim() || 'none') : "";
         return "" + this.type + ": " + this.message + info;
       };
       return function() {
@@ -1072,17 +1095,9 @@
           return result;
         };
       };
-      methods = {
-        collections: ["each", "map", "find", "detect", "filter", "select", "all", "every", "any", "some", "include", "contains", "invoke", "pluck", "sortBy", "groupBy", "sortedIndex", "shuffle", "toArray", "size"],
-        arrays: ["first", "head", "initial", "last", "rest", "tail", "compact", "flatten", "without", "union", "intersection", "difference", "uniq", "unique", "zip"],
-        functions: ["memoize", "delay", "defer", "throttle", "debounce", "once", "after", "wrap", "compose"],
-        objects: ["keys", "values", "functions", "methods", "extend", "defaults", "clone", "create", "tap", "isEmpty", "isElement", "isArray", "isArguments", "isFunction", "isString", "isNumber", "isBoolean", "isDate", "isUndefined"],
-        utility: ["identity", "times", "mixin", "escape", "template"],
-        chaining: []
-      };
+      methods = helpers.underscore_methods;
       list_methods = methods.collections.concat(methods.arrays);
       general_methods = methods.functions.concat(methods.objects, methods.utility, methods.chaining);
-      console.log(general_methods);
       for (_i = 0, _len = list_methods.length; _i < _len; _i++) {
         method = list_methods[_i];
         global_method_set(method_name(method), _list_proxy(_[method]));
@@ -1113,6 +1128,8 @@
       global_method_set("index", _.indexOf);
       return global_method_set("last-index", _.lastIndexOf);
     })(_);
+    oppo_data = oppo.read('(defmacro defn (fname args ...body)\n  `(def fname\n    (lambda args\n      ...body)))\n\n(defmacro apply (fn ...args ls)\n  `((. fn apply) fn (concat args ls)))\n\n(defmacro call (fn ...args)\n  `(apply fn args))\n\n(defmacro do (...body)\n  `(call (lambda () (...body))))\n\n(defmacro not= (...args)\n  `(not (= ...args)))\n\n(defmacro not== (...args)\n  `(not (== ...args)))\n\n(defmacro not=== (...args)\n  `(not (=== ...args)))');
+    oppo.eval(oppo_data);
     return self;
   });
   oppo.module("oppo.helpers", ["compiler"], function(_arg) {
@@ -1163,6 +1180,14 @@
       } else {
         return (_ref = (_ref2 = x.constructor) != null ? _ref2.name : void 0) != null ? _ref : (Object.prototype.toString.call(x)).match(/\s(\w+)/)[1];
       }
+    };
+    self.underscore_methods = {
+      collections: ["each", "map", "find", "detect", "filter", "select", "all", "every", "any", "some", "include", "contains", "invoke", "pluck", "sortBy", "groupBy", "sortedIndex", "shuffle", "toArray", "size"],
+      arrays: ["first", "head", "initial", "last", "rest", "tail", "compact", "flatten", "without", "union", "intersection", "difference", "uniq", "unique", "zip"],
+      functions: ["memoize", "delay", "defer", "throttle", "debounce", "once", "after", "wrap", "compose"],
+      objects: ["keys", "values", "functions", "methods", "extend", "defaults", "clone", "create", "tap", "isEmpty", "isElement", "isArray", "isArguments", "isFunction", "isString", "isNumber", "isBoolean", "isDate", "isUndefined"],
+      utility: ["identity", "times", "mixin", "escape", "template"],
+      chaining: []
     };
     return self;
   });

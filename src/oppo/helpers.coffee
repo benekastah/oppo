@@ -28,5 +28,99 @@ oppo.module "oppo.helpers", ["compiler"], ({compile}) ->
       typeof x
     else
       x.constructor?.name ? (Object::toString.call x).match(/\s(\w+)/)[1]
+      
+  ## Set forth the underscore methods.
+  ## Methods on the same line are aliases to the same function.
+  ## Entries that are commented out are entries that exist in underscore,
+  ## but we're modifying the name, functionality or are leaving out.
+  self.underscore_methods =
+    collections: [
+      "each", # "forEach"
+      "map"
+      # "reduce", "inject", "foldl",
+      # "reduceRight", "foldr"
+      "find", "detect"
+      "filter", "select"
+      "all", "every"
+      "any", "some"
+      "include", "contains"
+      "invoke"
+      "pluck"
+      # "max"
+      # "min"
+      "sortBy"
+      "groupBy"
+      "sortedIndex"
+      "shuffle"
+      "toArray"
+      "size"
+    ]
+    arrays: [
+      "first", "head"
+      "initial"
+      "last"
+      "rest", "tail"
+      "compact"
+      "flatten"
+      "without"
+      "union"
+      "intersection"
+      "difference"
+      "uniq", "unique"
+      "zip"
+      # "indexOf"
+      # "lastIndexOf"
+      # "range"
+    ]
+    functions: [
+      # "bind"
+      # "bindAll"
+      "memoize"
+      "delay"
+      "defer"
+      "throttle"
+      "debounce"
+      "once"
+      "after"
+      "wrap"
+      "compose"
+    ]
+    objects: [
+      "keys"
+      "values"
+      "functions", "methods"
+      "extend"
+      "defaults"
+      "clone"
+      "create" # our own function, added in module
+      "tap"
+      # "isEqual"
+      "isEmpty"
+      "isElement"
+      "isArray"
+      "isArguments"
+      "isFunction"
+      "isString"
+      "isNumber"
+      "isBoolean"
+      "isDate"
+      # "isRegExp"
+      # "isNaN"
+      # "isNull"
+      "isUndefined"
+    ]
+    utility: [
+      # "noConflict"
+      "identity"
+      "times"
+      "mixin"
+      # "uniqueId"
+      "escape"
+      "template"
+    ]
+    chaining: [
+      # "chain"
+      # "value"
+    ]
     
   self

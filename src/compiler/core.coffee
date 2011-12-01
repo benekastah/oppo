@@ -1,5 +1,5 @@
 
-oppo.module "compiler.core", ["compiler", "compiler.helpers"], ({compile}, helpers) ->
+oppo.module "compiler.core", ["compiler", "compiler.helpers", "underscore"], ({compile}, helpers, _) ->
   self = this
   
   self.identifier = (ident) ->
@@ -21,7 +21,7 @@ oppo.module "compiler.core", ["compiler", "compiler.helpers"], ({compile}, helpe
   
   self.program = (first, args) ->
     base_deps = ["global", "require", "load"]
-    if first?[0]? is "module"
+    if first?[0] is "module"
       first[2] ?= []
       first[2] = [base_deps..., first[2]...]
       compile first.concat args[1..]
@@ -87,51 +87,45 @@ oppo.module "compiler.core", ["compiler", "compiler.helpers"], ({compile}, helpe
       compile [["lambda", [], vars..., body...]]
     
   # Module functions
-  self.defm = (ident, val) ->
-    err = compile ["def-error", "\"#{ident}\""]
-    ident = if ident is "self" then ident else "self['#{compile ident}']"
-    val = compile val
-    helpers.def ident, val, err
-    
-  self.setm = (ident, val) ->
-    err = compile ["set-error", "\"#{ident}\""]
-    ident = if ident is "self" then ident else "self['#{compile ident}']"
-    val = compile val
-    helpers.set ident, val, err
-    
   self.def = (ident, val) ->
     err = compile ["def-error", "\"#{ident}\""]
-    ident = compile [".", "_private", ident]
+    ident = compile ident
     val = compile val
-    helpers.set ident, val, err
+    
+    # We have a simple variable
+    if helpers.is_js_identifier ident
+      helpers.Var.track new helpers.Var ident
+    
+    helpers.def ident, val, err
     
   self.set = (ident, val) ->
     err = compile ["set-error", "\"#{ident}\""]
-    ident = compile [".", "_private", ident]
+    ident = compile ident
     val = compile val
     helpers.set ident, val, err
     
   self.module = (name, deps, body...) ->
     name = "\"#{name}\""
     
-    vars = [
-      new helpers.Var "self", "this"
-      new helpers.Var "_private", "Object.create(global)"
-    ]
+    Var = helpers.Var
+    Var.new_set()
+    Var.track new Var "self", "this"
     
     body = body.map (item) -> compile item
+    args = _.map deps, (item) -> compile item
+    vars = Var.grab()
     
     fn = """
-    (function (#{deps.join ', '}) {
+    (function (#{args.join ', '}) {
       #{vars.join '\n  '}
-      with (_private) {
-        #{body.join ',\n  '};
+      with (this) {
+        #{body.join ',\n    '};
       }
-      return this.self;
+      return self;
     })
     """
     
-    deps = helpers.stringify.to_js deps.map (dep) -> "\"#{dep}\""
+    deps = helpers.stringify.to_js _.map (deps or []), (dep) -> "\"#{dep}\""
     "(oppo || require('oppo')).module(#{name}, #{deps}, #{fn})"
     
   # javascript interop helpers

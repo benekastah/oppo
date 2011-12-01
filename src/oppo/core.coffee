@@ -14,37 +14,10 @@ oppo.module "oppo.core", [
   
   {global_method_set, global_method_get, make_prototype_method} = helpers.get_runtime_builders self
   
-  ## Some basic macros
-  oppo_data = oppo.read '''
-  (defmacro defn (fname args ...body)
-    `(def fname
-      (lambda args
-        ...body)))
-    
-  (defmacro apply (fn ...args ls)
-    `((. fn apply) fn (concat args ls)))
-    
-  (defmacro call (fn ...args)
-    `(apply fn args))
-    
-  (defmacro do (...body)
-    `(call (lambda () (...body))))
-    
-  (defmacro not= (...args)
-    `(not (= ...args)))
-    
-  (defmacro not== (...args)
-    `(not (== ...args)))
-    
-  (defmacro not=== (...args)
-    `(not (=== ...args)))
-  '''
-  oppo.eval oppo_data
-  
   ## Error handling
   global_method_set "throw", do ->
     toString = ->
-      info = if @info? then "\n\n  Additional Info: #{@info.join(', ')}" else ""
+      info = if @info? then "\n  Additional Info: #{@info.join(', ').trim() or 'none'}" else ""
       "#{@type}: #{@message}#{info}"
     (type, message, info...) ->
       throw {type, message, info, toString}
@@ -151,105 +124,11 @@ oppo.module "oppo.core", [
         # if was_string and _.isArray result
         #   result = result.join ''
         result
-      
-    ## Set forth the underscore methods.
-    ## Methods on the same line are aliases to the same function.
-    ## Entries that are commented out are entries that exist in underscore,
-    ## but we're modifying the name, functionality or are leaving out.
-    methods =
-      collections: [
-        "each", # "forEach"
-        "map"
-        # "reduce", "inject", "foldl",
-        # "reduceRight", "foldr"
-        "find", "detect"
-        "filter", "select"
-        "all", "every"
-        "any", "some"
-        "include", "contains"
-        "invoke"
-        "pluck"
-        # "max"
-        # "min"
-        "sortBy"
-        "groupBy"
-        "sortedIndex"
-        "shuffle"
-        "toArray"
-        "size"
-      ]
-      arrays: [
-        "first", "head"
-        "initial"
-        "last"
-        "rest", "tail"
-        "compact"
-        "flatten"
-        "without"
-        "union"
-        "intersection"
-        "difference"
-        "uniq", "unique"
-        "zip"
-        # "indexOf"
-        # "lastIndexOf"
-        # "range"
-      ]
-      functions: [
-        # "bind"
-        # "bindAll"
-        "memoize"
-        "delay"
-        "defer"
-        "throttle"
-        "debounce"
-        "once"
-        "after"
-        "wrap"
-        "compose"
-      ]
-      objects: [
-        "keys"
-        "values"
-        "functions", "methods"
-        "extend"
-        "defaults"
-        "clone"
-        "create" # our own function, added in module
-        "tap"
-        # "isEqual"
-        "isEmpty"
-        "isElement"
-        "isArray"
-        "isArguments"
-        "isFunction"
-        "isString"
-        "isNumber"
-        "isBoolean"
-        "isDate"
-        # "isRegExp"
-        # "isNaN"
-        # "isNull"
-        "isUndefined"
-      ]
-      utility: [
-        # "noConflict"
-        "identity"
-        "times"
-        "mixin"
-        # "uniqueId"
-        "escape"
-        "template"
-      ]
-      chaining: [
-        # "chain"
-        # "value"
-      ]
+    
+    methods = helpers.underscore_methods
       
     list_methods = methods.collections.concat methods.arrays
     general_methods = methods.functions.concat methods.objects, methods.utility, methods.chaining
-    
-    console.log general_methods
       
     for method in list_methods
       global_method_set (method_name method), _list_proxy _[method]
@@ -267,6 +146,34 @@ oppo.module "oppo.core", [
     
     global_method_set "index", _.indexOf
     global_method_set "last-index", _.lastIndexOf
+    
+  ## Some basic macros
+  ## This goes last so that the entire runtime is built before it executes
+  oppo_data = oppo.read '''
+  (defmacro defn (fname args ...body)
+    `(def fname
+      (lambda args
+        ...body)))
+
+  (defmacro apply (fn ...args ls)
+    `((. fn apply) fn (concat args ls)))
+
+  (defmacro call (fn ...args)
+    `(apply fn args))
+
+  (defmacro do (...body)
+    `(call (lambda () (...body))))
+
+  (defmacro not= (...args)
+    `(not (= ...args)))
+
+  (defmacro not== (...args)
+    `(not (== ...args)))
+
+  (defmacro not=== (...args)
+    `(not (=== ...args)))
+  '''
+  oppo.eval oppo_data
     
   self
   

@@ -32,6 +32,7 @@ oppo.module = do ->
   _module_list = {}
   _requiring = {}
   _requiring_submodules = {}
+  _waiting = {}
   
   _module_list_traverse = (name, eachback) ->
     namespace = name.split '.'

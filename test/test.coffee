@@ -26,14 +26,14 @@ oppo.module "test", ["oppo"], (oppo) ->
   
   ast = oppo.read '''
   
-  (defn fact (n)
-    (if ~(n <= 2)
-      n
-      ~(n * (fact ~(n - 1)))))
+  ;(defn fact (n)
+  ;  (if ~(n <= 2)
+  ;    n
+  ;    ~(n * (fact ~(n - 1)))))
 
-  (fact 5)
+  ;(fact 5)
   
-  (print (macroexpand-1 `(defn a () (+ 1 1))))
+  (+ 1 1)
 
   '''
 

@@ -32,6 +32,7 @@ run = (buffer) ->
     result = oppo.compile oppo_data
   else
     result = oppo.eval oppo_data
+    try result = JSON.stringify result
   console.log result
   
   prompt()
