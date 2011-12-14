@@ -1,0 +1,5 @@
+(defmacro do (body)
+  ())
+
+(defmacro lambda (fname args body)
+  ())
