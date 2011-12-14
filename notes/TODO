@@ -1,5 +1,0 @@
-* identifiers should be case-insensitive, unless accessing native JS stuff
-* unless accessing native JS stuff directly, evaluation should be lazy
-* memoization
-* tail-call optimization
-* convert code to continuation-passing style in compilation
