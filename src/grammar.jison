@@ -44,7 +44,7 @@
 
 program
   : s_expression_list EOF
-    { return ["program"].concat($1); }
+    { return ["do"].concat($1); }
   ;
 
 s_expression_list
@@ -119,6 +119,8 @@ special_form
     { $$ = ["quote", $2]; }
   | SYNTAX_QUOTE s_expression
     { $$ = ["syntaxQuote", $2]; }
+  | SYNTAX_EXPAND s_expression
+    { $$ = ["syntaxExpand", $2]; }
   | FUNCTION element_list ')'
     { $$ = ["lambda", [], $2]; }
   | INFIX element_list ')'

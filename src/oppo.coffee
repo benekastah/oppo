@@ -1,185 +1,123 @@
-global ?= window
-Parser ?= require './parser'
-_ ?= require 'underscore'
+
 oppo = exports ? (global.oppo = {})
 compiler = oppo.compiler ?= {}
-
-_.mixin
-  objectSet: (o, s, v) ->
-    [s, v, o] = [o, s, null] if arguments.length < 3
-    
-    o ?= global
-    path = (s ? "").split "."
-    _final = path.pop()
-    get = (o, k) -> o[k] ?= {}
-    
-    ret = _.reduce path, get, o
-    ret[_final] = v
-
-# comment out the keywords that we use as themselves within oppo
-JS_KEYWORDS = [
-  "break"
-  "class"
-  "const"
-  "continue"
-  "debugger"
-  "default"
-  "delete"
-  "do"
-  "else"
-  "enum"
-  "export"
-  "extends"
-  "finally"
-  "for"
-  "function"
-  "if"
-  "implements"
-  "import"
-  "in"
-  "instanceof"
-  "interface"
-  "label"
-  "let"
-  "new"
-  "package"
-  "private"
-  "protected"
-  "public"
-  "static"
-  "return"
-  "switch"
-  "super"
-  "this"
-  "throw"
-  "try"
-  "catch"
-  "typeof"
-  "var"
-  "void"
-  "while"
-  "with"
-  "yield"
-]
-
-JS_ILLEGAL_IDENTIFIER_CHARS =
-  "~": "tilde"
-  "`": "backtick"
-  "!": "exclmark"
-  "@": "at"
-  "#": "pound"
-  "%": "percent"
-  "^": "carat"
-  "&": "amperstand"
-  "*": "star"
-  "(": "oparen"
-  ")": "cparen"
-  "-": "dash"
-  "+": "plus"
-  "=": "equals"
-  "{": "ocurly"
-  "}": "ccurly"
-  "[": "osquare"
-  "]": "csquare"
-  "|": "pipe"
-  "\\": "bslash"
-  "\"": "dblquote"
-  "'": "snglquote"
-  ":": "colon"
-  ";": "semicolon"
-  "<": "oangle"
-  ">": "rangle"
-  ",": "comma"
-  ".": "dot"
-  "?": "qmark"
-  "/": "fslash"
-  " ": "space"
-  "\t": "tab"
-  "\n": "newline"
-  "\r": "return"
-  "\v": "vertical"
-  "\0": "null"
-
-cantParse = (o) -> new TypeError "Can't parse: #{o}"
-
-is_string = (s) -> (_.isString s) and /^".*"$/.test s
-is_number = (n) -> not _.isNaN n
-is_symbol = (s) -> (_.isString s) and (not is_number s) and (not is_string s)
-
-to_js_symbol = (s) ->
-  # Modify keywords
-  for keyword in JS_KEYWORDS
-    ident = if ident is keyword then "_#{ident}_" else ident
-  
-  # Sanitize special characters
-  # Simply convert dashes to underscores
-  ident = ident.replace /\-/g, '_'
-  for own _char, replaced of JS_ILLEGAL_IDENTIFIER_CHARS
-    while (ident.indexOf _char) >= 0
-      ident = ident.replace _char, "_#{replaced}_"
-  
-  ident
-  
-destring = (s) -> 
-  new_s = s.replace /^"/, ''
-  if new_s isnt s
-    new_s = new_s.replace /"$/, ''
-  new_s
 
 ###
 READER, EVAL, COMPILE
 ###
-oppo.read = compiler.read = (string) -> Parser.parse string
+read = oppo.read = compiler.read = (string) ->
+  trimmed = trim.call string
+  string = "nil" if trimmed is ''
+  Parser.parse string
 
-oppo.eval = compiler.eval = (sexp) ->
+compile = oppo.compile = compiler.compile = (sexp) ->
+  ret = "null"
   if (is_string sexp) or (is_number sexp)
-    return sexp
+    ret = sexp
   else if is_symbol sexp
-    to_js_symbol sexp
+    ret = to_js_symbol sexp
   else if _.isArray sexp
-    call = oppo.eval _.first sexp
-    if (macro = compiler[call])
-      macro program[1..]...
+    fn = oppo.eval _.first sexp
+    if (macro = compiler[fn])
+      args = program[1..]
+      ret = macro args...
     else
-      throw cantParse sexp
+      ret = compiler.call sexp
   else
-    throw cantParse sexp
+    raiseParseError sexp
     
-oppo.compile = compiler.compile = _.compose oppo.eval, oppo.read
+  ret
+    
+eval = oppo.eval = compiler.eval = _.compose eval, oppo.compile
+
+###
+MISC
+###
+compiler.def = (name, value) ->
+  name = compile name
+  value = compile value
+  current_group = last_var_group()
+  raiseDefError name if name in current_group
+  current_group.push name
+  "#{name} = #{value}"
+  
+compiler[compile 'set!'] = (name, value) ->
+  name = compile name
+  value = compile value
+  "typeof #{name} !== 'undefined' ? #{name} = #{value} : !function () { throw \"Can't set variable that has not been defined: #{name}\" }()"
+
+compiler.js_eval = (js) -> destring js
+
+compiler.call = (fn, args...) -> "#{fn}(#{args.join ', '})"
+
+compiler.do = (body...) ->
+  compiled_body = _.map body, compile
+  ret = compiled_body.join ',\n'
+  "(#{ret})"
+
+###
+FUNCTIONS
+###
+get_args = (args) ->
+  destructure = _.any args, is_splat
+  
+  if (destructure)
+    vars = destructure_list args, "arguments"
+    args = []
+    body = []
+    (body.push ['def', _var[0], ['js-eval', _var[1]]]) for _var in vars
+  else
+    args = args.map (arg) -> compile arg
+    body = []
+    
+  [args, body]
+
+compiler.lambda = (args, body...) ->
+  [args, body] = get_args args
+  vars = end_var_group()
+  var_stmt = if vars.length "var #{vars.join ', '};\n" else ''
+  body = _.map body, compile
+  """
+  (function (#{args.join ", "}) {
+    #{var_stmt}return #{body.join ', '};
+  })
+  """
 
 ###
 MACROS
 ###
 compiler.defmacro = (name, argnames, template) ->
-  _.objectSet compiler, name, (args) ->
-    newSyntaxQuote = _.bind compiler.syntaxQuote, argnames, args
-    [oldSyntaxQuote, compiler.syntaxQuote] = [compiler.syntaxQuote, newSyntaxQuote]
+  objectSet compiler, name, (args...) ->
+    evald = oppo.eval [['lambda', argnames, template] '...args']
+    oppo.compile evald
     
-    body = oppo.eval template
+compiler.syntax_quote = (sexpr) ->
+  SPECIAL = ['unquote', 'unquote-splice']
+  special_list = []
     
-    compiler.syntaxQuote = oldSyntaxQuote
-    oppo.eval body
-    
-compiler.syntaxExpand = (argnames, args, item) ->
-  if arguments.length < 3
-    throw new TypeError "Can't expand syntax outside of macro: #{item}"
+  each_item = (item, i, ls, parent, parent_index) ->
+    if i is 0
+      switch item
+        when 'unquote'
+          return compiler.unquote item, true
+        when 'unquote_splice'
+          list = compiler.unquote_splice item, true
+          list = [list] if not _.isArray list
+          end_list = []
+          while parent.length >= parent_index
+            end_list.unshift parent.pop()
+          parent.push.apply parent, list.concat end_list
+    item
+
+  recursive_map sexpr, each_item
   
-  index = _.indexOf argnames, item
-  if index >= 0
-    compile args[index]
-  else
-    throw new TypeError "No replacement found for #{item}."
     
-compiler.syntaxQuote = (argnames, args, item) ->
-  if arguments.length < 3
-    throw new TypeError "Can't expand syntax outside of macro: #{item}"
-    
-  newSyntaxExpand = _.bind compiler.syntaxExpand, argnames, args
-  [oldSyntaxExpand, compiler.syntaxExpand] = [compiler.syntaxExpand, newSyntaxExpand]
-  
-  ret = oppo.eval item
-  
-  compiler.syntaxExpand = oldSyntaxExpand
-  ret
-  
-compiler['js-eval'] = (js) -> destring js
+compiler.unquote = (item, syntax_quote) ->
+  if not syntax_quote
+    raise TypeError, "Cannot unquote item outside of a syntax quote"
+  oppo.compile item
+
+compiler.unquote_splice = (item, syntax_quote) ->
+  if not syntax_quote
+    raise TypeError, "Cannot unquote-splice item outside of a syntax quote"
+  oppo.compile item

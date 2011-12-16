@@ -1,3 +1,0 @@
-oppo = require '../'
-
-oppo.eval

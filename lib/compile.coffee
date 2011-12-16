@@ -3,7 +3,7 @@ fs = require 'fs'
 oppo = require '../'
 cwd = process.cwd()
 
-console.log "oppo", oppo
+# console.log "oppo", oppo
 
 getFiles = (file_and_dir_list) ->
   files = []
@@ -24,8 +24,13 @@ getFiles = (file_and_dir_list) ->
       files.push full_item
   files
 
-module.exports = compile = (output_dir, source_files, watch) ->
+module.exports = compile = (output, source_files, watch) ->
   files = getFiles source_files
+  if /\.js$/.test output
+    output_fname = path.basename output
+    output_dir = path.dirname output
+  else
+    output_dir = output
   
   for file in files
     dir = path.dirname file
@@ -37,9 +42,11 @@ module.exports = compile = (output_dir, source_files, watch) ->
     if not /\.oppo$/.test fname
       fname = "#{file}.oppo"
     jsfile = fname.replace /\.oppo$/, '.js'
-    jsfile = "#{output_dir ? dir}/#{jsfile}"
+    jsfile = path.join output_dir ? dir, output_fname ? jsfile
     
     fs.readFile file, 'utf8', (err, code) ->
+      throw err if err
+      
       read_code = oppo.read code
       compiled_code = oppo.compile read_code
       
