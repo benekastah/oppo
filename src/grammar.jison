@@ -79,9 +79,9 @@ callable_list
 
 typed_list
   : '[' element_list ']'
-    { $$ = ["typed-list"].concat($2); }
+    { $$ = ["quote", $2]; }
   | '[' ']'
-    { $$ = ["typed-list"]; }
+    { $$ = ["quote", []]; }
   ;
   
 hash_map

@@ -1,39 +1,58 @@
 
+parser ?= require './parser'
 oppo = exports ? (global.oppo = {})
 compiler = oppo.compiler ?= {}
 
 ###
 READER, EVAL, COMPILE
 ###
-read = oppo.read = compiler.read = (string) ->
+read = oppo.read = (string) ->
   trimmed = trim.call string
   string = "nil" if trimmed is ''
-  Parser.parse string
+  parser.parse string
 
-compile = oppo.compile = compiler.compile = (sexp) ->
-  ret = "null"
-  if (is_string sexp) or (is_number sexp)
+began = false
+compile = oppo.compile = (sexp) ->
+  if not began
+    top_level = began = true
+  
+  if not sexp?
+    ret = "null"
+  else if sexp is true
+    ret = "true"
+  else if sexp is false
+    ret = "false"
+  else if (is_string sexp) or (is_number sexp)
     ret = sexp
   else if is_symbol sexp
     ret = to_js_symbol sexp
   else if _.isArray sexp
-    fn = oppo.eval _.first sexp
+    fn = oppo.compile _.first sexp
     if (macro = compiler[fn])
-      args = program[1..]
+      args = sexp[1..]
       ret = macro args...
     else
-      ret = compiler.call sexp
+      ret = compiler.call.apply null, sexp
   else
     raiseParseError sexp
     
+  if top_level or not began
+    began = false
+    vars = end_final_var_group()
+    if vars.length
+      ret = """
+      var #{vars.join ', '};
+      #{ret};
+      """
+    
   ret
     
-eval = oppo.eval = compiler.eval = _.compose eval, oppo.compile
+oppo.eval = _.compose (_.bind global.eval, global), oppo.compile
 
 ###
 MISC
 ###
-compiler.def = (name, value) ->
+compiler[compile 'var'] = (name, value, current_group=last_var_group()) ->
   name = compile name
   value = compile value
   current_group = last_var_group()
@@ -41,19 +60,60 @@ compiler.def = (name, value) ->
   current_group.push name
   "#{name} = #{value}"
   
+compiler.def = (name, value) ->
+  compiler[compile 'var'] name, value, first_var_group()
+  
 compiler[compile 'set!'] = (name, value) ->
   name = compile name
   value = compile value
-  "typeof #{name} !== 'undefined' ? #{name} = #{value} : !function () { throw \"Can't set variable that has not been defined: #{name}\" }()"
+  compile ['if', ['js-eval', "typeof #{name} !== 'undefined'"]
+    ['js-eval', "#{name} = #{value}"]
+    ['throw', "Can't set variable that has not been defined: #{name}"]]
 
 compiler.js_eval = (js) -> destring js
 
-compiler.call = (fn, args...) -> "#{fn}(#{args.join ', '})"
-
-compiler.do = (body...) ->
-  compiled_body = _.map body, compile
+compiler[compile 'do'] = (body...) ->
+  compiled_body = _.map arguments, compile
   ret = compiled_body.join ',\n'
   "(#{ret})"
+
+compiler[compile 'if'] = (test, t, f) ->
+  if arguments.length is 2
+    Array::push.call arguments, f
+  [c_test, c_t, c_f] = _.map arguments, compile
+  """
+  (/* if */ #{c_test} ?
+    /* then */ #{c_t} :
+    /* else */ #{c_f})
+  """
+    
+compiler.map = (sexp) ->
+  ret = "{ "
+  for item, i in sexp
+    if i % 2 is 0
+      c_key = compile item
+      ret += "#{c_key} : "
+    else
+      c_value = compile item
+      ret += "#{c_value},\n"
+  ret.replace /,\n$/, ' }'
+    
+compiler.quote = (sexp) ->
+  if _.isArray sexp
+    q_sexp = _.map sexp, compiler.quote
+    "[#{q_sexp.join ', '}]"
+  else
+    "\"#{sexp}\"".replace(/^""/, '"\\"').replace /""$/, '\\""'
+    
+
+compiler.eval = -> compiler.call 'oppo.eval', arguments...
+
+###
+ERRORS
+###
+compiler[compile 'throw'] = (err) ->
+  c_err = compile err
+  "!function () { throw #{c_err} }()"
 
 ###
 FUNCTIONS
@@ -73,15 +133,21 @@ get_args = (args) ->
   [args, body]
 
 compiler.lambda = (args, body...) ->
-  [args, body] = get_args args
+  new_var_group()
+  [args, argsbody] = get_args args
+  body = _.map [argsbody..., body...], compile
   vars = end_var_group()
-  var_stmt = if vars.length "var #{vars.join ', '};\n" else ''
-  body = _.map body, compile
+  var_stmt = if vars.length then "var #{vars.join ', '};\n" else ''
   """
   (function (#{args.join ", "}) {
     #{var_stmt}return #{body.join ', '};
   })
   """
+  
+compiler.call = (fn, args...) ->
+  c_fn = compile fn
+  c_args = _.map args, compile
+  "#{c_fn}(#{c_args.join ', '})"
 
 ###
 MACROS

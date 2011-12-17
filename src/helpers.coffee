@@ -1,5 +1,4 @@
 global ?= window
-Parser ?= require './parser'
 _ ?= require 'underscore'
 
 JS_KEYWORDS = [
@@ -75,7 +74,8 @@ JS_ILLEGAL_IDENTIFIER_CHARS =
   "<": "oangle"
   ">": "rangle"
   ",": "comma"
-  ".": "dot"
+  # Leave the dots in for member access
+  # ".": "dot"
   "?": "qmark"
   "/": "fslash"
   " ": "space"
@@ -86,8 +86,9 @@ JS_ILLEGAL_IDENTIFIER_CHARS =
   "\0": "null"
 
 is_string = (s) -> (_.isString s) and /^".*"$/.test s
-is_number = (n) -> not _.isNaN n
+is_number = (n) -> not _.isNaN Number n
 is_symbol = (s) -> (_.isString s) and (not is_number s) and (not is_string s)
+is_splat = (s) -> (_.isArray s) and s[0] is 'splat'
 
 objectSet = (o, s, v) ->
   [s, v, o] = [o, s, null] if arguments.length < 3
@@ -108,7 +109,7 @@ recursive_map = (ls, fn, pass_back, parent, parent_index) ->
     else
       self.recursive_map item, fn, pass_back, ls, i
 
-to_js_symbol = (s) ->
+to_js_symbol = (ident) ->
   # Modify keywords
   for keyword in JS_KEYWORDS
     ident = if ident is keyword then "_#{ident}_" else ident
@@ -157,13 +158,24 @@ raiseDefError = (name) -> raise "DefError", "Can't define previously defined val
 Vars
 ###
 # Define our variables to export from anonymous function scope
-[new_var_group, last_var_group, end_var_group] = []
+[new_var_group, last_var_group, end_var_group, end_final_var_group] = []
 do ->
   # initial array in var_groups is for the main scope
   var_groups = [ [] ]
   new_var_group = -> var_groups.push []
   last_var_group = -> _.last var_groups
-  end_var_group = -> var_groups.pop()
+  first_var_group = -> var_groups[0]
+  
+  end_var_group = -> 
+    ret = var_groups.pop()
+    if var_groups.length is 0
+      var_groups.push []
+    ret
+    
+  end_final_var_group = ->
+    if var_groups.length isnt 1
+      raise "VarGroupsError", "Expecting 1 final var group, got #{var_groups.length} instead"
+    end_var_group()
   
   
 ###

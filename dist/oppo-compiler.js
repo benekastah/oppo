@@ -1,12 +1,8 @@
 (function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, compile, compiler, destring, destructure_list, end_var_group, eval, gensym, get_args, is_number, is_string, is_symbol, last_var_group, make_error, new_var_group, objectSet, oppo, raise, raiseDefError, raiseParseError, read, recursive_map, to_js_symbol, trim, _ref, _ref2, _ref3;
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, compile, compiler, destring, destructure_list, end_final_var_group, end_var_group, gensym, get_args, is_number, is_splat, is_string, is_symbol, last_var_group, make_error, new_var_group, objectSet, oppo, raise, raiseDefError, raiseParseError, read, recursive_map, to_js_symbol, trim, _ref, _ref2, _ref3;
   var __hasProp = Object.prototype.hasOwnProperty, __indexOf = Array.prototype.indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (__hasProp.call(this, i) && this[i] === item) return i; } return -1; }, __slice = Array.prototype.slice;
 
   if (typeof global === "undefined" || global === null) global = window;
-
-  if (typeof Parser === "undefined" || Parser === null) {
-    Parser = require('./parser');
-  }
 
   if (typeof _ === "undefined" || _ === null) _ = require('underscore');
 
@@ -40,7 +36,6 @@
     "<": "oangle",
     ">": "rangle",
     ",": "comma",
-    ".": "dot",
     "?": "qmark",
     "/": "fslash",
     " ": "space",
@@ -56,11 +51,15 @@
   };
 
   is_number = function(n) {
-    return !_.isNaN(n);
+    return !_.isNaN(Number(n));
   };
 
   is_symbol = function(s) {
     return (_.isString(s)) && (!is_number(s)) && (!is_string(s));
+  };
+
+  is_splat = function(s) {
+    return (_.isArray(s)) && s[0] === 'splat';
   };
 
   objectSet = function(o, s, v) {
@@ -94,8 +93,8 @@
     });
   };
 
-  to_js_symbol = function(s) {
-    var ident, keyword, replaced, _char, _i, _len;
+  to_js_symbol = function(ident) {
+    var keyword, replaced, _char, _i, _len;
     for (_i = 0, _len = JS_KEYWORDS.length; _i < _len; _i++) {
       keyword = JS_KEYWORDS[_i];
       ident = ident === keyword ? "_" + ident + "_" : ident;
@@ -161,10 +160,10 @@
   Vars
   */
 
-  _ref2 = [], new_var_group = _ref2[0], last_var_group = _ref2[1], end_var_group = _ref2[2];
+  _ref2 = [], new_var_group = _ref2[0], last_var_group = _ref2[1], end_var_group = _ref2[2], end_final_var_group = _ref2[3];
 
   (function() {
-    var var_groups;
+    var first_var_group, var_groups;
     var_groups = [[]];
     new_var_group = function() {
       return var_groups.push([]);
@@ -172,8 +171,20 @@
     last_var_group = function() {
       return _.last(var_groups);
     };
-    return end_var_group = function() {
-      return var_groups.pop();
+    first_var_group = function() {
+      return var_groups[0];
+    };
+    end_var_group = function() {
+      var ret;
+      ret = var_groups.pop();
+      if (var_groups.length === 0) var_groups.push([]);
+      return ret;
+    };
+    return end_final_var_group = function() {
+      if (var_groups.length !== 1) {
+        raise("VarGroupsError", "Expecting 1 final var group, got " + var_groups.length + " instead");
+      }
+      return end_var_group();
     };
   })();
 
@@ -218,6 +229,10 @@
     return result;
   };
 
+  if (typeof parser === "undefined" || parser === null) {
+    parser = require('./parser');
+  }
+
   oppo = typeof exports !== "undefined" && exports !== null ? exports : (global.oppo = {});
 
   compiler = (_ref3 = oppo.compiler) != null ? _ref3 : oppo.compiler = {};
@@ -226,42 +241,55 @@
   READER, EVAL, COMPILE
   */
 
-  read = oppo.read = compiler.read = function(string) {
+  read = oppo.read = function(string) {
     var trimmed;
     trimmed = trim.call(string);
     if (trimmed === '') string = "nil";
-    return Parser.parse(string);
+    return parser.parse(string);
   };
 
-  compile = oppo.compile = compiler.compile = function(sexp) {
-    var args, fn, macro, ret;
-    ret = "null";
-    if ((is_string(sexp)) || (is_number(sexp))) {
+  began = false;
+
+  compile = oppo.compile = function(sexp) {
+    var args, fn, macro, ret, top_level, vars;
+    if (!began) top_level = began = true;
+    if (!(sexp != null)) {
+      ret = "null";
+    } else if (sexp === true) {
+      ret = "true";
+    } else if (sexp === false) {
+      ret = "false";
+    } else if ((is_string(sexp)) || (is_number(sexp))) {
       ret = sexp;
     } else if (is_symbol(sexp)) {
       ret = to_js_symbol(sexp);
     } else if (_.isArray(sexp)) {
-      fn = oppo.eval(_.first(sexp));
+      fn = oppo.compile(_.first(sexp));
       if ((macro = compiler[fn])) {
-        args = program.slice(1);
+        args = sexp.slice(1);
         ret = macro.apply(null, args);
       } else {
-        ret = compiler.call(sexp);
+        ret = compiler.call.apply(null, sexp);
       }
     } else {
       raiseParseError(sexp);
     }
+    if (top_level || !began) {
+      began = false;
+      vars = end_final_var_group();
+      if (vars.length) ret = "var " + (vars.join(', ')) + ";\n" + ret + ";";
+    }
     return ret;
   };
 
-  eval = oppo.eval = compiler.eval = _.compose(eval, oppo.compile);
+  oppo.eval = _.compose(_.bind(global.eval, global), oppo.compile);
 
   /*
   MISC
   */
 
-  compiler.def = function(name, value) {
-    var current_group;
+  compiler[compile('var')] = function(name, value, current_group) {
+    if (current_group == null) current_group = last_var_group();
     name = compile(name);
     value = compile(value);
     current_group = last_var_group();
@@ -270,28 +298,73 @@
     return "" + name + " = " + value;
   };
 
+  compiler.def = function(name, value) {
+    return compiler[compile('var')](name, value, first_var_group());
+  };
+
   compiler[compile('set!')] = function(name, value) {
     name = compile(name);
     value = compile(value);
-    return "typeof " + name + " !== 'undefined' ? " + name + " = " + value + " : !function () { throw \"Can't set variable that has not been defined: " + name + "\" }()";
+    return compile(['if', ['js-eval', "typeof " + name + " !== 'undefined'"], ['js-eval', "" + name + " = " + value], ['throw', "Can't set variable that has not been defined: " + name]]);
   };
 
   compiler.js_eval = function(js) {
     return destring(js);
   };
 
-  compiler.call = function() {
-    var args, fn;
-    fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    return "" + fn + "(" + (args.join(', ')) + ")";
-  };
-
-  compiler["do"] = function() {
+  compiler[compile('do')] = function() {
     var body, compiled_body, ret;
     body = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    compiled_body = _.map(body, compile);
+    compiled_body = _.map(arguments, compile);
     ret = compiled_body.join(',\n');
     return "(" + ret + ")";
+  };
+
+  compiler[compile('if')] = function(test, t, f) {
+    var c_f, c_t, c_test, _ref4;
+    if (arguments.length === 2) Array.prototype.push.call(arguments, f);
+    _ref4 = _.map(arguments, compile), c_test = _ref4[0], c_t = _ref4[1], c_f = _ref4[2];
+    return "(/* if */ " + c_test + " ?\n  /* then */ " + c_t + " :\n  /* else */ " + c_f + ")";
+  };
+
+  compiler.map = function(sexp) {
+    var c_key, c_value, i, item, ret, _len;
+    ret = "{ ";
+    for (i = 0, _len = sexp.length; i < _len; i++) {
+      item = sexp[i];
+      if (i % 2 === 0) {
+        c_key = compile(item);
+        ret += "" + c_key + " : ";
+      } else {
+        c_value = compile(item);
+        ret += "" + c_value + ",\n";
+      }
+    }
+    return ret.replace(/,\n$/, ' }');
+  };
+
+  compiler.quote = function(sexp) {
+    var q_sexp;
+    if (_.isArray(sexp)) {
+      q_sexp = _.map(sexp, compiler.quote);
+      return "[" + (q_sexp.join(', ')) + "]";
+    } else {
+      return ("\"" + sexp + "\"").replace(/^""/, '"\\"').replace(/""$/, '\\""');
+    }
+  };
+
+  compiler.eval = function() {
+    return compiler.call.apply(compiler, ['oppo.eval'].concat(__slice.call(arguments)));
+  };
+
+  /*
+  ERRORS
+  */
+
+  compiler[compile('throw')] = function(err) {
+    var c_err;
+    c_err = compile(err);
+    return "!function () { throw " + c_err + " }()";
   };
 
   /*
@@ -319,13 +392,22 @@
   };
 
   compiler.lambda = function() {
-    var args, body, var_stmt, vars, _ref4;
+    var args, argsbody, body, var_stmt, vars, _ref4;
     args = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    _ref4 = get_args(args), args = _ref4[0], body = _ref4[1];
+    new_var_group();
+    _ref4 = get_args(args), args = _ref4[0], argsbody = _ref4[1];
+    body = _.map(__slice.call(argsbody).concat(__slice.call(body)), compile);
     vars = end_var_group();
-    var_stmt = vars.length("var " + (vars.join(', ')) + ";\n") ? void 0 : '';
-    body = _.map(body, compile);
+    var_stmt = vars.length ? "var " + (vars.join(', ')) + ";\n" : '';
     return "(function (" + (args.join(", ")) + ") {\n  " + var_stmt + "return " + (body.join(', ')) + ";\n})";
+  };
+
+  compiler.call = function() {
+    var args, c_args, c_fn, fn;
+    fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    c_fn = compile(fn);
+    c_args = _.map(args, compile);
+    return "" + c_fn + "(" + (c_args.join(', ')) + ")";
   };
 
   /*
