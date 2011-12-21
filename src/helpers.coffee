@@ -74,8 +74,7 @@ JS_ILLEGAL_IDENTIFIER_CHARS =
   "<": "oangle"
   ">": "rangle"
   ",": "comma"
-  # Leave the dots in for member access
-  # ".": "dot"
+  ".": "dot"
   "?": "qmark"
   "/": "fslash"
   " ": "space"
@@ -85,10 +84,9 @@ JS_ILLEGAL_IDENTIFIER_CHARS =
   "\v": "vertical"
   "\0": "null"
 
-is_string = (s) -> (_.isString s) and /^".*"$/.test s
-is_number = (n) -> not _.isNaN Number n
-is_symbol = (s) -> (_.isString s) and (not is_number s) and (not is_string s)
-is_splat = (s) -> (_.isArray s) and s[0] is 'splat'
+is_splat = (s) -> s?[0]?[1] is 'splat'
+is_unquote = (u) -> u?[0]?[1] is 'unquote'
+is_symbol = (s) -> s?[0] is 'symbol'
 
 objectSet = (o, s, v) ->
   [s, v, o] = [o, s, null] if arguments.length < 3
@@ -107,7 +105,7 @@ recursive_map = (ls, fn, pass_back, parent, parent_index) ->
     if pass_back item
       fn item, i, ls, parent, parent_index
     else
-      self.recursive_map item, fn, pass_back, ls, i
+      recursive_map item, fn, pass_back, ls, i
 
 to_js_symbol = (ident) ->
   # Modify keywords
@@ -122,12 +120,6 @@ to_js_symbol = (ident) ->
       ident = ident.replace _char, "_#{replaced}_"
   
   ident
-  
-destring = (s) -> 
-  new_s = s.replace /^"/, ''
-  if new_s isnt s
-    new_s = new_s.replace /"$/, ''
-  new_s
   
 gensym = (sym='gen') ->
   num = (Math.floor Math.random() * 1e+10).toString 32
@@ -158,13 +150,13 @@ raiseDefError = (name) -> raise "DefError", "Can't define previously defined val
 Vars
 ###
 # Define our variables to export from anonymous function scope
-[new_var_group, last_var_group, end_var_group, end_final_var_group] = []
+[new_var_group, first_var_group, last_var_group, end_var_group, end_final_var_group] = []
 do ->
   # initial array in var_groups is for the main scope
   var_groups = [ [] ]
   new_var_group = -> var_groups.push []
-  last_var_group = -> _.last var_groups
   first_var_group = -> var_groups[0]
+  last_var_group = -> _.last var_groups
   
   end_var_group = -> 
     ret = var_groups.pop()
@@ -181,7 +173,7 @@ do ->
 ###
 List destructuring
 ###
-destructure_list = (pattern, sourceName) ->
+desplat_list = (pattern, sourceName, jsfn) ->
   result = []
   
   patternLen = pattern.length
@@ -198,18 +190,36 @@ destructure_list = (pattern, sourceName) ->
   }
   
   for item, i in pattern
-    if self.is_splat item
+    if is_splat item
+      item = compile item[1]
       oldSourceIndex = "#{sourceIndex}"
       sourceIndex.value = (patternLen - i) * -1
-      nm = self.splat item
-      result.push [nm, "Array.prototype.slice.call(#{sourceName}, #{oldSourceIndex}, #{sourceIndex})"]
+      result.push jsfn item, sourceName, sourceIndex, oldSourceIndex
     else
-      sourceText = "#{sourceName}[#{sourceIndex}]"
+      compiled = jsfn sourceName, sourceIndex
       sourceIndex.value++
       if item instanceof Array
         result = result.concat destructure_list, item, sourceText
       else
-        result.push [item, sourceText]
+        result.push compiled
       
   result
+
+destructure_list = do ->
+  jsfn = (itemName, mainName, index, oldIndex) ->
+    if oldIndex?
+      [itemName, "Array.prototype.slice.call(#{mainName}, #{oldIndex}, #{index})"]
+    else
+      [itemName, "#{mainName}[#{index}]"]
+  
+  -> desplatList arguments..., jsfn
+  
+restructure_list = do ->
+  jsfn = (itemName, mainName, index, oldIndex) ->
+    if oldIndex?
+      "#{mainName}.slice(#{oldIndex}, #{index}).concat(itemName, #{mainName}.slice(#{index} + 1))"
+    else
+      ""
+  
+  -> desplatList arguments..., jsfn
   

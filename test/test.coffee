@@ -1,9 +1,10 @@
 
 program = '''
 
-(if #f
-  (console.log "yay!")
-  (console.log {'a "b" 'c "d"}))
+(defmacro + (...nums)
+  (js-eval (nums.join " + ")))
+    
+(+ 1 2 3 4)
 
 '''
 
@@ -12,4 +13,4 @@ compiled = oppo.compile code
 
 console.log compiled
 
-oppo.eval code
+console.log "result", eval compiled

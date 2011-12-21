@@ -1,7 +1,7 @@
 (function() {
   var code, compiled, program;
 
-  program = '\n(if #f\n  (console.log "yay!")\n  (console.log {\'a "b" \'c "d"}))\n';
+  program = '\n(defmacro + (...nums)\n  (js-eval (nums.join " + ")))\n    \n(+ 1 2 3 4)\n';
 
   code = oppo.read(program);
 
@@ -9,6 +9,6 @@
 
   console.log(compiled);
 
-  oppo.eval(code);
+  console.log("result", eval(compiled));
 
 }).call(this);

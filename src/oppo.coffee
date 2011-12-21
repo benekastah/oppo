@@ -12,20 +12,16 @@ read = oppo.read = (string) ->
   parser.parse string
 
 began = false
-compile = oppo.compile = (sexp) ->
+compile = oppo.compile = (sexp=null) ->
   if not began
     top_level = began = true
   
-  if not sexp?
-    ret = "null"
-  else if sexp is true
-    ret = "true"
-  else if sexp is false
-    ret = "false"
-  else if (is_string sexp) or (is_number sexp)
-    ret = sexp
+  if sexp in [null, true, false] or _.isNumber sexp
+    ret = "#{sexp}"
   else if is_symbol sexp
-    ret = to_js_symbol sexp
+    ret = to_js_symbol sexp[1]
+  else if _.isString sexp
+    ret = "\"#{sexp}\""
   else if _.isArray sexp
     fn = oppo.compile _.first sexp
     if (macro = compiler[fn])
@@ -49,35 +45,38 @@ compile = oppo.compile = (sexp) ->
     
 oppo.eval = _.compose (_.bind global.eval, global), oppo.compile
 
+read_compile = _.compose oppo.compile, oppo.read
+
 ###
 MISC
 ###
-compiler[compile 'var'] = (name, value, current_group=last_var_group()) ->
+compiler[to_js_symbol 'var'] = (name, value, current_group=last_var_group()) ->
   name = compile name
   value = compile value
-  current_group = last_var_group()
   raiseDefError name if name in current_group
   current_group.push name
   "#{name} = #{value}"
   
 compiler.def = (name, value) ->
-  compiler[compile 'var'] name, value, first_var_group()
+  compiler[to_js_symbol 'var'] name, value, first_var_group()
   
-compiler[compile 'set!'] = (name, value) ->
+compiler[to_js_symbol 'set!'] = (name, value) ->
   name = compile name
   value = compile value
-  compile ['if', ['js-eval', "typeof #{name} !== 'undefined'"]
-    ['js-eval', "#{name} = #{value}"]
-    ['throw', "Can't set variable that has not been defined: #{name}"]]
+  read_compile """
+  (if (js-eval "typeof #{name} !== 'undefined'")
+    (js-eval "#{name} =  #{value}")
+    (throw "Can't set variable that has not been defined: #{name}"))
+  """
 
-compiler.js_eval = (js) -> destring js
+compiler.js_eval = (js) -> js
 
-compiler[compile 'do'] = (body...) ->
+compiler[to_js_symbol 'do'] = (body...) ->
   compiled_body = _.map arguments, compile
   ret = compiled_body.join ',\n'
   "(#{ret})"
 
-compiler[compile 'if'] = (test, t, f) ->
+compiler[to_js_symbol 'if'] = (test, t, f) ->
   if arguments.length is 2
     Array::push.call arguments, f
   [c_test, c_t, c_f] = _.map arguments, compile
@@ -87,7 +86,7 @@ compiler[compile 'if'] = (test, t, f) ->
     /* else */ #{c_f})
   """
     
-compiler.map = (sexp) ->
+compiler.js_map = (sexp...) ->
   ret = "{ "
   for item, i in sexp
     if i % 2 is 0
@@ -105,13 +104,18 @@ compiler.quote = (sexp) ->
   else
     "\"#{sexp}\"".replace(/^""/, '"\\"').replace /""$/, '\\""'
     
-
 compiler.eval = -> compiler.call 'oppo.eval', arguments...
+
+compiler[to_js_symbol "."] = (base, names...) ->
+  c_base = compile base
+  c_names = _.map names, compile
+  c_names.unshift c_base
+  c_names.join "."
 
 ###
 ERRORS
 ###
-compiler[compile 'throw'] = (err) ->
+compiler[to_js_symbol 'throw'] = (err) ->
   c_err = compile err
   "!function () { throw #{c_err} }()"
 
@@ -125,7 +129,7 @@ get_args = (args) ->
     vars = destructure_list args, "arguments"
     args = []
     body = []
-    (body.push ['def', _var[0], ['js-eval', _var[1]]]) for _var in vars
+    (body.push read "(var #{_var[0]} (js-eval \"#{_var[1]}\"))") for _var in vars
   else
     args = args.map (arg) -> compile arg
     body = []
@@ -153,37 +157,38 @@ compiler.call = (fn, args...) ->
 MACROS
 ###
 compiler.defmacro = (name, argnames, template) ->
-  objectSet compiler, name, (args...) ->
-    evald = oppo.eval [['lambda', argnames, template] '...args']
+  c_name = compile name
+  objectSet compiler, c_name, (args...) ->
+    js = oppo.compile [[['symbol', 'lambda'], argnames, template], args...]
+    evald = eval js
     oppo.compile evald
+  "/* defmacro #{c_name} */ null"
     
 compiler.syntax_quote = (sexpr) ->
-  SPECIAL = ['unquote', 'unquote-splice']
-  special_list = []
+  for item, i in sexpr
+    if is_splat item
+      splat = compile item[1]
+      a1 = compile [["symbol", "quote"], sexpr[...i]]
+      a2 = splat
+      a3 = compile [["symbol", "quote"], sexpr[i+1..]]
+      sexpr = ""
+      i--
+    else if is_unquote item
+      sexpr[i] = eval item[1]
+    else if _.isArray item
+      sexpr[i] = compiler.syntaxQuote item
     
-  each_item = (item, i, ls, parent, parent_index) ->
-    if i is 0
-      switch item
-        when 'unquote'
-          return compiler.unquote item, true
-        when 'unquote_splice'
-          list = compiler.unquote_splice item, true
-          list = [list] if not _.isArray list
-          end_list = []
-          while parent.length >= parent_index
-            end_list.unshift parent.pop()
-          parent.push.apply parent, list.concat end_list
-    item
-
-  recursive_map sexpr, each_item
-  
-    
-compiler.unquote = (item, syntax_quote) ->
-  if not syntax_quote
-    raise TypeError, "Cannot unquote item outside of a syntax quote"
-  oppo.compile item
-
-compiler.unquote_splice = (item, syntax_quote) ->
-  if not syntax_quote
-    raise TypeError, "Cannot unquote-splice item outside of a syntax quote"
-  oppo.compile item
+# compiler.unquote = (item, syntax_quote) ->
+#   if not syntax_quote
+#     raise TypeError, "Cannot unquote item outside of a syntax quote"
+#   oppo.compile item
+# 
+# compiler.unquote_splice = (item, syntax_quote) ->
+#   if not syntax_quote
+#     raise TypeError, "Cannot unquote-splice item outside of a syntax quote"
+#   oppo.compile item
+#   
+# compiler.splat = (item, syntax_quote) ->
+#   if not syntax_quote
+#     raise TypeError, "Cannot unquote-splice item outside of a syntax quote"
+#   oppo.compile item

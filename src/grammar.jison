@@ -1,41 +1,46 @@
 /* Oppo - the awesome/experimental lisp on the JSVM */
 
 %lex
+%x string
 %%
 
-";".*                               { /* comment */ }
-[\s,]+                              { /* ignore */ }
+";".*                                   { /* comment */ }
+[\s,]+                                  { /* ignore */ }
 
-"("                                 { return '('; }
-")"                                 { return ')'; }
-"["                                 { return '['; }
-"]"                                 { return ']'; }
-"#{"                                { return 'HASH_MAP_START'; }
-"{"                                 { return 'JS_MAP_START'; }
-"}"                                 { return 'MAP_END'; }
+"\""                                    this.begin('string');
+<string>"\""                            this.popState();
+<string>[^"]*                           { return 'STRING'; } //"
 
-"'"                                 { return 'QUOTE'; }
-"`"                                 { return 'SYNTAX_QUOTE'; }
-"~"                                 { return 'SYNTAX_EXPAND'; }
-"#("                                { return 'FUNCTION'; }
-"~("                                { return 'INFIX'; }
-"..."                               { return 'SPLAT'; }
-":"                                 { return ':'; }
+[+-]?[0-9]+("."[0-9]+)?\b               { return 'DECIMAL_NUMBER'; }
+[+-]?"#0"[0-8]+\b                       { return 'OCTAL_NUMBER'; }
+[+-]?"#x"[0-9a-fA-F]+\b                 { return 'HEXIDECIMAL_NUMBER'; }
+[+-]?"#b"[0-1]+\b                       { return 'BINARY_NUMBER'; }
 
-\"[^\"]*\"                          { return 'STRING'; }    //"
-[+-]?[0-9]+("."[0-9]+)?\b           { return 'DECIMAL_NUMBER'; }
-[+-]?"#0"[0-9]+\b                   { return 'OCTAL_NUMBER'; }
-[+-]?"#0x"[0-9]+\b                  { return 'HEXIDECIMAL_NUMBER'}
+"nil"\b                                 { return 'NIL'; }
+"#t"\b                                  { return 'BOOLEAN_TRUE'; }
+"#f"\b                                  { return 'BOOLEAN_FALSE'; }
 
-"nil"\b                             { return 'NIL'; }
-"#t"\b                              { return 'BOOLEAN_TRUE'; }
-"#f"\b                              { return 'BOOLEAN_FALSE'; }
+"("                                     { return '('; }
+")"                                     { return ')'; }
+"["                                     { return '['; }
+"]"                                     { return ']'; }
+"#{"                                    { return 'HASH_MAP_START'; }
+"{"                                     { return 'JS_MAP_START'; }
+"}"                                     { return 'MAP_END'; }
 
-"@"                                 { return '@'; }
-.+?(?=[)}\]\s]+)                 { return 'IDENTIFIER'; }
+"'"                                     { return 'QUOTE'; }
+"`"                                     { return 'SYNTAX_QUOTE'; }
+","                                     { return 'UNQUOTE'; }
+"#("                                    { return 'FUNCTION'; }
+"~("                                    { return 'INFIX'; }
+"..."                                   { return 'SPLAT'; }
 
-<<EOF>>                             { return 'EOF'; }
-.                                   { return 'INVALID'; }
+":"                                     { return ':'; }
+"@"                                     { return '@'; }
+[\w!@#\$%\^&\*\-\+=:'\?\/\\<>\.,]+     { return 'IDENTIFIER'; }   //'
+
+<<EOF>>                                 { return 'EOF'; }
+.                                       { return 'INVALID'; }
 
 /lex
 
@@ -44,30 +49,28 @@
 
 program
   : s_expression_list EOF
-    { return ["do"].concat($1); }
+    { return [["symbol", "do"]].concat($1); }
   ;
 
 s_expression_list
-  : s_expression
-    { $$ = [$1]; }
-  | s_expression_list s_expression
+  : s_expression_list s_expression
     { $$ = $1; $$.push($2); }
+  | s_expression
+    { $$ = [$1]; }
   ;
 
 s_expression
   : special_form
   | list
-  | js_map
   | symbol
-  | splat
   | literal
   | atom
   ;
 
 list
   : callable_list
-  | typed_list
-  | hash_map
+  | quoted_list
+  | js_map
   ;
 
 callable_list
@@ -77,25 +80,18 @@ callable_list
     { $$ = []; }
   ;
 
-typed_list
+quoted_list
   : '[' element_list ']'
-    { $$ = ["quote", $2]; }
+    { $$ = [["symbol", "quote"], $2]; }
   | '[' ']'
-    { $$ = ["quote", []]; }
-  ;
-  
-hash_map
-  : HASH_MAP_START element_list MAP_END
-    { $$ = ["hash-map"].concat($2); }
-  | HASH_MAP_START MAP_END
-    { $$ = ["hash-map"]; }
+    { $$ = [["symbol", "quote"], []]; }
   ;
   
 js_map
   : JS_MAP_START element_list MAP_END
-    { $$ = ["map"].concat($2); }
+  { $$ = [["symbol", "js-map"]].concat($2); }
   | JS_MAP_START MAP_END
-    {$$ = ["map"]}
+    {$$ = [["symbol", "js-map"]]}
   ;
 
 element_list
@@ -108,23 +104,18 @@ element_list
 element
   : s_expression
   ;
-  
-splat
-  : SPLAT symbol
-    { $$ = ["splat", $2]; }
-  ;
 
 special_form
   : QUOTE s_expression
-    { $$ = ["quote", $2]; }
+    { $$ = [["symbol", "quote"], $2]; }
   | SYNTAX_QUOTE s_expression
-    { $$ = ["syntaxQuote", $2]; }
-  | SYNTAX_EXPAND s_expression
-    { $$ = ["syntaxExpand", $2]; }
+    { $$ = [["symbol", "syntax-quote"], $2]; }
+  | UNQUOTE s_expression
+    { $$ = [["symbol", "unquote"], $2]; }
   | FUNCTION element_list ')'
-    { $$ = ["lambda", [], $2]; }
+    { $$ = [["symbol", "lambda"], [], $2]; }
   | INFIX element_list ')'
-    { $$ = ["infix", $2]; }
+    { $$ = [["symbol", "infix"], $2]; }
   ;
 
 atom
@@ -138,26 +129,32 @@ atom
 
 literal
   : STRING
-    { $$ = "\"" + yytext.substr(1, yytext.length-2).replace(/"/g, '\\"') + "\""; }
+    { $$ = $1; }
   | number
   ;
   
 number
   : DECIMAL_NUMBER
-    { $$ = Number(yytext, 10); }
+    { $$ = parseInt(yytext, 10); }
   | OCTAL_NUMBER
-    { $$ = parseInt(yytext.replace(/^#/, ''), 8); }
+    { $$ = parseInt(yytext.replace(/^#0/, ''), 8); }
   | HEXIDECIMAL_NUMBER
-    { $$ = parseInt(yytext.replace(/^#/, ''), 16); }
+    { $$ = parseInt(yytext.replace(/^#x/, ''), 16); }
+  | BINARY_NUMBER
+    { $$ = parseInt(yytext.replace(/^#b/, ''), 2); }
   ;
   
 symbol
   : IDENTIFIER
-    { $$ = yytext; }
+    { $$ = ["symbol", yytext]; }
   | ':' IDENTIFIER
-    { $$ = ["keyword", $2]}
-  | '@' IDENTIFIER
-    { $$ = [".", "self", $2]; }
+    { $$ = [["symbol", "keyword"], $2]}
+  | splat
+  ;
+
+splat
+  : SPLAT symbol
+    { $$ = [["symbol", "splat"], $2]; }
   ;
   
 %%

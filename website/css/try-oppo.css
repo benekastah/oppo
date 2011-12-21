@@ -1,0 +1,30 @@
+/*html, body { height: 100%, width: 100% }*/
+
+#wrapper {
+  margin: 0 auto;
+  width: 920px;
+}
+
+.code {
+  border: solid 1px #555;
+  background-color: #222;
+  color: #ddd;
+  font-family: monospace;
+  font-size: 1.1em;
+}
+
+textarea.code {
+  width: 440px;
+  height: 600px;
+  float: left;
+  margin: 5px;
+}
+
+#result {
+  clear: both;
+  margin: 5px;
+  width: 900px;
+  height: 150px;
+}
+
+h1 { text-align: center; }
