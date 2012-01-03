@@ -1,15 +1,19 @@
 /* Oppo - the awesome/experimental lisp on the JSVM */
 
 %lex
-%x string
+%x string regex
 %%
 
 ";".*                                   { /* comment */ }
-[\s,]+                                  { /* ignore */ }
+\s+                                     { /* ignore */ }
 
 "\""                                    this.begin('string');
 <string>"\""                            this.popState();
 <string>[^"]*                           { return 'STRING'; } //"
+
+"#\""                                   this.begin('regexp');
+<regex>"\""[a-z]*                       { this.popState(); return 'FLAGS'; }
+<regex>[^"]*                            { return 'REGEX'; } //"
 
 [+-]?[0-9]+("."[0-9]+)?\b               { return 'DECIMAL_NUMBER'; }
 [+-]?"#0"[0-8]+\b                       { return 'OCTAL_NUMBER'; }
@@ -27,17 +31,16 @@
 "#{"                                    { return 'HASH_MAP_START'; }
 "{"                                     { return 'JS_MAP_START'; }
 "}"                                     { return 'MAP_END'; }
+"#("                                    { return 'FUNCTION'; }
 
 "'"                                     { return 'QUOTE'; }
 "`"                                     { return 'SYNTAX_QUOTE'; }
-","                                     { return 'UNQUOTE'; }
-"#("                                    { return 'FUNCTION'; }
-"~("                                    { return 'INFIX'; }
+"~"                                     { return 'UNQUOTE'; }
 "..."                                   { return 'SPLAT'; }
 
 ":"                                     { return ':'; }
 "@"                                     { return '@'; }
-[\w!@#\$%\^&\*\-\+=:'\?\/\\<>\.,]+     { return 'IDENTIFIER'; }   //'
+[\w!@#\$%\^&\*\-\+=:'\?\/\\<>\.,]+      { return 'IDENTIFIER'; }   //'
 
 <<EOF>>                                 { return 'EOF'; }
 .                                       { return 'INVALID'; }
@@ -114,8 +117,6 @@ special_form
     { $$ = [["symbol", "unquote"], $2]; }
   | FUNCTION element_list ')'
     { $$ = [["symbol", "lambda"], [], $2]; }
-  | INFIX element_list ')'
-    { $$ = [["symbol", "infix"], $2]; }
   ;
 
 atom
@@ -130,6 +131,8 @@ atom
 literal
   : STRING
     { $$ = $1; }
+  | REGEX FLAGS
+    { $$ = [["symbol", "regex"], $1, $2.substr(1)]; }
   | number
   ;
   

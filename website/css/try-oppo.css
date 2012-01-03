@@ -13,10 +13,13 @@
   font-size: 1.1em;
 }
 
+.editor {
+  float: left;
+}
+
 textarea.code {
   width: 440px;
   height: 600px;
-  float: left;
   margin: 5px;
 }
 

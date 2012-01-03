@@ -1,0 +1,21 @@
+;; Macros
+
+(defmacro print (...things)
+  `((. console log) ...things))
+  
+(defmacro defn (nm argslist ...body)
+  `(def ~nm (lambda ~argslist ...body)))
+
+;; Set up underscore
+(let (collections [:each :map :reduce :reduceRight :find :filter :reject :all :any :include :invoke :pluck :max :min :sortBy :groupBy :sortedIndex :shuffle :toArray :size]
+      arrays [:first :initial :last :rest :compact :flatten :without :union :intersection :difference :uniq :zip :indexOf :lastIndexOf :range]
+      functions [:bind :bindAll :memoize :delay :defer :throttle :debounce :once :after :wrap :compose]
+      objects [:keys :values :functions :extend :defaults :clone :tap :isEqual :isEmpty :isElement :isArray :isArguments :isFunction :isString :isNumber :isBoolean :isDate :isRegExp :isNaN :isNull :isUndefined]
+      utility [:noConflict :identity :times :mixin :uniqueId :escape :template]
+      chaining [:chain :value])
+  
+  ;(defn dasherize (s)
+  ;  ((. s replace)))
+  
+  ;; Add all the underscore methods here
+  )

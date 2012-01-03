@@ -88,6 +88,8 @@ is_splat = (s) -> s?[0]?[1] is 'splat'
 is_unquote = (u) -> u?[0]?[1] is 'unquote'
 is_symbol = (s) -> s?[0] is 'symbol'
 
+to_symbol = (s) -> ['symbol', s]
+
 objectSet = (o, s, v) ->
   [s, v, o] = [o, s, null] if arguments.length < 3
   
@@ -122,8 +124,14 @@ to_js_symbol = (ident) ->
   ident
   
 gensym = (sym='gen') ->
+  if not is_symbol sym
+    c_sym = to_js_symbol sym
+  else
+    c_sym = compile sym
+  
+  time = (+ new Date).toString 32
   num = (Math.floor Math.random() * 1e+10).toString 32
-  "#{sym}-#{num}"
+  "#{c_sym}_#{time}_#{num}"
   
 trim = String::trim ? -> (@replace /^\s+/, '').replace /\s+$/, ''
   
@@ -171,13 +179,13 @@ do ->
   
   
 ###
-List destructuring
+List (de/re)structuring
 ###
-desplat_list = (pattern, sourceName, jsfn) ->
+destructure_list = (pattern, sourceName) ->
   result = []
+  has_splat = false
   
   patternLen = pattern.length
-  # sourceLen = source.length
   sourceIndex = {
     value: 0
     toString: ->
@@ -191,35 +199,50 @@ desplat_list = (pattern, sourceName, jsfn) ->
   
   for item, i in pattern
     if is_splat item
-      item = compile item[1]
+      has_splat = true
+      c_item = compile item[1]
       oldSourceIndex = "#{sourceIndex}"
       sourceIndex.value = (patternLen - i) * -1
-      result.push jsfn item, sourceName, sourceIndex, oldSourceIndex
+      result.push [c_item, "Array.prototype.slice.call(#{sourceName}, #{oldSourceIndex}, #{sourceIndex})"]
     else
-      compiled = jsfn sourceName, sourceIndex
-      sourceIndex.value++
+      index.value++
+      compiled = [(compile item), "#{sourceName}[#{sourceIndex}]"]
       if item instanceof Array
         result = result.concat destructure_list, item, sourceText
       else
         result.push compiled
       
+  if has_splat then result else []
+  
+restructure_list = (pattern, sourceName) ->
+  ident = gensym sourceName
+  concatArgs = []
+  result = [(to_symbol ident)]
+  
+  slice_start = null
+  do_slice = ->
+    if slice_start?
+      concatArgs.push "#{sourceName}.slice(#{slice_start}, #{i})"
+      slice_start = null
+  
+  for item, i in pattern
+    if is_splat item
+      do_slice()
+      c_item = compile item[1]
+      concatArgs.push c_item
+    else if is_unquote item
+      do_slice()
+      concatArgs.push "[#{compile item[1]}]"
+    else if (_.isArray item) and not is_symbol item
+      do_slice()
+      new_ident = "#{sourceName}[#{i}]"
+      restructured = restructure_list item, new_ident
+      concatArgs.push "[#{restructured[1]}]"
+    else
+      if not slice_start?
+        slice_start = i
+  
+  do_slice()
+  
+  result.push "[].concat(#{concatArgs.join ', '})"
   result
-
-destructure_list = do ->
-  jsfn = (itemName, mainName, index, oldIndex) ->
-    if oldIndex?
-      [itemName, "Array.prototype.slice.call(#{mainName}, #{oldIndex}, #{index})"]
-    else
-      [itemName, "#{mainName}[#{index}]"]
-  
-  -> desplatList arguments..., jsfn
-  
-restructure_list = do ->
-  jsfn = (itemName, mainName, index, oldIndex) ->
-    if oldIndex?
-      "#{mainName}.slice(#{oldIndex}, #{index}).concat(itemName, #{mainName}.slice(#{index} + 1))"
-    else
-      ""
-  
-  -> desplatList arguments..., jsfn
-  

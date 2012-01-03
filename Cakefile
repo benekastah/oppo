@@ -31,7 +31,7 @@ task "build", "Build all", (options) ->
       options.success = ->
         options.success = null
         invoke "closure:compile"
-      invoke "compile:runtime"
+      invoke "build:runtime"
     invoke "build:compiler"
   invoke "build:parser"
 
@@ -99,12 +99,34 @@ task "closure:compile", "Compile existing build files into single oppo.js file",
   
   exec command, post_exec options
   
-task "compile:runtime", "Compile oppo runtime", (options) ->
+# task "compile:runtime", "Compile oppo runtime", (options) ->
+#   unless options['omit-runtime']
+#     dir = options.output ?= "dist"
+#     command = "bin/oppo -c src/runtime -o #{dir}/oppo-runtime.js"
+#     console.log "Compiling oppo runtime: #{command}"
+#     exec command, post_exec options
+#   else
+#     options.success and options.success()
+    
+task "build:runtime", "Build oppo runtime", (options) ->
   unless options['omit-runtime']
     dir = options.output ?= "dist"
-    command = "bin/oppo -c src/oppo -o #{dir}/oppo-runtime.js"
-    console.log "Compiling oppo runtime: #{command}"
-    exec command, post_exec options
+    file = "#{dir}/oppo-runtime.js"
+    fs.readFile "src/runtime.oppo", "utf8", (err, code) ->
+      if err then throw err
+      code = code.replace /"/g, '"'
+      code = code.split "\n"
+      code = for item in code
+        "\"#{item}\\n\""
+      file_contents = """
+      (function () {
+        var code, result;
+        code = oppo.read(#{code.join " +\n"});
+        result = oppo.compile(code);
+        return eval(result);
+      })();
+      """
+      fs.writeFile file, file_contents, 'utf8', options.success
   else
-    options.success and options.success()
-  
+    options.success?()
+    

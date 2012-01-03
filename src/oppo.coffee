@@ -97,9 +97,9 @@ compiler.js_map = (sexp...) ->
       ret += "#{c_value},\n"
   ret.replace /,\n$/, ' }'
     
-compiler.quote = (sexp) ->
+compiler.quote = (sexp, quote_all) ->
   if _.isArray sexp
-    q_sexp = _.map sexp, compiler.quote
+    q_sexp = _.map sexp, compile
     "[#{q_sexp.join ', '}]"
   else
     "\"#{sexp}\"".replace(/^""/, '"\\"').replace /""$/, '\\""'
@@ -111,6 +111,8 @@ compiler[to_js_symbol "."] = (base, names...) ->
   c_names = _.map names, compile
   c_names.unshift c_base
   c_names.join "."
+  
+compiler.keyword = (key) -> compile key
 
 ###
 ERRORS
@@ -139,56 +141,70 @@ get_args = (args) ->
 compiler.lambda = (args, body...) ->
   new_var_group()
   [args, argsbody] = get_args args
-  body = _.map [argsbody..., body...], compile
+  body = argsbody.concat body
+  body = _.map body, (item) ->
+    if (is_symbol item) and /^%\d+$/.test item[1]
+      num = item[1].substr 1
+      "arguments[#{num}]"
+    item
+      
+  body = _.map body, compile
   vars = end_var_group()
   var_stmt = if vars.length then "var #{vars.join ', '};\n" else ''
-  """
+  ret = """
   (function (#{args.join ", "}) {
     #{var_stmt}return #{body.join ', '};
   })
   """
   
+compile.fn = compiler.lambda
+  
 compiler.call = (fn, args...) ->
   c_fn = compile fn
   c_args = _.map args, compile
   "#{c_fn}(#{c_args.join ', '})"
+  
+compiler[to_js_symbol 'let'] = (names_vals, body...) ->
+  vars = []
+  i = 0
+  while i < names_vals.length
+    vars.push [(to_symbol "var"), names_vals[i++], names_vals[i++]]
+    
+  body = vars.concat body
+  ret = compile [[(to_symbol "lambda"), [], body...]]
 
 ###
 MACROS
 ###
+quote_all = (list) ->
+  _quote = (item) -> [(to_symbol 'quote'), item]
+  ret = _quote _.map list, (item) ->
+    if (_.isArray item) and not is_symbol item
+      quote_all item
+    else
+      _quote item
+
 compiler.defmacro = (name, argnames, template) ->
   c_name = compile name
   objectSet compiler, c_name, (args...) ->
-    js = oppo.compile [[['symbol', 'lambda'], argnames, template], args...]
+    q_args = quote_all args
+    js = oppo.compile [[['symbol', 'lambda'], argnames, template], q_args[1]...]
     evald = eval js
     oppo.compile evald
   "/* defmacro #{c_name} */ null"
     
-compiler.syntax_quote = (sexpr) ->
-  for item, i in sexpr
-    if is_splat item
-      splat = compile item[1]
-      a1 = compile [["symbol", "quote"], sexpr[...i]]
-      a2 = splat
-      a3 = compile [["symbol", "quote"], sexpr[i+1..]]
-      sexpr = ""
-      i--
-    else if is_unquote item
-      sexpr[i] = eval item[1]
-    else if _.isArray item
-      sexpr[i] = compiler.syntaxQuote item
-    
-# compiler.unquote = (item, syntax_quote) ->
-#   if not syntax_quote
-#     raise TypeError, "Cannot unquote item outside of a syntax quote"
-#   oppo.compile item
-# 
-# compiler.unquote_splice = (item, syntax_quote) ->
-#   if not syntax_quote
-#     raise TypeError, "Cannot unquote-splice item outside of a syntax quote"
-#   oppo.compile item
-#   
-# compiler.splat = (item, syntax_quote) ->
-#   if not syntax_quote
-#     raise TypeError, "Cannot unquote-splice item outside of a syntax quote"
-#   oppo.compile item
+compiler.syntax_quote = (list) ->
+  sym = to_symbol
+  ident = gensym 'list'
+  restructured_list = restructure_list list, ident
+  restructured_list[1] = [(sym 'js-eval'), restructured_list[1]]
+  q_list = quote_all list
+  uq_list = compile q_list
+  
+  code = [
+    [(sym 'lambda'), [(sym ident)],
+      [(sym "var"), restructured_list...]]
+    q_list
+  ]
+  
+  ret = compile code
