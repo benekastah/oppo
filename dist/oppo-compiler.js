@@ -412,6 +412,17 @@
     return compile(key);
   };
 
+  compiler.regex = function(body, modifiers) {
+    return "/" + body + "/" + (modifiers || '');
+  };
+
+  compiler.str = function() {
+    var c_strs, strs;
+    strs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+    c_strs = _.map(strs, compile);
+    return "'' + " + (c_strs.join(' + '));
+  };
+
   /*
   ERRORS
   */
@@ -452,14 +463,6 @@
     new_var_group();
     _ref4 = get_args(args), args = _ref4[0], argsbody = _ref4[1];
     body = argsbody.concat(body);
-    body = _.map(body, function(item) {
-      var num;
-      if ((is_symbol(item)) && /^%\d+$/.test(item[1])) {
-        num = item[1].substr(1);
-        "arguments[" + num + "]";
-      }
-      return item;
-    });
     body = _.map(body, compile);
     vars = end_var_group();
     var_stmt = vars.length ? "var " + (vars.join(', ')) + ";\n" : '';

@@ -1,10 +1,35 @@
-;; Macros
-
+;; Misc macros and functions
 (defmacro print (...things)
   `((. console log) ...things))
   
 (defmacro defn (nm argslist ...body)
   `(def ~nm (lambda ~argslist ...body)))
+
+(defmacro apply)
+
+(defn typeof (x)
+  (let (cls ((. Object prototype toString call) x)
+        type-arr ((. cls match) #/\s([a-zA-Z]+)/)
+        type (first type-arr))
+    ((. toLowerCase) type)))
+
+;(defmacro .. (...items)
+;  (if (= 2 (size items))
+;    ))
+
+;; Collections
+(defmacro concat (...items)
+  `((. (first ~items) concat) ...(rest items)))
+
+;; Lists
+
+;; Strings
+
+;; Arithmetic
+(defmacro + (...nums)
+  )
+
+
 
 ;; Set up underscore
 (let (collections [:each :map :reduce :reduceRight :find :filter :reject :all :any :include :invoke :pluck :max :min :sortBy :groupBy :sortedIndex :shuffle :toArray :size]
@@ -15,7 +40,7 @@
       chaining [:chain :value])
   
   ;(defn dasherize (s)
-  ;  ((. s replace)))
+  ;  ((. s replace) #//))
   
   ;; Add all the underscore methods here
   )

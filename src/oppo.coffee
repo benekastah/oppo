@@ -114,6 +114,12 @@ compiler[to_js_symbol "."] = (base, names...) ->
   
 compiler.keyword = (key) -> compile key
 
+compiler.regex = (body, modifiers) -> "/#{body}/#{modifiers or ''}"
+
+compiler.str = (strs...) -> 
+  c_strs = _.map strs, compile
+  "'' + #{c_strs.join ' + '}"
+
 ###
 ERRORS
 ###
@@ -142,11 +148,6 @@ compiler.lambda = (args, body...) ->
   new_var_group()
   [args, argsbody] = get_args args
   body = argsbody.concat body
-  body = _.map body, (item) ->
-    if (is_symbol item) and /^%\d+$/.test item[1]
-      num = item[1].substr 1
-      "arguments[#{num}]"
-    item
       
   body = _.map body, compile
   vars = end_var_group()
