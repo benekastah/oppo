@@ -8,7 +8,13 @@ $.domReady ->
   
   compute_result = ->
     js = $js.val()
-    try result = eval js
+    try
+      evald = eval js
+      try
+        result = JSON.stringify evald
+        if typeof result isnt "string"
+          throw ""
+      catch e then result = evald
     catch e then result = e
     
     if typeof result is 'undefined'
@@ -23,7 +29,7 @@ $.domReady ->
     cache.set oppo_code_cache_key, code
     try
       ast = oppo.read code
-      js = oppo.compile ast
+      js = oppo.compile ast, true
     catch e then js = "/* #{e} */"
     $js.val js
   

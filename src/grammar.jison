@@ -154,13 +154,15 @@ symbol
   : IDENTIFIER
     { $$ = ["symbol", yytext]; }
   | ':' IDENTIFIER
-    { $$ = [["symbol", "keyword"], $2]}
-  | splat
+    { $$ = [["symbol", "keyword"], $2]; }
+  | UNQUOTE symbol
+    { $$ = [["symbol", "unquote"], $2]; }
+  | SPLAT symbol
+    { $$ = [["symbol", "splat"], $2]; }
   ;
 
 splat
-  : SPLAT symbol
-    { $$ = [["symbol", "splat"], $2]; }
+  : 
   ;
   
 %%

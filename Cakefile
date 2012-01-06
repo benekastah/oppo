@@ -120,8 +120,9 @@ task "build:runtime", "Build oppo runtime", (options) ->
         "\"#{item}\\n\""
       file_contents = """
       (function () {
-        var code, result;
-        code = oppo.read(#{code.join " +\n"});
+        var oppoString, code, result;
+        oppoString = #{code.join " +\n"};
+        code = oppo.read(oppoString);
         result = oppo.compile(code);
         return eval(result);
       })();

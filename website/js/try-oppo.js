@@ -7,10 +7,16 @@
     cache = $.cache("try-oppo");
     oppo_code_cache_key = "oppo-code";
     compute_result = function() {
-      var js, result;
+      var evald, js, result;
       js = $js.val();
       try {
-        result = eval(js);
+        evald = eval(js);
+        try {
+          result = JSON.stringify(evald);
+          if (typeof result !== "string") throw "";
+        } catch (e) {
+          result = evald;
+        }
       } catch (e) {
         result = e;
       }
@@ -27,7 +33,7 @@
       cache.set(oppo_code_cache_key, code);
       try {
         ast = oppo.read(code);
-        js = oppo.compile(ast);
+        js = oppo.compile(ast, true);
       } catch (e) {
         js = "/* " + e + " */";
       }

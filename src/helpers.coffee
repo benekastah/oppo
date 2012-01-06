@@ -30,8 +30,8 @@ JS_KEYWORDS = [
   "private"
   "protected"
   "public"
-  "static"
   "return"
+  "static"
   "switch"
   "super"
   "this"
@@ -39,6 +39,7 @@ JS_KEYWORDS = [
   "try"
   "catch"
   "typeof"
+  "undefined"
   "var"
   "void"
   "while"
@@ -158,10 +159,14 @@ raiseDefError = (name) -> raise "DefError", "Can't define previously defined val
 Vars
 ###
 # Define our variables to export from anonymous function scope
-[new_var_group, first_var_group, last_var_group, end_var_group, end_final_var_group] = []
+[new_var_group, first_var_group, last_var_group, end_var_group, end_final_var_group, initialize_var_groups] = []
 do ->
   # initial array in var_groups is for the main scope
-  var_groups = [ [] ]
+  var_groups = null
+  initialize_var_groups = ->
+    var_groups = [ [] ]
+  initialize_var_groups()
+  
   new_var_group = -> var_groups.push []
   first_var_group = -> var_groups[0]
   last_var_group = -> _.last var_groups
@@ -205,10 +210,10 @@ destructure_list = (pattern, sourceName) ->
       sourceIndex.value = (patternLen - i) * -1
       result.push [c_item, "Array.prototype.slice.call(#{sourceName}, #{oldSourceIndex}, #{sourceIndex})"]
     else
-      index.value++
       compiled = [(compile item), "#{sourceName}[#{sourceIndex}]"]
-      if item instanceof Array
-        result = result.concat destructure_list, item, sourceText
+      sourceIndex.value++
+      if not (is_symbol item) and item instanceof Array
+        result = result.concat (destructure_list item, sourceName)
       else
         result.push compiled
       

@@ -1,38 +1,35 @@
 (function () {
-  var code, result;
-  code = oppo.read(";; Misc macros and functions\n" +
+  var oppoString, code, result;
+  oppoString = ";; Misc macros and functions\n" +
 "(defmacro print (...things)\n" +
 "  `((. console log) ...things))\n" +
 "  \n" +
 "(defmacro defn (nm argslist ...body)\n" +
 "  `(def ~nm (lambda ~argslist ...body)))\n" +
 "\n" +
-"(defmacro apply)\n" +
+";(defmacro apply)\n" +
 "\n" +
 "(defn typeof (x)\n" +
 "  (let (cls ((. Object prototype toString call) x)\n" +
 "        type-arr ((. cls match) #/\s([a-zA-Z]+)/)\n" +
 "        type (first type-arr))\n" +
-"    ((. toLowerCase) type)))\n" +
+"    ((. type toLowerCase))))\n" +
 "\n" +
 ";(defmacro .. (...items)\n" +
 ";  (if (= 2 (size items))\n" +
 ";    ))\n" +
 "\n" +
 ";; Collections\n" +
-"(defmacro concat (...items)\n" +
-"  `((. (first ~items) concat) ...(rest items)))\n" +
-"  \n" +
-"(defmacro length (x)\n" +
-"  )\n" +
+"(defmacro concat (base ...items)\n" +
+"  `((. (first ~base) concat) ...items))\n" +
 "\n" +
 ";; Lists\n" +
 "\n" +
 ";; Strings\n" +
 "\n" +
 ";; Arithmetic\n" +
-"(defmacro + (...nums)\n" +
-"  )\n" +
+";(defmacro + (...nums)\n" +
+";  )\n" +
 "\n" +
 "\n" +
 "\n" +
@@ -48,7 +45,8 @@
 "  ;  ((. s replace) #//))\n" +
 "  \n" +
 "  ;; Add all the underscore methods here\n" +
-"  )\n");
+"  )\n";
+  code = oppo.read(oppoString);
   result = oppo.compile(code);
   return eval(result);
 })();

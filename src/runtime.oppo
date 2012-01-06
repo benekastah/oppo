@@ -5,29 +5,29 @@
 (defmacro defn (nm argslist ...body)
   `(def ~nm (lambda ~argslist ...body)))
 
-(defmacro apply)
+;(defmacro apply)
 
 (defn typeof (x)
   (let (cls ((. Object prototype toString call) x)
         type-arr ((. cls match) #/\s([a-zA-Z]+)/)
         type (first type-arr))
-    ((. toLowerCase) type)))
+    ((. type toLowerCase))))
 
 ;(defmacro .. (...items)
 ;  (if (= 2 (size items))
 ;    ))
 
 ;; Collections
-(defmacro concat (...items)
-  `((. (first ~items) concat) ...(rest items)))
+(defmacro concat (base ...items)
+  `((. (first ~base) concat) ...items))
 
 ;; Lists
 
 ;; Strings
 
 ;; Arithmetic
-(defmacro + (...nums)
-  )
+;(defmacro + (...nums)
+;  )
 
 
 

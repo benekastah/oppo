@@ -12,7 +12,11 @@ read = oppo.read = (string) ->
   parser.parse string
 
 began = false
-compile = oppo.compile = (sexp=null) ->
+compile = oppo.compile = (sexp = null, init_vars = false) ->
+  if init_vars
+    initialize_var_groups()
+    init_vars = false
+  
   if not began
     top_level = began = true
   
@@ -185,14 +189,37 @@ quote_all = (list) ->
     else
       _quote item
 
+mc_expand = false
+mc_expand_1 = false
 compiler.defmacro = (name, argnames, template) ->
   c_name = compile name
   objectSet compiler, c_name, (args...) ->
     q_args = quote_all args
     js = oppo.compile [[['symbol', 'lambda'], argnames, template], q_args[1]...]
     evald = eval js
-    oppo.compile evald
+    if not mc_expand and not mc_expand_1
+      oppo.compile evald
+    else
+      mc_expand_1 = false
+      evald
+      
   "/* defmacro #{c_name} */ null"
+    
+compiler.macroexpand = (sexp) ->
+  old_mc_expand = mc_expand
+  mc_expand = true
+  ret = compile sexp
+  ret = compile quote_all ret
+  mc_expand = old_mc_expand
+  ret
+  
+compiler.macroexpand_1 = (sexp) ->
+  mc_expand_1 = true
+  ret = compile sexp
+  ret = compile quote_all ret
+  mc_expand_1 = false
+  ret
+    
     
 compiler.syntax_quote = (list) ->
   sym = to_symbol
@@ -200,7 +227,6 @@ compiler.syntax_quote = (list) ->
   restructured_list = restructure_list list, ident
   restructured_list[1] = [(sym 'js-eval'), restructured_list[1]]
   q_list = quote_all list
-  uq_list = compile q_list
   
   code = [
     [(sym 'lambda'), [(sym ident)],

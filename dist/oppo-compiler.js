@@ -1,12 +1,12 @@
 (function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, is_splat, is_symbol, is_unquote, last_var_group, make_error, new_var_group, objectSet, oppo, quote_all, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _ref, _ref2, _ref3;
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, initialize_var_groups, is_splat, is_symbol, is_unquote, last_var_group, make_error, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _ref, _ref2, _ref3;
   var __hasProp = Object.prototype.hasOwnProperty, __indexOf = Array.prototype.indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (__hasProp.call(this, i) && this[i] === item) return i; } return -1; }, __slice = Array.prototype.slice;
 
   if (typeof global === "undefined" || global === null) global = window;
 
   if (typeof _ === "undefined" || _ === null) _ = require('underscore');
 
-  JS_KEYWORDS = ["break", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "finally", "for", "function", "if", "implements", "import", "in", "instanceof", "interface", "label", "let", "new", "package", "private", "protected", "public", "static", "return", "switch", "super", "this", "throw", "try", "catch", "typeof", "var", "void", "while", "with", "yield"];
+  JS_KEYWORDS = ["break", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "finally", "for", "function", "if", "implements", "import", "in", "instanceof", "interface", "label", "let", "new", "package", "private", "protected", "public", "return", "static", "switch", "super", "this", "throw", "try", "catch", "typeof", "undefined", "var", "void", "while", "with", "yield"];
 
   JS_ILLEGAL_IDENTIFIER_CHARS = {
     "~": "tilde",
@@ -162,11 +162,15 @@
   Vars
   */
 
-  _ref2 = [], new_var_group = _ref2[0], first_var_group = _ref2[1], last_var_group = _ref2[2], end_var_group = _ref2[3], end_final_var_group = _ref2[4];
+  _ref2 = [], new_var_group = _ref2[0], first_var_group = _ref2[1], last_var_group = _ref2[2], end_var_group = _ref2[3], end_final_var_group = _ref2[4], initialize_var_groups = _ref2[5];
 
   (function() {
     var var_groups;
-    var_groups = [[]];
+    var_groups = null;
+    initialize_var_groups = function() {
+      return var_groups = [[]];
+    };
+    initialize_var_groups();
     new_var_group = function() {
       return var_groups.push([]);
     };
@@ -221,10 +225,10 @@
         sourceIndex.value = (patternLen - i) * -1;
         result.push([c_item, "Array.prototype.slice.call(" + sourceName + ", " + oldSourceIndex + ", " + sourceIndex + ")"]);
       } else {
-        index.value++;
         compiled = [compile(item), "" + sourceName + "[" + sourceIndex + "]"];
-        if (item instanceof Array) {
-          result = result.concat(destructure_list, item, sourceText);
+        sourceIndex.value++;
+        if (!(is_symbol(item)) && item instanceof Array) {
+          result = result.concat(destructure_list(item, sourceName));
         } else {
           result.push(compiled);
         }
@@ -293,9 +297,14 @@
 
   began = false;
 
-  compile = oppo.compile = function(sexp) {
+  compile = oppo.compile = function(sexp, init_vars) {
     var args, fn, macro, ret, top_level, vars;
     if (sexp == null) sexp = null;
+    if (init_vars == null) init_vars = false;
+    if (init_vars) {
+      initialize_var_groups();
+      init_vars = false;
+    }
     if (!began) top_level = began = true;
     if ((sexp === null || sexp === true || sexp === false) || _.isNumber(sexp)) {
       ret = "" + sexp;
@@ -509,6 +518,10 @@
     }));
   };
 
+  mc_expand = false;
+
+  mc_expand_1 = false;
+
   compiler.defmacro = function(name, argnames, template) {
     var c_name;
     c_name = compile(name);
@@ -518,19 +531,42 @@
       q_args = quote_all(args);
       js = oppo.compile([[['symbol', 'lambda'], argnames, template]].concat(__slice.call(q_args[1])));
       evald = eval(js);
-      return oppo.compile(evald);
+      if (!mc_expand && !mc_expand_1) {
+        return oppo.compile(evald);
+      } else {
+        mc_expand_1 = false;
+        return evald;
+      }
     });
     return "/* defmacro " + c_name + " */ null";
   };
 
+  compiler.macroexpand = function(sexp) {
+    var old_mc_expand, ret;
+    old_mc_expand = mc_expand;
+    mc_expand = true;
+    ret = compile(sexp);
+    ret = compile(quote_all(ret));
+    mc_expand = old_mc_expand;
+    return ret;
+  };
+
+  compiler.macroexpand_1 = function(sexp) {
+    var ret;
+    mc_expand_1 = true;
+    ret = compile(sexp);
+    ret = compile(quote_all(ret));
+    mc_expand_1 = false;
+    return ret;
+  };
+
   compiler.syntax_quote = function(list) {
-    var code, ident, q_list, restructured_list, ret, sym, uq_list;
+    var code, ident, q_list, restructured_list, ret, sym;
     sym = to_symbol;
     ident = gensym('list');
     restructured_list = restructure_list(list, ident);
     restructured_list[1] = [sym('js-eval'), restructured_list[1]];
     q_list = quote_all(list);
-    uq_list = compile(q_list);
     code = [[sym('lambda'), [sym(ident)], [sym("var")].concat(__slice.call(restructured_list))], q_list];
     return ret = compile(code);
   };
