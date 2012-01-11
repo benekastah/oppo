@@ -87,9 +87,22 @@ JS_ILLEGAL_IDENTIFIER_CHARS =
 
 is_splat = (s) -> s?[0]?[1] is 'splat'
 is_unquote = (u) -> u?[0]?[1] is 'unquote'
-is_symbol = (s) -> s?[0] is 'symbol'
+
+_is = (what, x) -> x?[1] is what
+is_symbol = (s) -> s?[0] is "symbol"
 
 to_symbol = (s) -> ['symbol', s]
+quote_escape = (x) ->
+  ret = x
+  if (_is "regex", x) or (_is "regex", x?[0]?[1])
+    sexp = x[0..]
+    str = x[1]?[1]
+    if str
+      x[1][1] = str.replace /\\/g, "\\\\"
+    ret = x;
+  else if not _.isArray x
+    ret = x.replace /\\/g, "\\\\"
+  ret
 
 objectSet = (o, s, v) ->
   [s, v, o] = [o, s, null] if arguments.length < 3

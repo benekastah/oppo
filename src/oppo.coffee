@@ -100,15 +100,14 @@ compiler.js_map = (sexp...) ->
       c_value = compile item
       ret += "#{c_value},\n"
   ret.replace /,\n$/, ' }'
-    
-compiler.quote = (sexp, quote_all) ->
+       
+compiler.quote = (sexp) ->
+  sexp = quote_escape sexp
   if _.isArray sexp
     q_sexp = _.map sexp, compile
-    "[#{q_sexp.join ', '}]"
+    ret = "[#{q_sexp.join ', '}]"
   else
-    "\"#{sexp}\"".replace(/^""/, '"\\"').replace /""$/, '\\""'
-    
-compiler.eval = -> compiler.call 'oppo.eval', arguments...
+    ret = "\"#{sexp.replace /"/g, '\\"'}\""
 
 compiler[to_js_symbol "."] = (base, names...) ->
   c_base = compile base
@@ -116,7 +115,7 @@ compiler[to_js_symbol "."] = (base, names...) ->
   c_names.unshift c_base
   c_names.join "."
   
-compiler.keyword = (key) -> compile key
+compiler.keyword = (key) -> compile key[1]
 
 compiler.regex = (body, modifiers) -> "/#{body}/#{modifiers or ''}"
 

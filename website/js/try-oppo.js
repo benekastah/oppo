@@ -28,8 +28,8 @@
       return $result.html(result);
     };
     compile = function() {
-      var ast, code, js;
-      code = $oppo.val();
+      var ast, code, js, oppo_code;
+      code = oppo_code = $oppo.val();
       cache.set(oppo_code_cache_key, code);
       try {
         ast = oppo.read(code);

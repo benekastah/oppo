@@ -1,5 +1,5 @@
 (function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, initialize_var_groups, is_splat, is_symbol, is_unquote, last_var_group, make_error, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _ref, _ref2, _ref3;
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, initialize_var_groups, is_splat, is_symbol, is_unquote, last_var_group, make_error, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _is, _ref, _ref2, _ref3;
   var __hasProp = Object.prototype.hasOwnProperty, __indexOf = Array.prototype.indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (__hasProp.call(this, i) && this[i] === item) return i; } return -1; }, __slice = Array.prototype.slice;
 
   if (typeof global === "undefined" || global === null) global = window;
@@ -57,12 +57,30 @@
     return (u != null ? (_ref = u[0]) != null ? _ref[1] : void 0 : void 0) === 'unquote';
   };
 
+  _is = function(what, x) {
+    return (x != null ? x[1] : void 0) === what;
+  };
+
   is_symbol = function(s) {
-    return (s != null ? s[0] : void 0) === 'symbol';
+    return (s != null ? s[0] : void 0) === "symbol";
   };
 
   to_symbol = function(s) {
     return ['symbol', s];
+  };
+
+  quote_escape = function(x) {
+    var ret, sexp, str, _ref, _ref2;
+    ret = x;
+    if ((_is("regex", x)) || (_is("regex", x != null ? (_ref = x[0]) != null ? _ref[1] : void 0 : void 0))) {
+      sexp = x.slice(0);
+      str = (_ref2 = x[1]) != null ? _ref2[1] : void 0;
+      if (str) x[1][1] = str.replace(/\\/g, "\\\\");
+      ret = x;
+    } else if (!_.isArray(x)) {
+      ret = x.replace(/\\/g, "\\\\");
+    }
+    return ret;
   };
 
   objectSet = function(o, s, v) {
@@ -394,18 +412,15 @@
     return ret.replace(/,\n$/, ' }');
   };
 
-  compiler.quote = function(sexp, quote_all) {
-    var q_sexp;
+  compiler.quote = function(sexp) {
+    var q_sexp, ret;
+    sexp = quote_escape(sexp);
     if (_.isArray(sexp)) {
       q_sexp = _.map(sexp, compile);
-      return "[" + (q_sexp.join(', ')) + "]";
+      return ret = "[" + (q_sexp.join(', ')) + "]";
     } else {
-      return ("\"" + sexp + "\"").replace(/^""/, '"\\"').replace(/""$/, '\\""');
+      return ret = "\"" + (sexp.replace(/"/g, '\\"')) + "\"";
     }
-  };
-
-  compiler.eval = function() {
-    return compiler.call.apply(compiler, ['oppo.eval'].concat(__slice.call(arguments)));
   };
 
   compiler[to_js_symbol(".")] = function() {
@@ -418,7 +433,7 @@
   };
 
   compiler.keyword = function(key) {
-    return compile(key);
+    return compile(key[1]);
   };
 
   compiler.regex = function(body, modifiers) {

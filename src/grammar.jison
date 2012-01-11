@@ -7,13 +7,15 @@
 ";".*                                   { /* comment */ }
 \s+                                     { /* ignore */ }
 
-"\""                                    this.begin('string');
-<string>"\""                            this.popState();
-<string>[^"]*                           { return 'STRING'; } //"
+'"'                                     { this.begin('string'); this.string_buffer = ""; }
+<string>'"'                             { this.popState(); yytext = this.string_buffer; return 'STRING'; }
+<string>"\\\""                          { this.string_buffer += "\\\""; }
+<string>[^"]                            { this.string_buffer += yytext; } //"
 
-"#/"                                    this.begin('regex');
-<regex>"/"[a-z]*                        { this.popState(); return 'FLAGS'; }
-<regex>[^\/]*                           { return 'REGEX'; } //"
+"#/"                                    { this.begin('regex'); this.regex_buffer = ""; }
+<regex>"/"[a-zA-Z]*                     { this.popState(); yytext = this.regex_buffer + yytext; return 'REGEX'; }
+<regex>"\\/"                            { this.regex_buffer += "\\/"; }
+<regex>[^\/]                            { this.regex_buffer += yytext; }
 
 [+-]?[0-9]+("."[0-9]+)?\b               { return 'DECIMAL_NUMBER'; }
 [+-]?"#0"[0-8]+\b                       { return 'OCTAL_NUMBER'; }
@@ -34,13 +36,12 @@
 "#("                                    { return 'FUNCTION'; }
 "%"\d+                                  { return 'ARGUMENTS_ACCESSOR'; }
 
+"~"                                     { return 'UNQUOTE'; }
 "'"                                     { return 'QUOTE'; }
 "`"                                     { return 'SYNTAX_QUOTE'; }
-"~"                                     { return 'UNQUOTE'; }
 "..."                                   { return 'SPLAT'; }
 
-":"                                     { return ':'; }
-"@"                                     { return '@'; }
+":"                                     { return 'KEYWORD'; }
 [\w!@#\$%\^&\*\-\+=:'\?\/\\<>\.,]+      { return 'IDENTIFIER'; }   //'
 
 <<EOF>>                                 { return 'EOF'; }
@@ -93,9 +94,9 @@ quoted_list
   
 js_map
   : JS_MAP_START element_list MAP_END
-  { $$ = [["symbol", "js-map"]].concat($2); }
+    { $$ = [["symbol", "js-map"]].concat($2); }
   | JS_MAP_START MAP_END
-    {$$ = [["symbol", "js-map"]]}
+    { $$ = [["symbol", "js-map"]]; }
   ;
 
 element_list
@@ -116,6 +117,8 @@ special_form
     { $$ = [["symbol", "syntax-quote"], $2]; }
   | UNQUOTE s_expression
     { $$ = [["symbol", "unquote"], $2]; }
+  | SPLAT s_expression
+    { $$ = [["symbol", "splat"], $2]; }
   | FUNCTION element_list ')'
     { $$ = [["symbol", "lambda"], [], $2]; }
   | ARGUMENTS_ACCESSOR
@@ -133,10 +136,16 @@ atom
 
 literal
   : STRING
-    { $$ = $1; }
-  | REGEX FLAGS
-    { $$ = [["symbol", "regex"], $1, $2.substr(1)]; }
+    { $$ = $1.replace(/\n/, "\\n"); }
+  | regex
   | number
+  ;
+  
+regex
+  : REGEX {
+      var re = $1.split("/");
+      $$ = [["symbol", "regex"], re[0], re[1]];
+    }
   ;
   
 number
@@ -151,18 +160,10 @@ number
   ;
   
 symbol
-  : IDENTIFIER
-    { $$ = ["symbol", yytext]; }
-  | ':' IDENTIFIER
+  : KEYWORD symbol
     { $$ = [["symbol", "keyword"], $2]; }
-  | UNQUOTE symbol
-    { $$ = [["symbol", "unquote"], $2]; }
-  | SPLAT symbol
-    { $$ = [["symbol", "splat"], $2]; }
-  ;
-
-splat
-  : 
+  | IDENTIFIER
+    { $$ = ["symbol", yytext]; }
   ;
   
 %%

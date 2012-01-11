@@ -1,16 +1,23 @@
 ;; Misc macros and functions
+(defmacro eval (sexp)
+  `((. oppo eval) ~sexp))
+
 (defmacro print (...things)
   `((. console log) ...things))
   
 (defmacro defn (nm argslist ...body)
   `(def ~nm (lambda ~argslist ...body)))
+  
+(defmacro or (...items)
+  (let (s ((. items join) " || "))
+    `(js-eval ~s)))
 
 ;(defmacro apply)
 
 (defn typeof (x)
   (let (cls ((. Object prototype toString call) x)
         type-arr ((. cls match) #/\s([a-zA-Z]+)/)
-        type (first type-arr))
+        type ((. - first) type-arr))
     ((. type toLowerCase))))
 
 ;(defmacro .. (...items)
@@ -19,11 +26,15 @@
 
 ;; Collections
 (defmacro concat (base ...items)
-  `((. (first ~base) concat) ...items))
+  `((. ~base concat) ...items))
 
 ;; Lists
 
 ;; Strings
+; (defmacro str (...items)
+;   (let (new-items (concat ["\""] items "\"")
+;         s ((. new-items join) "\" + \""))
+;     `(js-eval ~((. s replace) " + \"\"" ""))))
 
 ;; Arithmetic
 ;(defmacro + (...nums)

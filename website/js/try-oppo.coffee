@@ -25,7 +25,7 @@ $.domReady ->
     $result.html result
 
   compile = ->
-    code = $oppo.val()
+    code = oppo_code = $oppo.val()
     cache.set oppo_code_cache_key, code
     try
       ast = oppo.read code
