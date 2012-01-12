@@ -85,22 +85,17 @@ JS_ILLEGAL_IDENTIFIER_CHARS =
   "\v": "vertical"
   "\0": "null"
 
-is_splat = (s) -> s?[0]?[1] is 'splat'
-is_unquote = (u) -> u?[0]?[1] is 'unquote'
+_is = (what, x) -> x?[0]?[1] is what
+is_splat = (s) -> _is 'splat', s
+is_unquote = (u) -> _is 'unquote', u
+is_quoted = (q) -> _is 'quote', q
 
-_is = (what, x) -> x?[1] is what
 is_symbol = (s) -> s?[0] is "symbol"
 
 to_symbol = (s) -> ['symbol', s]
 quote_escape = (x) ->
   ret = x
-  if (_is "regex", x) or (_is "regex", x?[0]?[1])
-    sexp = x[0..]
-    str = x[1]?[1]
-    if str
-      x[1][1] = str.replace /\\/g, "\\\\"
-    ret = x;
-  else if not _.isArray x
+  if _.isString x
     ret = x.replace /\\/g, "\\\\"
   ret
 
@@ -250,7 +245,8 @@ restructure_list = (pattern, sourceName) ->
       concatArgs.push c_item
     else if is_unquote item
       do_slice()
-      concatArgs.push "[#{compile item[1]}]"
+      c_item = compile item[1]
+      concatArgs.push "[#{c_item}]"
     else if (_.isArray item) and not is_symbol item
       do_slice()
       new_ident = "#{sourceName}[#{i}]"

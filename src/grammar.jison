@@ -7,15 +7,13 @@
 ";".*                                   { /* comment */ }
 \s+                                     { /* ignore */ }
 
-'"'                                     { this.begin('string'); this.string_buffer = ""; }
-<string>'"'                             { this.popState(); yytext = this.string_buffer; return 'STRING'; }
-<string>"\\\""                          { this.string_buffer += "\\\""; }
-<string>[^"]                            { this.string_buffer += yytext; } //"
+'"'                                     this.begin('string');
+<string>'"'                             this.popState();
+<string>(\\\"|[^"])*                    { return 'STRING'; } //"
 
-"#/"                                    { this.begin('regex'); this.regex_buffer = ""; }
-<regex>"/"[a-zA-Z]*                     { this.popState(); yytext = this.regex_buffer + yytext; return 'REGEX'; }
-<regex>"\\/"                            { this.regex_buffer += "\\/"; }
-<regex>[^\/]                            { this.regex_buffer += yytext; }
+"#/"                                    this.begin('regex');
+<regex>"/"[a-zA-Z]*                     { this.popState(); return 'FLAGS'; }
+<regex>(\\\/|[^\/])*                    { return 'REGEX'; }
 
 [+-]?[0-9]+("."[0-9]+)?\b               { return 'DECIMAL_NUMBER'; }
 [+-]?"#0"[0-8]+\b                       { return 'OCTAL_NUMBER'; }
@@ -142,10 +140,8 @@ literal
   ;
   
 regex
-  : REGEX {
-      var re = $1.split("/");
-      $$ = [["symbol", "regex"], re[0], re[1]];
-    }
+  : REGEX FLAGS
+    { $$ = [["symbol", "regex"], $1, $2.substr(1)]; }
   ;
   
 number

@@ -15,6 +15,7 @@
           result = JSON.stringify(evald);
           if (typeof result !== "string") throw "";
         } catch (e) {
+          console.trace();
           result = evald;
         }
       } catch (e) {
@@ -35,6 +36,7 @@
         ast = oppo.read(code);
         js = oppo.compile(ast, true);
       } catch (e) {
+        console.trace();
         js = "/* " + e + " */";
       }
       return $js.val(js);

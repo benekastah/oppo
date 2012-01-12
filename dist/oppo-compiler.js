@@ -1,5 +1,5 @@
 (function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, initialize_var_groups, is_splat, is_symbol, is_unquote, last_var_group, make_error, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _is, _ref, _ref2, _ref3;
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, initialize_var_groups, is_quoted, is_splat, is_symbol, is_unquote, last_var_group, make_error, math_fn, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _is, _ref, _ref2, _ref3;
   var __hasProp = Object.prototype.hasOwnProperty, __indexOf = Array.prototype.indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (__hasProp.call(this, i) && this[i] === item) return i; } return -1; }, __slice = Array.prototype.slice;
 
   if (typeof global === "undefined" || global === null) global = window;
@@ -47,18 +47,21 @@
     "\0": "null"
   };
 
-  is_splat = function(s) {
+  _is = function(what, x) {
     var _ref;
-    return (s != null ? (_ref = s[0]) != null ? _ref[1] : void 0 : void 0) === 'splat';
+    return (x != null ? (_ref = x[0]) != null ? _ref[1] : void 0 : void 0) === what;
+  };
+
+  is_splat = function(s) {
+    return _is('splat', s);
   };
 
   is_unquote = function(u) {
-    var _ref;
-    return (u != null ? (_ref = u[0]) != null ? _ref[1] : void 0 : void 0) === 'unquote';
+    return _is('unquote', u);
   };
 
-  _is = function(what, x) {
-    return (x != null ? x[1] : void 0) === what;
+  is_quoted = function(q) {
+    return _is('quote', q);
   };
 
   is_symbol = function(s) {
@@ -70,16 +73,9 @@
   };
 
   quote_escape = function(x) {
-    var ret, sexp, str, _ref, _ref2;
+    var ret;
     ret = x;
-    if ((_is("regex", x)) || (_is("regex", x != null ? (_ref = x[0]) != null ? _ref[1] : void 0 : void 0))) {
-      sexp = x.slice(0);
-      str = (_ref2 = x[1]) != null ? _ref2[1] : void 0;
-      if (str) x[1][1] = str.replace(/\\/g, "\\\\");
-      ret = x;
-    } else if (!_.isArray(x)) {
-      ret = x.replace(/\\/g, "\\\\");
-    }
+    if (_.isString(x)) ret = x.replace(/\\/g, "\\\\");
     return ret;
   };
 
@@ -279,7 +275,8 @@
         concatArgs.push(c_item);
       } else if (is_unquote(item)) {
         do_slice();
-        concatArgs.push("[" + (compile(item[1])) + "]");
+        c_item = compile(item[1]);
+        concatArgs.push("[" + c_item + "]");
       } else if ((_.isArray(item)) && !is_symbol(item)) {
         do_slice();
         new_ident = "" + sourceName + "[" + i + "]";
@@ -409,27 +406,37 @@
         ret += "" + c_value + ",\n";
       }
     }
-    return ret.replace(/,\n$/, ' }');
+    return ret.replace(/(\s|,\s)$/, ' }');
   };
 
   compiler.quote = function(sexp) {
-    var q_sexp, ret;
+    var q_sexp, ret, s_sexp;
     sexp = quote_escape(sexp);
     if (_.isArray(sexp)) {
       q_sexp = _.map(sexp, compile);
       return ret = "[" + (q_sexp.join(', ')) + "]";
     } else {
-      return ret = "\"" + (sexp.replace(/"/g, '\\"')) + "\"";
+      s_sexp = "" + sexp;
+      return ret = "\"" + (s_sexp.replace(/"/g, '\\"')) + "\"";
     }
   };
 
   compiler[to_js_symbol(".")] = function() {
-    var base, c_base, c_names, names;
+    var base, c_base, e_name, name, names, ret, _i, _len;
     base = arguments[0], names = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     c_base = compile(base);
-    c_names = _.map(names, compile);
-    c_names.unshift(c_base);
-    return c_names.join(".");
+    ret = c_base;
+    for (_i = 0, _len = names.length; _i < _len; _i++) {
+      name = names[_i];
+      e_name = null;
+      if (is_quoted(name)) e_name = oppo.eval(name);
+      if ((e_name != null) && is_symbol(e_name)) {
+        ret += "." + (compile(e_name));
+      } else {
+        ret += "[" + (compile(name)) + "]";
+      }
+    }
+    return ret;
   };
 
   compiler.keyword = function(key) {
@@ -437,15 +444,35 @@
   };
 
   compiler.regex = function(body, modifiers) {
-    return "/" + body + "/" + (modifiers || '');
+    return "/" + body + "/" + (modifiers != null ? modifiers : '');
   };
 
-  compiler.str = function() {
-    var c_strs, strs;
-    strs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    c_strs = _.map(strs, compile);
-    return "'' + " + (c_strs.join(' + '));
+  /*
+  MATH
+  */
+
+  math_fn = function(fn, symbol) {
+    return compiler[to_js_symbol(fn)] = function() {
+      var c_nums, nums;
+      nums = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      c_nums = _.map(nums, compile);
+      return c_nums.join(" " + (symbol || fn) + " ");
+    };
   };
+
+  math_fn("+");
+
+  math_fn("-");
+
+  math_fn("*");
+
+  math_fn("/");
+
+  math_fn("%");
+
+  /*
+  COMPARISONS
+  */
 
   /*
   ERRORS
@@ -454,7 +481,7 @@
   compiler[to_js_symbol('throw')] = function(err) {
     var c_err;
     c_err = compile(err);
-    return "!function () { throw " + c_err + " }()";
+    return "(function () { throw " + c_err + " })()";
   };
 
   /*

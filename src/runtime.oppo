@@ -1,32 +1,50 @@
 ;; Misc macros and functions
 (defmacro eval (sexp)
-  `((. oppo eval) ~sexp))
+  `((. oppo 'eval) ~sexp))
 
 (defmacro print (...things)
-  `((. console log) ...things))
+  `((. console 'log) ...things))
   
 (defmacro defn (nm argslist ...body)
   `(def ~nm (lambda ~argslist ...body)))
   
 (defmacro or (...items)
-  (let (s ((. items join) " || "))
+  (let (s ((. items 'join) " || "))
     `(js-eval ~s)))
 
 ;(defmacro apply)
 
-(defn typeof (x)
-  (let (cls ((. Object prototype toString call) x)
-        type-arr ((. cls match) #/\s([a-zA-Z]+)/)
-        type ((. - first) type-arr))
-    ((. type toLowerCase))))
+(defn js-type (x)
+  (let (cls ((. Object 'prototype 'toString 'call) x)
+        type-arr ((. cls 'match) #/\s([a-zA-Z]+)/)
+        type (nth type-arr 2))
+    ((. type 'toLowerCase))))
 
 ;(defmacro .. (...items)
 ;  (if (= 2 (size items))
 ;    ))
 
 ;; Collections
+
+; nth needs to be able to detect if 0 is passed in, and then throw an error
+; nth needs to be able to detect if n is not a number, in which case do the calculation at runtime
+(defmacro nth (a n)
+  `(. ~a ~(- n 1)))
+  
+(defmacro first (a)
+  `(nth ~a 1))
+  
+(defmacro second (a)
+  `(nth ~a 2))
+  
+(defmacro last (a)
+  `(nth ~a (. ~a 'length)))
+
 (defmacro concat (base ...items)
-  `((. ~base concat) ...items))
+  `((. ~base 'concat) ...items))
+  
+(defmacro join (a s)
+  `((. ~a 'join) ~s))
 
 ;; Lists
 
@@ -35,11 +53,6 @@
 ;   (let (new-items (concat ["\""] items "\"")
 ;         s ((. new-items join) "\" + \""))
 ;     `(js-eval ~((. s replace) " + \"\"" ""))))
-
-;; Arithmetic
-;(defmacro + (...nums)
-;  )
-
 
 
 ;; Set up underscore

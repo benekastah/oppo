@@ -14,7 +14,9 @@ $.domReady ->
         result = JSON.stringify evald
         if typeof result isnt "string"
           throw ""
-      catch e then result = evald
+      catch e
+        console.trace()
+        result = evald
     catch e then result = e
     
     if typeof result is 'undefined'
@@ -30,7 +32,9 @@ $.domReady ->
     try
       ast = oppo.read code
       js = oppo.compile ast, true
-    catch e then js = "/* #{e} */"
+    catch e
+      console.trace()
+      js = "/* #{e} */"
     $js.val js
   
   compile_and_compute_result = _.compose compute_result, compile

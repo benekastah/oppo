@@ -99,7 +99,7 @@ compiler.js_map = (sexp...) ->
     else
       c_value = compile item
       ret += "#{c_value},\n"
-  ret.replace /,\n$/, ' }'
+  ret.replace /(\s|,\s)$/, ' }'
        
 compiler.quote = (sexp) ->
   sexp = quote_escape sexp
@@ -107,28 +107,57 @@ compiler.quote = (sexp) ->
     q_sexp = _.map sexp, compile
     ret = "[#{q_sexp.join ', '}]"
   else
-    ret = "\"#{sexp.replace /"/g, '\\"'}\""
+    s_sexp = "#{sexp}"
+    ret = "\"#{s_sexp.replace /"/g, '\\"'}\""
 
 compiler[to_js_symbol "."] = (base, names...) ->
   c_base = compile base
-  c_names = _.map names, compile
-  c_names.unshift c_base
-  c_names.join "."
+  ret = c_base
+  for name in names
+    e_name = null
+    if is_quoted name
+      e_name = oppo.eval name
+    if e_name? and is_symbol e_name
+      ret += ".#{compile e_name}"
+    else
+      ret += "[#{compile name}]"
+  ret
   
 compiler.keyword = (key) -> compile key[1]
 
-compiler.regex = (body, modifiers) -> "/#{body}/#{modifiers or ''}"
+compiler.regex = (body, modifiers) -> "/#{body}/#{modifiers ? ''}"
 
-compiler.str = (strs...) -> 
-  c_strs = _.map strs, compile
-  "'' + #{c_strs.join ' + '}"
+# compiler.str = (strs...) -> 
+#   c_strs = _.map strs, compile
+#   "'' + #{c_strs.join ' + '}"
+
+###
+MATH
+###
+math_fn = (fn, symbol) ->
+  compiler[to_js_symbol fn] = (nums...) ->
+    c_nums = _.map nums, compile
+    c_nums.join " #{symbol or fn} "
+    
+math_fn "+"
+math_fn "-"
+math_fn "*"
+math_fn "/"
+math_fn "%"
+
+###
+COMPARISONS
+###
+# compare_fn = (fn, symbol) ->
+#   compiler[to_js_symbol fn] = (items...) ->
+#     
 
 ###
 ERRORS
 ###
 compiler[to_js_symbol 'throw'] = (err) ->
   c_err = compile err
-  "!function () { throw #{c_err} }()"
+  "(function () { throw #{c_err} })()"
 
 ###
 FUNCTIONS
