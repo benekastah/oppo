@@ -1,5 +1,5 @@
 (function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, initialize_var_groups, is_quoted, is_splat, is_symbol, is_unquote, last_var_group, make_error, math_fn, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _is, _ref, _ref2, _ref3;
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, initialize_var_groups, is_quoted, is_splat, is_symbol, is_unquote, last_var_group, make_error, math_fn, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _is, _ref, _ref2, _ref3;
   var __hasProp = Object.prototype.hasOwnProperty, __indexOf = Array.prototype.indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (__hasProp.call(this, i) && this[i] === item) return i; } return -1; }, __slice = Array.prototype.slice;
 
   if (typeof global === "undefined" || global === null) global = window;
@@ -415,6 +415,8 @@
     if (_.isArray(sexp)) {
       q_sexp = _.map(sexp, compile);
       return ret = "[" + (q_sexp.join(', ')) + "]";
+    } else if (_.isNumber(sexp)) {
+      return ret = sexp;
     } else {
       s_sexp = "" + sexp;
       return ret = "\"" + (s_sexp.replace(/"/g, '\\"')) + "\"";
@@ -471,8 +473,51 @@
   math_fn("%");
 
   /*
+  BINARY
+  */
+
+  binary_fn = math_fn;
+
+  binary_fn("||");
+
+  binary_fn("&&");
+
+  /*
   COMPARISONS
   */
+
+  compare_fn = function(fn, symbol) {
+    return compiler[to_js_symbol(fn)] = function() {
+      var c_items, item, items, last, ret, _i, _len, _ref4;
+      items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      c_items = _.map(items, compile);
+      ret = [];
+      last = c_items[0];
+      _ref4 = c_items.slice(1);
+      for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
+        item = _ref4[_i];
+        ret.push("" + last + " " + (symbol || fn) + " " + item);
+        last = item;
+      }
+      return ret.join(" && ");
+    };
+  };
+
+  compare_fn("<");
+
+  compare_fn(">");
+
+  compare_fn("<=");
+
+  compare_fn(">=");
+
+  compare_fn("==");
+
+  compare_fn("not==", "!=");
+
+  compare_fn("===");
+
+  compare_fn("not===", "!==");
 
   /*
   ERRORS

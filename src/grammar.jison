@@ -40,7 +40,7 @@
 "..."                                   { return 'SPLAT'; }
 
 ":"                                     { return 'KEYWORD'; }
-[\w!@#\$%\^&\*\-\+=:'\?\/\\<>\.,]+      { return 'IDENTIFIER'; }   //'
+[\w!@#\$%\^&\*\-\+=:'\?\|\/\\<>\.,]+    { return 'IDENTIFIER'; }   //'
 
 <<EOF>>                                 { return 'EOF'; }
 .                                       { return 'INVALID'; }

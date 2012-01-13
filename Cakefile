@@ -114,6 +114,7 @@ task "build:runtime", "Build oppo runtime", (options) ->
     file = "#{dir}/oppo-runtime.js"
     fs.readFile "src/runtime.oppo", "utf8", (err, code) ->
       if err then throw err
+      code = code.replace /\\/g, "\\\\"
       code = code.replace /'/g, "\\'"
       code = code.split "\n"
       code = for item in code

@@ -106,6 +106,8 @@ compiler.quote = (sexp) ->
   if _.isArray sexp
     q_sexp = _.map sexp, compile
     ret = "[#{q_sexp.join ', '}]"
+  else if _.isNumber sexp
+    ret = sexp
   else
     s_sexp = "#{sexp}"
     ret = "\"#{s_sexp.replace /"/g, '\\"'}\""
@@ -146,11 +148,34 @@ math_fn "/"
 math_fn "%"
 
 ###
+BINARY
+###
+# I know these aren't math functions, but it will work
+binary_fn = math_fn
+binary_fn "||"
+binary_fn "&&"
+
+###
 COMPARISONS
 ###
-# compare_fn = (fn, symbol) ->
-#   compiler[to_js_symbol fn] = (items...) ->
-#     
+compare_fn = (fn, symbol) ->
+  compiler[to_js_symbol fn] = (items...) ->
+    c_items = _.map items, compile
+    ret = []
+    last = c_items[0]
+    for item in c_items[1..]
+      ret.push "#{last} #{symbol or fn} #{item}"
+      last = item
+    ret.join " && "
+    
+compare_fn "<"
+compare_fn ">"
+compare_fn "<="
+compare_fn ">="
+compare_fn "=="
+compare_fn "not==", "!="
+compare_fn "==="
+compare_fn "not===", "!=="
 
 ###
 ERRORS

@@ -8,16 +8,18 @@
 (defmacro defn (nm argslist ...body)
   `(def ~nm (lambda ~argslist ...body)))
   
-(defmacro or (...items)
-  (let (s ((. items 'join) " || "))
-    `(js-eval ~s)))
+;(defmacro or (...items)
+;  (let (s ((. items 'join) " || "))
+;    `(js-eval ~s)))
+    
+;(defmacro and)
 
 ;(defmacro apply)
 
 (defn js-type (x)
   (let (cls ((. Object 'prototype 'toString 'call) x)
         type-arr ((. cls 'match) #/\s([a-zA-Z]+)/)
-        type (nth type-arr 2))
+        type (. type-arr 1))
     ((. type 'toLowerCase))))
 
 ;(defmacro .. (...items)
@@ -29,7 +31,11 @@
 ; nth needs to be able to detect if 0 is passed in, and then throw an error
 ; nth needs to be able to detect if n is not a number, in which case do the calculation at runtime
 (defmacro nth (a n)
-  `(. ~a ~(- n 1)))
+  (if (=== (js-type n) "number")
+    (if (not=== n 0)
+      `(. ~a ~(- n 1))
+      (throw "nth treats collections as one-based; cannot get zeroth item"))
+    `(. ~a (- ~n 1))))
   
 (defmacro first (a)
   `(nth ~a 1))
@@ -49,17 +55,26 @@
 ;; Lists
 
 ;; Strings
-; (defmacro str (...items)
-;   (let (new-items (concat ["\""] items "\"")
-;         s ((. new-items join) "\" + \""))
-;     `(js-eval ~((. s replace) " + \"\"" ""))))
+(defmacro replace (base ...items)
+  `((. ~base 'replace) ...items))
+
+(defmacro str (...items)
+  (let (new-items (concat ["\""] items "\"")
+        s ((. new-items join) "\" + \""))
+    `(js-eval ~(replace s " + \"\"" ""))))
 
 
 ;; Set up underscore
-(let (collections [:each :map :reduce :reduceRight :find :filter :reject :all :any :include :invoke :pluck :max :min :sortBy :groupBy :sortedIndex :shuffle :toArray :size]
-      arrays [:first :initial :last :rest :compact :flatten :without :union :intersection :difference :uniq :zip :indexOf :lastIndexOf :range]
-      functions [:bind :bindAll :memoize :delay :defer :throttle :debounce :once :after :wrap :compose]
-      objects [:keys :values :functions :extend :defaults :clone :tap :isEqual :isEmpty :isElement :isArray :isArguments :isFunction :isString :isNumber :isBoolean :isDate :isRegExp :isNaN :isNull :isUndefined]
+(let (collections [ :each :map :reduce :reduceRight :find :filter :reject :all 
+                    :any :include :invoke :pluck :max :min :sortBy :groupBy 
+                    :sortedIndex :shuffle :toArray :size]
+      arrays [:first :initial :last :rest :compact :flatten :without :union 
+              :intersection :difference :uniq :zip :indexOf :lastIndexOf :range]
+      functions [ :bind :bindAll :memoize :delay :defer :throttle :debounce 
+                  :once :after :wrap :compose]
+      objects [ :keys :values :functions :extend :defaults :clone :tap :isEqual 
+                :isEmpty :isElement :isArray :isArguments :isFunction :isString 
+                :isNumber :isBoolean :isDate :isRegExp :isNaN :isNull :isUndefined]
       utility [:noConflict :identity :times :mixin :uniqueId :escape :template]
       chaining [:chain :value])
   
