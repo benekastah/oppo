@@ -26,16 +26,14 @@
 ;  (if (= 2 (size items))
 ;    ))
 
-;; Collections
-
-; nth needs to be able to detect if 0 is passed in, and then throw an error
-; nth needs to be able to detect if n is not a number, in which case do the calculation at runtime
-(defmacro nth (a n)
-  (if (=== (js-type n) "number")
-    (if (not=== n 0)
-      `(. ~a ~(- n 1))
-      (throw "nth treats collections as one-based; cannot get zeroth item"))
-    `(. ~a (- ~n 1))))
+;; Collections    
+(defn (. window 'nth) (a n)
+  (if (=== n 0)
+    (throw "nth treats collections as one-based; cannot get zeroth item"))
+  (let (i (if (< n 0)
+            (+ (. a 'length) n)
+            (- n 1)))
+    (. a i)))
   
 (defmacro first (a)
   `(nth ~a 1))
@@ -44,7 +42,7 @@
   `(nth ~a 2))
   
 (defmacro last (a)
-  `(nth ~a (. ~a 'length)))
+  `(nth ~a -1))
 
 (defmacro concat (base ...items)
   `((. ~base 'concat) ...items))

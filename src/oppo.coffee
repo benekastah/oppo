@@ -71,8 +71,7 @@ compiler.def = (name, value) ->
     c_value = compile value
     err = read_compile "(throw \"Can't define variable that is already defined: #{c_name}\")"
     ret = """
-    /* def #{c_name} */
-    (typeof #{c_name} === 'undefined' ?
+    /* def #{c_name} */ (typeof #{c_name} === 'undefined' ?
       (#{c_name} = #{c_value}) :
       #{err})
     /* end def #{c_name} */
@@ -83,8 +82,7 @@ compiler[to_js_symbol 'set!'] = (name, value) ->
   c_value = compile value
   err = read_compile "(throw \"Can't set variable that has not been defined: #{c_name}\")"
   ret = """
-  /* set! #{c_name} */
-  (typeof #{c_name} !== 'undefined' ?
+  /* set! #{c_name} */ (typeof #{c_name} !== 'undefined' ?
     (#{c_name} = #{c_value}) :
     #{err})
   /* end set! #{c_name} */
@@ -104,8 +102,7 @@ compiler[to_js_symbol 'if'] = (test, t, f) ->
     Array::push.call arguments, f
   [c_test, c_t, c_f] = _.map arguments, compile
   """
-  /* if */
-  (#{c_test} ?
+  /* if */ (#{c_test} ?
     #{c_t} :
     #{c_f})
   /* end if */

@@ -378,7 +378,7 @@
     } else {
       c_value = compile(value);
       err = read_compile("(throw \"Can't define variable that is already defined: " + c_name + "\")");
-      return ret = "/* def " + c_name + " */\n(typeof " + c_name + " === 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end def " + c_name + " */";
+      return ret = "/* def " + c_name + " */ (typeof " + c_name + " === 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end def " + c_name + " */";
     }
   };
 
@@ -387,7 +387,7 @@
     c_name = compile(name);
     c_value = compile(value);
     err = read_compile("(throw \"Can't set variable that has not been defined: " + c_name + "\")");
-    return ret = "/* set! " + c_name + " */\n(typeof " + c_name + " !== 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end set! " + c_name + " */";
+    return ret = "/* set! " + c_name + " */ (typeof " + c_name + " !== 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end set! " + c_name + " */";
   };
 
   compiler.js_eval = function(js) {
@@ -408,7 +408,7 @@
     var c_f, c_t, c_test, _ref4;
     if (arguments.length === 2) Array.prototype.push.call(arguments, f);
     _ref4 = _.map(arguments, compile), c_test = _ref4[0], c_t = _ref4[1], c_f = _ref4[2];
-    return "/* if */\n(" + c_test + " ?\n  " + c_t + " :\n  " + c_f + ")\n/* end if */";
+    return "/* if */ (" + c_test + " ?\n  " + c_t + " :\n  " + c_f + ")\n/* end if */";
   };
 
   compiler.js_map = function() {
