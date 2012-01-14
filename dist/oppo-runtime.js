@@ -18,7 +18,7 @@
 '\n' +
 ';(defmacro apply)\n' +
 '\n' +
-'(defn js-type (x)\n' +
+'(defn (. window \'js-type) (x)\n' +
 '  (let (cls ((. Object \'prototype \'toString \'call) x)\n' +
 '        type-arr ((. cls \'match) #/\\s([a-zA-Z]+)/)\n' +
 '        type (. type-arr 1))\n' +

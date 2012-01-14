@@ -89,6 +89,7 @@ _is = (what, x) -> x?[0]?[1] is what
 is_splat = (s) -> _is 'splat', s
 is_unquote = (u) -> _is 'unquote', u
 is_quoted = (q) -> _is 'quote', q
+is_keyword = (k) -> _is 'keyword', k
 
 is_symbol = (s) -> s?[0] is "symbol"
 
@@ -172,23 +173,29 @@ do ->
   # initial array in var_groups is for the main scope
   var_groups = null
   initialize_var_groups = ->
+    # console.log "initializing var groups."
     var_groups = [ [] ]
   initialize_var_groups()
   
-  new_var_group = -> var_groups.push []
+  new_var_group = ->
+    var_groups.push (ret = [])
+    # console.log "Created var group; #{var_groups.length} total."
+    ret
   first_var_group = -> var_groups[0]
   last_var_group = -> _.last var_groups
   
-  end_var_group = -> 
+  end_var_group = ->
     ret = var_groups.pop()
-    if var_groups.length is 0
-      var_groups.push []
+    # console.log "Ended var group;   #{var_groups.length} remaining."
     ret
     
   end_final_var_group = ->
     if var_groups.length isnt 1
       raise "VarGroupsError", "Expecting 1 final var group, got #{var_groups.length} instead"
-    end_var_group()
+    # console.log "Ending final var group."
+    ret = end_var_group()
+    initialize_var_groups()
+    ret
   
   
 ###

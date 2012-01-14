@@ -80,7 +80,7 @@ callable_list
   : '(' element_list ')'
     { $$ = $2; }
   | '(' ')'
-    { $$ = []; }
+    { $$ = null; }
   ;
 
 quoted_list
@@ -134,7 +134,7 @@ atom
 
 literal
   : STRING
-    { $$ = $1.replace(/\n/, "\\n"); }
+    { $$ = $1; }
   | regex
   | number
   ;

@@ -13,9 +13,9 @@ read = oppo.read = (string) ->
 
 began = false
 compile = oppo.compile = (sexp = null, init_vars = false) ->
-  if init_vars
-    initialize_var_groups()
-    init_vars = false
+  # if init_vars
+  #   initialize_var_groups()
+  #   init_vars = false
   
   if not began
     top_level = began = true
@@ -25,7 +25,7 @@ compile = oppo.compile = (sexp = null, init_vars = false) ->
   else if is_symbol sexp
     ret = to_js_symbol sexp[1]
   else if _.isString sexp
-    ret = "\"#{sexp}\""
+    ret = "\"#{sexp.replace /\n/g, '\\n'}\""
   else if _.isArray sexp
     fn = oppo.compile _.first sexp
     if (macro = compiler[fn])
@@ -55,25 +55,44 @@ read_compile = _.compose oppo.compile, oppo.read
 MISC
 ###
 compiler[to_js_symbol 'var'] = (name, value, current_group=last_var_group()) ->
-  name = compile name
-  value = compile value
-  raiseDefError name if name in current_group
-  current_group.push name
-  "#{name} = #{value}"
+  c_name = compile name
+  c_value = compile value
+  raiseDefError c_name if c_name in current_group
+  current_group.push c_name
+  "#{c_name} = #{c_value}"
   
 compiler.def = (name, value) ->
-  compiler[to_js_symbol 'var'] name, value, first_var_group()
+  _var = compiler[to_js_symbol 'var']
+  first_group = first_var_group()
+  c_name = compile name
+  if c_name is to_js_symbol c_name
+    ret = _var name, value, first_group
+  else
+    c_value = compile value
+    err = read_compile "(throw \"Can't define variable that is already defined: #{c_name}\")"
+    ret = """
+    /* def #{c_name} */
+    (typeof #{c_name} === 'undefined' ?
+      (#{c_name} = #{c_value}) :
+      #{err})
+    /* end def #{c_name} */
+    """
   
 compiler[to_js_symbol 'set!'] = (name, value) ->
-  name = compile name
-  value = compile value
-  read_compile """
-  (if (js-eval "typeof #{name} !== 'undefined'")
-    (js-eval "#{name} =  #{value}")
-    (throw "Can't set variable that has not been defined: #{name}"))
+  c_name = compile name
+  c_value = compile value
+  err = read_compile "(throw \"Can't set variable that has not been defined: #{c_name}\")"
+  ret = """
+  /* set! #{c_name} */
+  (typeof #{c_name} !== 'undefined' ?
+    (#{c_name} = #{c_value}) :
+    #{err})
+  /* end set! #{c_name} */
   """
 
-compiler.js_eval = (js) -> js
+compiler.js_eval = (js) ->
+  compiled = compile js
+  ret = eval compiled
 
 compiler[to_js_symbol 'do'] = (body...) ->
   compiled_body = _.map arguments, compile
@@ -85,21 +104,51 @@ compiler[to_js_symbol 'if'] = (test, t, f) ->
     Array::push.call arguments, f
   [c_test, c_t, c_f] = _.map arguments, compile
   """
-  (/* if */ #{c_test} ?
-    /* then */ #{c_t} :
-    /* else */ #{c_f})
+  /* if */
+  (#{c_test} ?
+    #{c_t} :
+    #{c_f})
+  /* end if */
   """
     
 compiler.js_map = (sexp...) ->
+  sym = gensym "obj"
+  add_ons = []
+  item_added = false
   ret = "{ "
   for item, i in sexp
     if i % 2 is 0
-      c_key = compile item
-      ret += "#{c_key} : "
+      if (is_quoted item) and is_symbol (e_key = oppo.eval item)
+        ret += "#{compile e_key} : "
+      else if (_.isString item) or (is_keyword item)
+        ret += "#{compile item} : "
+      else if (_.isNumber item) and not (_.isNaN item)
+        ret += "\"#{compile item}\" : "
+      else
+        item_added = true
+        add_ons.push "#{sym}[#{compile item}] = "
     else
       c_value = compile item
-      ret += "#{c_value},\n"
-  ret.replace /(\s|,\s)$/, ' }'
+      if not item_added
+        ret += "#{c_value},\n"
+      else
+        item_added = false
+        last = add_ons.pop()
+        last += c_value
+        add_ons.push last
+        
+  ret = ret.replace /(\s|,\s)$/, ' }'
+  if not add_ons.length
+    ret
+  else
+    add_ons = _.map add_ons, (x) -> [(to_symbol "js-eval"), x]
+    add_ons.unshift (to_symbol "do")
+    add_ons.push ["symbol", sym]
+    """
+    (function (#{sym}) {
+      return #{compile add_ons};
+    })(#{ret})
+    """
        
 compiler.quote = (sexp) ->
   sexp = quote_escape sexp
@@ -150,7 +199,6 @@ math_fn "%"
 ###
 BINARY
 ###
-# I know these aren't math functions, but it will work
 binary_fn = math_fn
 binary_fn "||"
 binary_fn "&&"
