@@ -90,6 +90,7 @@ is_splat = (s) -> _is 'splat', s
 is_unquote = (u) -> _is 'unquote', u
 is_quoted = (q) -> _is 'quote', q
 is_keyword = (k) -> _is 'keyword', k
+is_string = (s) -> (_.isString s) and (/^"/.test s) and /"$/.test s
 
 is_symbol = (s) -> s?[0] is "symbol"
 
@@ -131,7 +132,7 @@ to_js_symbol = (ident) ->
     while (ident.indexOf _char) >= 0
       ident = ident.replace _char, "_#{replaced}_"
   
-  ident
+  ident.toLowerCase()
   
 gensym = (sym='gen') ->
   if not is_symbol sym

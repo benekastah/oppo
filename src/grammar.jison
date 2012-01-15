@@ -7,9 +7,9 @@
 ";".*                                   { /* comment */ }
 \s+                                     { /* ignore */ }
 
-'"'                                     this.begin('string');
-<string>'"'                             this.popState();
-<string>(\\\"|[^"])*                    { return 'STRING'; } //"
+'"'                                     { this.begin('string'); this.string_buffer = ""; }
+<string>'"'                             { this.popState(); yytext = this.string_buffer; return 'STRING'; }
+<string>(\\\"|[^"])*                    this.string_buffer = yytext;
 
 "#/"                                    this.begin('regex');
 <regex>"/"[a-zA-Z]*                     { this.popState(); return 'FLAGS'; }
@@ -53,6 +53,8 @@
 program
   : s_expression_list EOF
     { return [["symbol", "do"]].concat($1); }
+  | EOF
+    { return null; }
   ;
 
 s_expression_list

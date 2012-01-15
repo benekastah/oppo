@@ -3,6 +3,9 @@
   oppoString = ';; Misc macros and functions\n' +
 '(defmacro eval (sexp)\n' +
 '  `((. oppo \'eval) ~sexp))\n' +
+'  \n' +
+'(defmacro read (s)\n' +
+'  `((. oppo \'read) ~s))\n' +
 '\n' +
 '(defmacro print (...things)\n' +
 '  `((. console \'log) ...things))\n' +
@@ -10,16 +13,41 @@
 '(defmacro defn (nm argslist ...body)\n' +
 '  `(def ~nm (lambda ~argslist ...body)))\n' +
 '  \n' +
-';(defmacro or (...items)\n' +
-';  (let (s ((. items \'join) " || "))\n' +
-';    `(js-eval ~s)))\n' +
+'(defn (. window \'->bool) (x)\n' +
+'  (if (|| (== x nil) (=== x #f) (=== x "") (not=== x x))\n' +
+'    #f\n' +
+'    #t))\n' +
 '    \n' +
-';(defmacro and)\n' +
+'(defn (. window \'->num) (n)\n' +
+'  ((. window :Number) n))\n' +
+'  \n' +
+'(defn (. window \'->str) (s)\n' +
+'  (str s))\n' +
+'\n' +
+'(defn not (x) (js-eval "!x"))\n' +
+'\n' +
+'(let (binary-each (lambda (type ls)\n' +
+'                (let (item (nth ls 1))\n' +
+'                  (if (|| (&& (=== type :or) item)\n' +
+'                          (&& (=== type :and) (not item)))\n' +
+'                    item\n' +
+'                    (if (> (. ls \'length) 0)\n' +
+'                      (binary-each type ((. ls \'slice) 1))\n' +
+'                      nil)))))\n' +
+'  (defn (. window \'or) (...items)\n' +
+'    (binary-each :or items))\n' +
+'    \n' +
+'  (defn (. window \'and) (...items)\n' +
+'    (binary-each :and items)))\n' +
 '\n' +
 ';(defmacro apply)\n' +
 '\n' +
+'(def global (|| global window))\n' +
+'\n' +
+'(defmacro defg )\n' +
+'\n' +
 '(defn (. window \'js-type) (x)\n' +
-'  (let (cls ((. Object \'prototype \'toString \'call) x)\n' +
+'  (let (cls ((. Object :prototype :toString :call) x)\n' +
 '        type-arr ((. cls \'match) #/\\s([a-zA-Z]+)/)\n' +
 '        type (. type-arr 1))\n' +
 '    ((. type \'toLowerCase))))\n' +
@@ -57,11 +85,9 @@
 ';; Strings\n' +
 '(defmacro replace (base ...items)\n' +
 '  `((. ~base \'replace) ...items))\n' +
-'\n' +
-'(defmacro str (...items)\n' +
-'  (let (new-items (concat ["\\""] items "\\"")\n' +
-'        s ((. new-items join) "\\" + \\""))\n' +
-'    `(js-eval ~(replace s " + \\"\\"" ""))))\n' +
+'  \n' +
+'(defmacro remove (base pattern)\n' +
+'  `(replace base pattern ""))\n' +
 '\n' +
 '\n' +
 ';; Set up underscore\n' +
@@ -78,8 +104,16 @@
 '      utility [:noConflict :identity :times :mixin :uniqueId :escape :template]\n' +
 '      chaining [:chain :value])\n' +
 '  \n' +
+'  (defmacro -get (m)\n' +
+'    `(. - ~m))\n' +
+'  \n' +
+'  (def (. window \'=) (-get :isEqual))\n' +
+'  \n' +
 '  ;(defn dasherize (s)\n' +
-'  ;  ((. s replace) #//))\n' +
+'  ;  (. (replace s #/([a-z])([A-Z])/ "$1-$2") :toLowerCase))\n' +
+'    \n' +
+'  ;(defn symbolize (s)\n' +
+'  ;  (if ()))\n' +
 '  \n' +
 '  ;; Add all the underscore methods here\n' +
 '  )\n';

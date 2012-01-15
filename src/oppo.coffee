@@ -7,8 +7,8 @@ compiler = oppo.compiler ?= {}
 READER, EVAL, COMPILE
 ###
 read = oppo.read = (string) ->
-  trimmed = trim.call string
-  string = "nil" if trimmed is ''
+  # trimmed = trim.call string
+  # string = "nil" if trimmed is ''
   parser.parse string
 
 began = false
@@ -54,6 +54,10 @@ read_compile = _.compose oppo.compile, oppo.read
 ###
 MISC
 ###
+compiler.symbol = (sym) ->
+  e_sym = eval compile sym
+  compile (to_symbol e_sym)
+
 compiler[to_js_symbol 'var'] = (name, value, current_group=last_var_group()) ->
   c_name = compile name
   c_value = compile value
@@ -89,8 +93,13 @@ compiler[to_js_symbol 'set!'] = (name, value) ->
   """
 
 compiler.js_eval = (js) ->
-  compiled = compile js
-  ret = eval compiled
+  c_js = compile js
+  if is_string c_js
+    e_js = c_js.substr 1, c_js.length - 2
+    e_js = e_js.replace /"/g, '\\"'
+    ret = eval "\"#{e_js}\""
+  else
+    ret = "eval(#{c_js})"
 
 compiler[to_js_symbol 'do'] = (body...) ->
   compiled_body = _.map arguments, compile
@@ -102,7 +111,7 @@ compiler[to_js_symbol 'if'] = (test, t, f) ->
     Array::push.call arguments, f
   [c_test, c_t, c_f] = _.map arguments, compile
   """
-  /* if */ (#{c_test} ?
+  /* if */ (#{to_js_symbol '->bool'}(#{c_test}) ?
     #{c_t} :
     #{c_f})
   /* end if */
@@ -141,7 +150,7 @@ compiler.js_map = (sexp...) ->
     add_ons = _.map add_ons, (x) -> [(to_symbol "js-eval"), x]
     add_ons.unshift (to_symbol "do")
     add_ons.push ["symbol", sym]
-    """
+    ret = """
     (function (#{sym}) {
       return #{compile add_ons};
     })(#{ret})
@@ -175,9 +184,9 @@ compiler.keyword = (key) -> compile key[1]
 
 compiler.regex = (body, modifiers) -> "/#{body}/#{modifiers ? ''}"
 
-# compiler.str = (strs...) -> 
-#   c_strs = _.map strs, compile
-#   "'' + #{c_strs.join ' + '}"
+compiler.str = (strs...) -> 
+  c_strs = _.map strs, compile
+  "\"\" + #{c_strs.join ' + '}"
 
 ###
 MATH
@@ -274,7 +283,8 @@ compiler[to_js_symbol 'let'] = (names_vals, body...) ->
     vars.push [(to_symbol "var"), names_vals[i++], names_vals[i++]]
     
   body = vars.concat body
-  ret = compile [[(to_symbol "lambda"), [], body...]]
+  let_fn = [[(to_symbol "lambda"), [], body...]]
+  ret = compile let_fn
 
 ###
 MACROS

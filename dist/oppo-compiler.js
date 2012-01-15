@@ -1,5 +1,5 @@
 (function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, initialize_var_groups, is_keyword, is_quoted, is_splat, is_symbol, is_unquote, last_var_group, make_error, math_fn, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _is, _ref, _ref2, _ref3;
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, initialize_var_groups, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, last_var_group, make_error, math_fn, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _is, _ref, _ref2, _ref3;
   var __hasProp = Object.prototype.hasOwnProperty, __indexOf = Array.prototype.indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (__hasProp.call(this, i) && this[i] === item) return i; } return -1; }, __slice = Array.prototype.slice;
 
   if (typeof global === "undefined" || global === null) global = window;
@@ -68,6 +68,10 @@
     return _is('keyword', k);
   };
 
+  is_string = function(s) {
+    return (_.isString(s)) && (/^"/.test(s)) && /"$/.test(s);
+  };
+
   is_symbol = function(s) {
     return (s != null ? s[0] : void 0) === "symbol";
   };
@@ -128,7 +132,7 @@
         ident = ident.replace(_char, "_" + replaced + "_");
       }
     }
-    return ident;
+    return ident.toLowerCase();
   };
 
   gensym = function(sym) {
@@ -312,9 +316,6 @@
   */
 
   read = oppo.read = function(string) {
-    var trimmed;
-    trimmed = trim.call(string);
-    if (trimmed === '') string = "nil";
     return parser.parse(string);
   };
 
@@ -358,6 +359,12 @@
   MISC
   */
 
+  compiler.symbol = function(sym) {
+    var e_sym;
+    e_sym = eval(compile(sym));
+    return compile(to_symbol(e_sym));
+  };
+
   compiler[to_js_symbol('var')] = function(name, value, current_group) {
     var c_name, c_value;
     if (current_group == null) current_group = last_var_group();
@@ -391,9 +398,15 @@
   };
 
   compiler.js_eval = function(js) {
-    var compiled, ret;
-    compiled = compile(js);
-    return ret = eval(compiled);
+    var c_js, e_js, ret;
+    c_js = compile(js);
+    if (is_string(c_js)) {
+      e_js = c_js.substr(1, c_js.length - 2);
+      e_js = e_js.replace(/"/g, '\\"');
+      return ret = eval("\"" + e_js + "\"");
+    } else {
+      return ret = "eval(" + c_js + ")";
+    }
   };
 
   compiler[to_js_symbol('do')] = function() {
@@ -408,7 +421,7 @@
     var c_f, c_t, c_test, _ref4;
     if (arguments.length === 2) Array.prototype.push.call(arguments, f);
     _ref4 = _.map(arguments, compile), c_test = _ref4[0], c_t = _ref4[1], c_f = _ref4[2];
-    return "/* if */ (" + c_test + " ?\n  " + c_t + " :\n  " + c_f + ")\n/* end if */";
+    return "/* if */ (" + (to_js_symbol('->bool')) + "(" + c_test + ") ?\n  " + c_t + " :\n  " + c_f + ")\n/* end if */";
   };
 
   compiler.js_map = function() {
@@ -452,7 +465,7 @@
       });
       add_ons.unshift(to_symbol("do"));
       add_ons.push(["symbol", sym]);
-      return "(function (" + sym + ") {\n  return " + (compile(add_ons)) + ";\n})(" + ret + ")";
+      return ret = "(function (" + sym + ") {\n  return " + (compile(add_ons)) + ";\n})(" + ret + ")";
     }
   };
 
@@ -494,6 +507,13 @@
 
   compiler.regex = function(body, modifiers) {
     return "/" + body + "/" + (modifiers != null ? modifiers : '');
+  };
+
+  compiler.str = function() {
+    var c_strs, strs;
+    strs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+    c_strs = _.map(strs, compile);
+    return "\"\" + " + (c_strs.join(' + '));
   };
 
   /*
@@ -623,7 +643,7 @@
   };
 
   compiler[to_js_symbol('let')] = function() {
-    var body, i, names_vals, ret, vars;
+    var body, i, let_fn, names_vals, ret, vars;
     names_vals = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     vars = [];
     i = 0;
@@ -631,7 +651,8 @@
       vars.push([to_symbol("var"), names_vals[i++], names_vals[i++]]);
     }
     body = vars.concat(body);
-    return ret = compile([[to_symbol("lambda"), []].concat(__slice.call(body))]);
+    let_fn = [[to_symbol("lambda"), []].concat(__slice.call(body))];
+    return ret = compile(let_fn);
   };
 
   /*
