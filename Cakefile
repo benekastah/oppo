@@ -75,8 +75,7 @@ task "closure:compile", "Compile existing build files into single oppo.js file",
       #{formatting}
     """
   else ""
-    
-  console.log options
+  
   runtime = if options['omit-runtime'] then '' else "#{dir}/oppo-runtime.js"
   
   command = """

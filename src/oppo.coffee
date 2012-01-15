@@ -96,7 +96,7 @@ compiler.js_eval = (js) ->
   c_js = compile js
   if is_string c_js
     e_js = c_js.substr 1, c_js.length - 2
-    e_js = e_js.replace /"/g, '\\"'
+    e_js = e_js.replace /\\?"/g, '\\"'
     ret = eval "\"#{e_js}\""
   else
     ret = "eval(#{c_js})"
@@ -205,7 +205,12 @@ math_fn "%"
 ###
 BINARY
 ###
-binary_fn = math_fn
+binary_fn = (fn, symbol) ->
+  compiler[to_js_symbol fn] = (nums...) ->
+    c_nums = _.map nums, compile
+    ret = c_nums.join " #{symbol or fn} "
+    "(#{ret})"
+    
 binary_fn "||"
 binary_fn "&&"
 
@@ -221,6 +226,7 @@ compare_fn = (fn, symbol) ->
       ret.push "#{last} #{symbol or fn} #{item}"
       last = item
     ret.join " && "
+    "(#{ret})"
     
 compare_fn "<"
 compare_fn ">"

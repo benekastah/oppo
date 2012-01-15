@@ -56,13 +56,23 @@ case 31: this.$ = $$[$0];
 break;
 case 34: this.$ = [["symbol", "regex"], $$[$0-1], $$[$0].substr(1)]; 
 break;
-case 35: this.$ = parseInt(yytext, 10); 
+case 35: this.$ = parseFloat(yytext, 10); 
 break;
-case 36: this.$ = parseInt(yytext.replace(/^#0/, ''), 8); 
+case 36:
+      if (/[8-9]/.test(yytext))
+        this.$ = NaN;
+      else
+        this.$ = parseInt(yytext.replace(/^#0/, ''), 8);
+    
 break;
 case 37: this.$ = parseInt(yytext.replace(/^#x/, ''), 16); 
 break;
-case 38: this.$ = parseInt(yytext.replace(/^#b/, ''), 2); 
+case 38:
+      if (/[2-9]/.test(yytext))
+        this.$ = NaN;
+      else
+        this.$ = parseInt(yytext.replace(/^#b/, ''), 2);
+    
 break;
 case 39: this.$ = [["symbol", "keyword"], $$[$0]]; 
 break;
@@ -449,7 +459,7 @@ case 31: return 'INVALID';
 break;
 }
 };
-lexer.rules = [/^;.*/,/^\s+/,/^"/,/^"/,/^(\\"|[^"])*/,/^#\//,/^\/[a-zA-Z]*/,/^(\\\/|[^\/])*/,/^[+-]?[0-9]+(\.[0-9]+)?\b/,/^[+-]?#0[0-8]+\b/,/^[+-]?#x[0-9a-fA-F]+\b/,/^[+-]?#b[0-1]+\b/,/^nil\b/,/^#t\b/,/^#f\b/,/^\(/,/^\)/,/^\[/,/^\]/,/^#\{/,/^\{/,/^\}/,/^#\(/,/^%\d+/,/^~/,/^'/,/^`/,/^\.\.\./,/^:/,/^[\w!@#\$%\^&\*\-\+=:'\?\|\/\\<>\.,]+/,/^$/,/^./];
+lexer.rules = [/^;.*/,/^\s+/,/^"/,/^"/,/^(\\"|[^"])*/,/^#\//,/^\/[a-zA-Z]*/,/^(\\\/|[^\/])*/,/^[+-]?[0-9]+(\.[0-9]+)?\b/,/^[+-]?#0[0-9]+\b/,/^[+-]?#x[0-9a-fA-F]+\b/,/^[+-]?#b[0-9]+\b/,/^nil\b/,/^#t\b/,/^#f\b/,/^\(/,/^\)/,/^\[/,/^\]/,/^#\{/,/^\{/,/^\}/,/^#\(/,/^%\d+/,/^~/,/^'/,/^`/,/^\.\.\./,/^:/,/^[\w!@#\$%\^&\*\-\+=:'\?\|\/\\<>\.,]+/,/^$/,/^./];
 lexer.conditions = {"string":{"rules":[3,4],"inclusive":false},"regex":{"rules":[6,7],"inclusive":false},"INITIAL":{"rules":[0,1,2,5,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],"inclusive":true}};return lexer;})()
 parser.lexer = lexer;
 return parser;

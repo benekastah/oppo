@@ -13,27 +13,34 @@
 '(defmacro defn (nm argslist ...body)\n' +
 '  `(def ~nm (lambda ~argslist ...body)))\n' +
 '  \n' +
+'(defmacro apply (fn ...args)\n' +
+'  (let (args-list ((. window :Array \'prototype \'concat \'apply) [] args))\n' +
+'    `(~fn ...args-list)))\n' +
+'  \n' +
+';; Type conversion\n' +
 '(defn (. window \'->bool) (x)\n' +
-'  (if (|| (== x nil) (=== x #f) (=== x "") (not=== x x))\n' +
-'    #f\n' +
-'    #t))\n' +
-'    \n' +
+'  (js-eval "!(x == null || x === false || x === \\"\\" || x !== x)"))\n' +
+'  \n' +
 '(defn (. window \'->num) (n)\n' +
 '  ((. window :Number) n))\n' +
 '  \n' +
 '(defn (. window \'->str) (s)\n' +
 '  (str s))\n' +
 '\n' +
-'(defn not (x) (js-eval "!x"))\n' +
+';; Binary functions\n' +
+'(defn (. window \'not) (x)\n' +
+'  (let (bx (->bool x))\n' +
+'    (js-eval "!bx")))\n' +
 '\n' +
-'(let (binary-each (lambda (type ls)\n' +
-'                (let (item (nth ls 1))\n' +
-'                  (if (|| (&& (=== type :or) item)\n' +
-'                          (&& (=== type :and) (not item)))\n' +
-'                    item\n' +
-'                    (if (> (. ls \'length) 0)\n' +
-'                      (binary-each type ((. ls \'slice) 1))\n' +
-'                      nil)))))\n' +
+'(let (binary-each\n' +
+'        (lambda (type ls)\n' +
+'          (let (item (nth ls 1))\n' +
+'            (if (|| (&& (=== type :or) (->bool item))\n' +
+'                    (&& (=== type :and) (not item))\n' +
+'                    (=== (. ls \'length) 0))\n' +
+'              item\n' +
+'              (binary-each type ((. ls \'slice) 1))))))\n' +
+'                \n' +
 '  (defn (. window \'or) (...items)\n' +
 '    (binary-each :or items))\n' +
 '    \n' +
@@ -65,20 +72,19 @@
 '            (- n 1)))\n' +
 '    (. a i)))\n' +
 '  \n' +
-'(defmacro first (a)\n' +
-'  `(nth ~a 1))\n' +
+'(defn (. window \'first) (a) (nth a 1))\n' +
 '  \n' +
-'(defmacro second (a)\n' +
-'  `(nth ~a 2))\n' +
+'(defn (. window \'second) (a) (nth a 2))\n' +
 '  \n' +
-'(defmacro last (a)\n' +
-'  `(nth ~a -1))\n' +
+'(defn (. window \'last) (a) (nth a -1))\n' +
 '\n' +
-'(defmacro concat (base ...items)\n' +
-'  `((. ~base \'concat) ...items))\n' +
+'(defn (. window \'concat) (base ...items)\n' +
+'  (apply (. base \'concat) ...items))\n' +
 '  \n' +
-'(defmacro join (a s)\n' +
-'  `((. ~a \'join) ~s))\n' +
+'(defn (. window \'join) (a s)\n' +
+'  ((. a \'join) s))\n' +
+'  \n' +
+'(defmacro slice ())\n' +
 '\n' +
 ';; Lists\n' +
 '\n' +

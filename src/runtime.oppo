@@ -11,27 +11,34 @@
 (defmacro defn (nm argslist ...body)
   `(def ~nm (lambda ~argslist ...body)))
   
+(defmacro apply (fn ...args)
+  (let (args-list ((. window :Array 'prototype 'concat 'apply) [] args))
+    `(~fn ...args-list)))
+  
+;; Type conversion
 (defn (. window '->bool) (x)
-  (if (|| (== x nil) (=== x #f) (=== x "") (not=== x x))
-    #f
-    #t))
-    
+  (js-eval "!(x == null || x === false || x === \"\" || x !== x)"))
+  
 (defn (. window '->num) (n)
   ((. window :Number) n))
   
 (defn (. window '->str) (s)
   (str s))
 
-(defn not (x) (js-eval "!x"))
+;; Binary functions
+(defn (. window 'not) (x)
+  (let (bx (->bool x))
+    (js-eval "!bx")))
 
-(let (binary-each (lambda (type ls)
-                (let (item (nth ls 1))
-                  (if (|| (&& (=== type :or) item)
-                          (&& (=== type :and) (not item)))
-                    item
-                    (if (> (. ls 'length) 0)
-                      (binary-each type ((. ls 'slice) 1))
-                      nil)))))
+(let (binary-each
+        (lambda (type ls)
+          (let (item (nth ls 1))
+            (if (|| (&& (=== type :or) (->bool item))
+                    (&& (=== type :and) (not item))
+                    (=== (. ls 'length) 0))
+              item
+              (binary-each type ((. ls 'slice) 1))))))
+                
   (defn (. window 'or) (...items)
     (binary-each :or items))
     
@@ -63,20 +70,19 @@
             (- n 1)))
     (. a i)))
   
-(defmacro first (a)
-  `(nth ~a 1))
+(defn (. window 'first) (a) (nth a 1))
   
-(defmacro second (a)
-  `(nth ~a 2))
+(defn (. window 'second) (a) (nth a 2))
   
-(defmacro last (a)
-  `(nth ~a -1))
+(defn (. window 'last) (a) (nth a -1))
 
-(defmacro concat (base ...items)
-  `((. ~base 'concat) ...items))
+(defn (. window 'concat) (base ...items)
+  (apply (. base 'concat) ...items))
   
-(defmacro join (a s)
-  `((. ~a 'join) ~s))
+(defn (. window 'join) (a s)
+  ((. a 'join) s))
+  
+(defmacro slice ())
 
 ;; Lists
 

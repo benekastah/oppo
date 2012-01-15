@@ -402,7 +402,7 @@
     c_js = compile(js);
     if (is_string(c_js)) {
       e_js = c_js.substr(1, c_js.length - 2);
-      e_js = e_js.replace(/"/g, '\\"');
+      e_js = e_js.replace(/\\?"/g, '\\"');
       return ret = eval("\"" + e_js + "\"");
     } else {
       return ret = "eval(" + c_js + ")";
@@ -543,7 +543,15 @@
   BINARY
   */
 
-  binary_fn = math_fn;
+  binary_fn = function(fn, symbol) {
+    return compiler[to_js_symbol(fn)] = function() {
+      var c_nums, nums, ret;
+      nums = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      c_nums = _.map(nums, compile);
+      ret = c_nums.join(" " + (symbol || fn) + " ");
+      return "(" + ret + ")";
+    };
+  };
 
   binary_fn("||");
 
@@ -566,7 +574,8 @@
         ret.push("" + last + " " + (symbol || fn) + " " + item);
         last = item;
       }
-      return ret.join(" && ");
+      ret.join(" && ");
+      return "(" + ret + ")";
     };
   };
 

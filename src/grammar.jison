@@ -16,9 +16,9 @@
 <regex>(\\\/|[^\/])*                    { return 'REGEX'; }
 
 [+-]?[0-9]+("."[0-9]+)?\b               { return 'DECIMAL_NUMBER'; }
-[+-]?"#0"[0-8]+\b                       { return 'OCTAL_NUMBER'; }
+[+-]?"#0"[0-9]+\b                       { return 'OCTAL_NUMBER'; }
 [+-]?"#x"[0-9a-fA-F]+\b                 { return 'HEXIDECIMAL_NUMBER'; }
-[+-]?"#b"[0-1]+\b                       { return 'BINARY_NUMBER'; }
+[+-]?"#b"[0-9]+\b                       { return 'BINARY_NUMBER'; }
 
 "nil"\b                                 { return 'NIL'; }
 "#t"\b                                  { return 'BOOLEAN_TRUE'; }
@@ -148,13 +148,23 @@ regex
   
 number
   : DECIMAL_NUMBER
-    { $$ = parseInt(yytext, 10); }
+    { $$ = parseFloat(yytext, 10); }
   | OCTAL_NUMBER
-    { $$ = parseInt(yytext.replace(/^#0/, ''), 8); }
+    {
+      if (/[8-9]/.test(yytext))
+        $$ = NaN;
+      else
+        $$ = parseInt(yytext.replace(/^#0/, ''), 8);
+    }
   | HEXIDECIMAL_NUMBER
     { $$ = parseInt(yytext.replace(/^#x/, ''), 16); }
   | BINARY_NUMBER
-    { $$ = parseInt(yytext.replace(/^#b/, ''), 2); }
+    {
+      if (/[2-9]/.test(yytext))
+        $$ = NaN;
+      else
+        $$ = parseInt(yytext.replace(/^#b/, ''), 2);
+    }
   ;
   
 symbol
