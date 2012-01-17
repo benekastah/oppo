@@ -184,9 +184,21 @@ compiler.keyword = (key) -> compile key[1]
 
 compiler.regex = (body, modifiers) -> "/#{body}/#{modifiers ? ''}"
 
-compiler.str = (strs...) -> 
-  c_strs = _.map strs, compile
-  "\"\" + #{c_strs.join ' + '}"
+compiler.str = (strs...) ->
+  first_is_str = null
+  c_strs = _.map strs, (s) ->
+    if (is_quoted s) and is_symbol s[1]
+      s = to_js_symbol s[1][1]
+    c_s = compile s
+    first_is_str ?= is_string c_s
+    c_s
+    
+  initial_str = if first_is_str then '' else '"" + '
+  "#{initial_str}#{c_strs.join ' + '}"
+  
+compiler[to_js_symbol 'undefined?'] = (x) ->
+  c_x = compile x
+  "(typeof #{c_x} === 'undefined')"
 
 ###
 MATH
@@ -247,7 +259,10 @@ compiler[to_js_symbol 'throw'] = (err) ->
 ###
 FUNCTIONS
 ###
-get_args = (args) ->
+get_args = (args=[]) ->
+  if args is "null"
+    args = []
+    
   destructure = _.any args, is_splat
   
   if (destructure)
@@ -259,7 +274,7 @@ get_args = (args) ->
     args = args.map (arg) -> compile arg
     body = []
     
-  [args, body]
+  [args or [], body or []]
 
 compiler.lambda = (args, body...) ->
   new_var_group()
@@ -281,6 +296,14 @@ compiler.call = (fn, args...) ->
   c_fn = compile fn
   c_args = _.map args, compile
   "#{c_fn}(#{c_args.join ', '})"
+  
+compiler.apply = (fn, args...) ->
+  c_fn = compile fn
+  spl_fn = c_fn.split '.'
+  spl_fn.pop()
+  fn_base = spl_fn.join '.'
+  c_args = _.map args, compile
+  "#{c_fn}.apply(#{fn_base or null}, [].concat(#{c_args.join ', '}))"
   
 compiler[to_js_symbol 'let'] = (names_vals, body...) ->
   vars = []

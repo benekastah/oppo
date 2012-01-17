@@ -5,28 +5,43 @@
 (defmacro read (s)
   `((. oppo 'read) ~s))
 
-(defmacro print (...things)
+(defmacro println (...things)
   `((. console 'log) ...things))
-  
+
 (defmacro defn (nm argslist ...body)
   `(def ~nm (lambda ~argslist ...body)))
+
+(defn identity (x) x)
+
+;; Global definitions
+(def ->bool identity)
+
+(def global (if (undefined? global) window global))
+
+(defmacro gdef (nm value)
+  `(def (. global (quote ~nm)) ~value))
   
-(defmacro apply (fn ...args)
-  (let (args-list ((. window :Array 'prototype 'concat 'apply) [] args))
-    `(~fn ...args-list)))
+(if (. global 'global) () (gdef global global))
+(gdef identity identity)
   
+(defmacro gdefn (nm argslist ...body)
+  `(gdef ~nm (lambda ~argslist ...body)))
+
+(gdefn println (...things)
+  (apply (. console 'log) things))
+
 ;; Type conversion
-(defn (. window '->bool) (x)
+(gdefn ->bool (x)
   (js-eval "!(x == null || x === false || x === \"\" || x !== x)"))
-  
-(defn (. window '->num) (n)
+
+(gdefn ->num (n)
   ((. window :Number) n))
-  
-(defn (. window '->str) (s)
+
+(gdefn ->str (s)
   (str s))
 
 ;; Binary functions
-(defn (. window 'not) (x)
+(gdefn not (x)
   (let (bx (->bool x))
     (js-eval "!bx")))
 
@@ -39,19 +54,13 @@
               item
               (binary-each type ((. ls 'slice) 1))))))
                 
-  (defn (. window 'or) (...items)
+  (gdefn or (...items)
     (binary-each :or items))
     
-  (defn (. window 'and) (...items)
+  (gdefn and (...items)
     (binary-each :and items)))
 
-;(defmacro apply)
-
-(def global (|| global window))
-
-(defmacro defg )
-
-(defn (. window 'js-type) (x)
+(gdefn js-type (x)
   (let (cls ((. Object :prototype :toString :call) x)
         type-arr ((. cls 'match) #/\s([a-zA-Z]+)/)
         type (. type-arr 1))
@@ -62,7 +71,7 @@
 ;    ))
 
 ;; Collections    
-(defn (. window 'nth) (a n)
+(gdefn nth (a n)
   (if (=== n 0)
     (throw "nth treats collections as one-based; cannot get zeroth item"))
   (let (i (if (< n 0)
@@ -70,19 +79,19 @@
             (- n 1)))
     (. a i)))
   
-(defn (. window 'first) (a) (nth a 1))
+(gdefn first (a) (nth a 1))
   
-(defn (. window 'second) (a) (nth a 2))
+(gdefn second (a) (nth a 2))
   
-(defn (. window 'last) (a) (nth a -1))
+(gdefn last (a) (nth a -1))
 
-(defn (. window 'concat) (base ...items)
+(gdefn concat (base ...items)
   (apply (. base 'concat) ...items))
   
-(defn (. window 'join) (a s)
+(gdefn join (a s)
   ((. a 'join) s))
   
-(defmacro slice ())
+;(defmacro slice ())
 
 ;; Lists
 
@@ -92,32 +101,60 @@
   
 (defmacro remove (base pattern)
   `(replace base pattern ""))
+  
+(defmacro match (base pattern)
+  `((. ~base 'match) pattern))
 
+;; Regex
+(defmacro re-match ())
+
+;; Math
+(gdefn + (...nums)
+  ())
 
 ;; Set up underscore
-(let (collections [ :each :map :reduce :reduceRight :find :filter :reject :all 
+(let (underscore-methods 
+          ;; collections
+        [ ;:each 
+          :map :reduce :reduceRight :find :filter :reject :all 
                     :any :include :invoke :pluck :max :min :sortBy :groupBy 
-                    :sortedIndex :shuffle :toArray :size]
-      arrays [:first :initial :last :rest :compact :flatten :without :union 
-              :intersection :difference :uniq :zip :indexOf :lastIndexOf :range]
-      functions [ :bind :bindAll :memoize :delay :defer :throttle :debounce 
-                  :once :after :wrap :compose]
-      objects [ :keys :values :functions :extend :defaults :clone :tap :isEqual 
-                :isEmpty :isElement :isArray :isArguments :isFunction :isString 
-                :isNumber :isBoolean :isDate :isRegExp :isNaN :isNull :isUndefined]
-      utility [:noConflict :identity :times :mixin :uniqueId :escape :template]
-      chaining [:chain :value])
+                    :sortedIndex :shuffle :toArray :size
+          ;; arrays
+          :first :initial :last :rest :compact :flatten :without :union 
+              :intersection :difference :uniq :zip :indexOf :lastIndexOf :range
+          ;; functions
+          :bind :bindAll :memoize :delay :defer :throttle :debounce 
+                    :once :after :wrap :compose
+          ;; objects
+          :keys :values :functions :extend :defaults :clone :tap :isEqual 
+                    :isEmpty :isElement :isArray :isArguments :isFunction :isString 
+                    :isNumber :isBoolean :isDate :isRegExp :isNaN :isNull
+                    ;:isUndefined
+          ;; utility
+          :noConflict :identity :times :mixin :uniqueId :escape :template
+          ;; chaining
+          :chain :value])
   
   (defmacro -get (m)
     `(. - ~m))
   
-  (def (. window '=) (-get :isEqual))
+  (gdef = (-get :isEqual))
+  (gdef each (-get :each))
   
-  ;(defn dasherize (s)
-  ;  (. (replace s #/([a-z])([A-Z])/ "$1-$2") :toLowerCase))
+  (defn dasherize (s)
+    (replace s #/([a-z])([A-Z])/ "$1-$2"))
     
-  ;(defn symbolize (s)
-  ;  (if ()))
+  (defmacro symbolize (s)
+    (let (dashed (dasherize s)
+          replaced-is (replace dashed #/^is\-(.*)$/ "$1?")
+          replaced-to (if (not=== replaced-is dashed)
+                        (replace replaced-is #/^to\-(.*)$/ "->$1")
+                        replaced-is))
+      `(symbol ~replaced-to)))
+      
+  (each underscore-methods
+    (lambda (nm)
+      (gdef (symbolize nm) (-get nm))))
   
   ;; Add all the underscore methods here
   )

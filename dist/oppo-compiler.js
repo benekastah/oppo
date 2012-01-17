@@ -510,10 +510,24 @@
   };
 
   compiler.str = function() {
-    var c_strs, strs;
+    var c_strs, first_is_str, initial_str, strs;
     strs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    c_strs = _.map(strs, compile);
-    return "\"\" + " + (c_strs.join(' + '));
+    first_is_str = null;
+    c_strs = _.map(strs, function(s) {
+      var c_s;
+      if ((is_quoted(s)) && is_symbol(s[1])) s = to_js_symbol(s[1][1]);
+      c_s = compile(s);
+      if (first_is_str == null) first_is_str = is_string(c_s);
+      return c_s;
+    });
+    initial_str = first_is_str ? '' : '"" + ';
+    return "" + initial_str + (c_strs.join(' + '));
+  };
+
+  compiler[to_js_symbol('undefined?')] = function(x) {
+    var c_x;
+    c_x = compile(x);
+    return "(typeof " + c_x + " === 'undefined')";
   };
 
   /*
@@ -611,6 +625,8 @@
 
   get_args = function(args) {
     var body, destructure, vars, _i, _len, _var;
+    if (args == null) args = [];
+    if (args === "null") args = [];
     destructure = _.any(args, is_splat);
     if (destructure) {
       vars = destructure_list(args, "arguments");
@@ -626,7 +642,7 @@
       });
       body = [];
     }
-    return [args, body];
+    return [args || [], body || []];
   };
 
   compiler.lambda = function() {
@@ -649,6 +665,17 @@
     c_fn = compile(fn);
     c_args = _.map(args, compile);
     return "" + c_fn + "(" + (c_args.join(', ')) + ")";
+  };
+
+  compiler.apply = function() {
+    var args, c_args, c_fn, fn, fn_base, spl_fn;
+    fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    c_fn = compile(fn);
+    spl_fn = c_fn.split('.');
+    spl_fn.pop();
+    fn_base = spl_fn.join('.');
+    c_args = _.map(args, compile);
+    return "" + c_fn + ".apply(" + (fn_base || null) + ", [].concat(" + (c_args.join(', ')) + "))";
   };
 
   compiler[to_js_symbol('let')] = function() {
