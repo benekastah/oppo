@@ -1,5 +1,11 @@
 (function () {
-  var oppoString, code, result;
+  var oppoString, code, result, oppo;
+  
+  if (typeof window === 'undefined')
+    oppo = exports;
+  else
+    oppo = window.oppo;
+  
   oppoString = ';; Misc macros and functions\n' +
 '(defmacro eval (sexp)\n' +
 '  `((. oppo \'eval) ~sexp))\n' +
@@ -13,10 +19,8 @@
 '(defmacro defn (nm argslist ...body)\n' +
 '  `(def ~nm (lambda ~argslist ...body)))\n' +
 '\n' +
-'(defn identity (x) x)\n' +
-'\n' +
 ';; Global definitions\n' +
-'(def ->bool identity)\n' +
+'(def ->bool (. - \'identity))\n' +
 '\n' +
 '(def global (if (undefined? global) window global))\n' +
 '\n' +
@@ -24,7 +28,6 @@
 '  `(def (. global (quote ~nm)) ~value))\n' +
 '  \n' +
 '(if (. global \'global) () (gdef global global))\n' +
-'(gdef identity identity)\n' +
 '  \n' +
 '(defmacro gdefn (nm argslist ...body)\n' +
 '  `(gdef ~nm (lambda ~argslist ...body)))\n' +
@@ -115,51 +118,99 @@
 '  ())\n' +
 '\n' +
 ';; Set up underscore\n' +
-'(let (underscore-methods \n' +
-'          ;; collections\n' +
-'        [ ;:each \n' +
-'          :map :reduce :reduceRight :find :filter :reject :all \n' +
-'                    :any :include :invoke :pluck :max :min :sortBy :groupBy \n' +
-'                    :sortedIndex :shuffle :toArray :size\n' +
-'          ;; arrays\n' +
-'          :first :initial :last :rest :compact :flatten :without :union \n' +
-'              :intersection :difference :uniq :zip :indexOf :lastIndexOf :range\n' +
-'          ;; functions\n' +
-'          :bind :bindAll :memoize :delay :defer :throttle :debounce \n' +
-'                    :once :after :wrap :compose\n' +
-'          ;; objects\n' +
-'          :keys :values :functions :extend :defaults :clone :tap :isEqual \n' +
-'                    :isEmpty :isElement :isArray :isArguments :isFunction :isString \n' +
-'                    :isNumber :isBoolean :isDate :isRegExp :isNaN :isNull\n' +
-'                    ;:isUndefined\n' +
-'          ;; utility\n' +
-'          :noConflict :identity :times :mixin :uniqueId :escape :template\n' +
-'          ;; chaining\n' +
-'          :chain :value])\n' +
-'  \n' +
-'  (defmacro -get (m)\n' +
-'    `(. - ~m))\n' +
-'  \n' +
-'  (gdef = (-get :isEqual))\n' +
-'  (gdef each (-get :each))\n' +
-'  \n' +
-'  (defn dasherize (s)\n' +
-'    (replace s #/([a-z])([A-Z])/ "$1-$2"))\n' +
-'    \n' +
-'  (defmacro symbolize (s)\n' +
-'    (let (dashed (dasherize s)\n' +
-'          replaced-is (replace dashed #/^is\\-(.*)$/ "$1?")\n' +
-'          replaced-to (if (not=== replaced-is dashed)\n' +
-'                        (replace replaced-is #/^to\\-(.*)$/ "->$1")\n' +
-'                        replaced-is))\n' +
-'      `(symbol ~replaced-to)))\n' +
-'      \n' +
-'  (each underscore-methods\n' +
-'    (lambda (nm)\n' +
-'      (gdef (symbolize nm) (-get nm))))\n' +
-'  \n' +
-'  ;; Add all the underscore methods here\n' +
-'  )\n';
+'; (let (_fn (fn (source-name target-names)\n' +
+';             (let (targets (if (> (. target-names \'length) 0) target-names [source-name]))\n' +
+';               ((. - \'each)  targets\n' +
+';                             (fn (nm)\n' +
+';                               (def (. global nm) (. - source-name))))))\n' +
+';       _fns (fn (name-map)\n' +
+';             (apply (. - \'each) name-map _fn)))\n' +
+';   \n' +
+';   (_fns { ;; Collections\n' +
+';           :each []\n' +
+';           :map []\n' +
+';           :reduce [\'reduce \'foldl]\n' +
+';           :reduceRight [\'reduce-right \'foldr]\n' +
+';           :find []\n' +
+';           :filter []\n' +
+';           :reject []\n' +
+';           :all []\n' +
+';           :any []\n' +
+';           :include []\n' +
+';           :invoke []\n' +
+';           :pluck []\n' +
+';           ; :max []\n' +
+';           ; :min []\n' +
+';           :sortBy [\'sort-by]\n' +
+';           :groupBy [\'group-by]\n' +
+';           :sortedIndex [\'sorted-index]\n' +
+';           :suffle []\n' +
+';           :toArray [\'->array]\n' +
+';           :size []\n' +
+';           \n' +
+';           ;; Arrays\n' +
+';           :first [\'first \'head]\n' +
+';           :initial [\'initial \'init]\n' +
+';           :last []\n' +
+';           :rest [\'rest \'tail]\n' +
+';           :compact []\n' +
+';           :flatten []\n' +
+';           :without []\n' +
+';           :union []\n' +
+';           :intersection []\n' +
+';           :difference []\n' +
+';           :uniq []\n' +
+';           :zip []\n' +
+';           :indexOf [\'index-of]\n' +
+';           :lastIndexOf [\'last-index-of]\n' +
+';           :range []\n' +
+';           \n' +
+';           ;; Functions\n' +
+';           :bind []\n' +
+';           :bindAll [\'bind-all]\n' +
+';           :memoize []\n' +
+';           :delay []\n' +
+';           :defer []\n' +
+';           :throttle []\n' +
+';           :debounce []\n' +
+';           :once []\n' +
+';           :after []\n' +
+';           :wrap []\n' +
+';           :compose []\n' +
+';           \n' +
+';           ;; Objects\n' +
+';           :keys []\n' +
+';           :values []\n' +
+';           :functions []\n' +
+';           :extend []\n' +
+';           :defaults []\n' +
+';           :clone []\n' +
+';           :tap []\n' +
+';           :isEqual [\'equal? \'=]\n' +
+';           :isEmpty [\'empty?]\n' +
+';           :isElement [\'element?]\n' +
+';           :isArray [\'array?]\n' +
+';           :isArguments [\'arguments?]\n' +
+';           :isFunction [\'function?]\n' +
+';           :isNumber [\'number?]\n' +
+';           :isBoolean [\'boolean? \'bool?]\n' +
+';           :isDate [\'date?]\n' +
+';           :isRegExp [\'regex?]\n' +
+';           :isNaN [\'nan?]\n' +
+';           :isNull [\'nil?]\n' +
+';           :isUndefined [\'undefined?]\n' +
+';           \n' +
+';           ;; Utility\n' +
+';           ; :noConflict []\n' +
+';           :identity []\n' +
+';           :times []\n' +
+';           :uniqueId [\'unique-id]\n' +
+';           :escape []\n' +
+';           :template []\n' +
+';           \n' +
+';           ;; Chaining\n' +
+';           :chain []\n' +
+';           :value []}))\n';
   code = oppo.read(oppoString);
   result = oppo.compile(code);
   return eval(result);

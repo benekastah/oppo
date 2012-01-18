@@ -1,6 +1,6 @@
 (function() {
   var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, initialize_var_groups, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, last_var_group, make_error, math_fn, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _is, _ref, _ref2, _ref3;
-  var __hasProp = Object.prototype.hasOwnProperty, __indexOf = Array.prototype.indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (__hasProp.call(this, i) && this[i] === item) return i; } return -1; }, __slice = Array.prototype.slice;
+  var __hasProp = Object.prototype.hasOwnProperty, __slice = Array.prototype.slice, __indexOf = Array.prototype.indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (__hasProp.call(this, i) && this[i] === item) return i; } return -1; };
 
   if (typeof global === "undefined" || global === null) global = window;
 
@@ -138,11 +138,7 @@
   gensym = function(sym) {
     var c_sym, num, time;
     if (sym == null) sym = 'gen';
-    if (!is_symbol(sym)) {
-      c_sym = to_js_symbol(sym);
-    } else {
-      c_sym = compile(sym);
-    }
+    c_sym = compile([to_symbol('symbol'), sym]);
     time = (+(new Date)).toString(32);
     num = (Math.floor(Math.random() * 1e+10)).toString(32);
     return "" + c_sym + "_" + time + "_" + num;
@@ -334,11 +330,11 @@
       ret = "\"" + (sexp.replace(/\n/g, '\\n')) + "\"";
     } else if (_.isArray(sexp)) {
       fn = oppo.compile(_.first(sexp));
+      args = sexp.slice(1);
       if ((macro = compiler[fn])) {
-        args = sexp.slice(1);
         ret = macro.apply(null, args);
       } else {
-        ret = compiler.call.apply(null, sexp);
+        ret = compiler.call.apply(compiler, [[to_symbol("js-eval"), fn]].concat(__slice.call(args)));
       }
     } else {
       raiseParseError(sexp);
@@ -361,9 +357,11 @@
 
   compiler.symbol = function(sym) {
     var e_sym;
-    e_sym = eval(compile(sym));
+    e_sym = eval(compile([to_symbol("str"), sym]));
     return compile(to_symbol(e_sym));
   };
+
+  compiler.gensym = gensym;
 
   compiler[to_js_symbol('var')] = function(name, value, current_group) {
     var c_name, c_value;
@@ -418,10 +416,12 @@
   };
 
   compiler[to_js_symbol('if')] = function(test, t, f) {
-    var c_f, c_t, c_test, _ref4;
+    var c_f, c_t, c_test, cond, sym, _ref4;
     if (arguments.length === 2) Array.prototype.push.call(arguments, f);
     _ref4 = _.map(arguments, compile), c_test = _ref4[0], c_t = _ref4[1], c_f = _ref4[2];
-    return "/* if */ (" + (to_js_symbol('->bool')) + "(" + c_test + ") ?\n  " + c_t + " :\n  " + c_f + ")\n/* end if */";
+    sym = gensym("cond");
+    cond = compile([to_symbol('var'), to_symbol(sym), test]);
+    return "/* if */ ((" + cond + ") !== false && " + sym + " !== null && " + sym + " !== '' ?\n  " + (compile(t)) + " :\n  " + (compile(f)) + ")\n/* end if */";
   };
 
   compiler.js_map = function() {
@@ -513,6 +513,7 @@
     var c_strs, first_is_str, initial_str, strs;
     strs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     first_is_str = null;
+    if (strs.length === 0) strs.push("");
     c_strs = _.map(strs, function(s) {
       var c_s;
       if ((is_quoted(s)) && is_symbol(s[1])) s = to_js_symbol(s[1][1]);
@@ -657,7 +658,7 @@
     return ret = "(function (" + (args.join(", ")) + ") {\n  " + var_stmt + "return " + (body.join(', ')) + ";\n})";
   };
 
-  compile.fn = compiler.lambda;
+  compiler.fn = compiler.lambda;
 
   compiler.call = function() {
     var args, c_args, c_fn, fn;
@@ -679,11 +680,12 @@
   };
 
   compiler[to_js_symbol('let')] = function() {
-    var body, i, let_fn, names_vals, ret, vars;
+    var body, i, len, let_fn, names_vals, ret, vars;
     names_vals = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     vars = [];
     i = 0;
-    while (i < names_vals.length) {
+    len = names_vals.length;
+    while (i < len) {
       vars.push([to_symbol("var"), names_vals[i++], names_vals[i++]]);
     }
     body = vars.concat(body);
@@ -715,6 +717,7 @@
 
   compiler.defmacro = function(name, argnames, template) {
     var c_name;
+    if (argnames == null) argnames = [];
     c_name = compile(name);
     objectSet(compiler, c_name, function() {
       var args, evald, js, q_args;

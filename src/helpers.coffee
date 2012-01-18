@@ -135,10 +135,7 @@ to_js_symbol = (ident) ->
   ident.toLowerCase()
   
 gensym = (sym='gen') ->
-  if not is_symbol sym
-    c_sym = to_js_symbol sym
-  else
-    c_sym = compile sym
+  c_sym = compile [(to_symbol 'symbol'), sym]
   
   time = (+ new Date).toString 32
   num = (Math.floor Math.random() * 1e+10).toString 32

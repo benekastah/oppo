@@ -20,9 +20,9 @@
 [+-]?"#x"[0-9a-fA-F]+\b                 { return 'HEXIDECIMAL_NUMBER'; }
 [+-]?"#b"[0-9]+\b                       { return 'BINARY_NUMBER'; }
 
-"nil"\b                                 { return 'NIL'; }
-"#t"\b                                  { return 'BOOLEAN_TRUE'; }
-"#f"\b                                  { return 'BOOLEAN_FALSE'; }
+"#n"                                    { return 'NIL'; }
+"#t"                                    { return 'BOOLEAN_TRUE'; }
+"#f"                                    { return 'BOOLEAN_FALSE'; }
 
 "("                                     { return '('; }
 ")"                                     { return ')'; }
@@ -31,16 +31,18 @@
 "#{"                                    { return 'HASH_MAP_START'; }
 "{"                                     { return 'JS_MAP_START'; }
 "}"                                     { return 'MAP_END'; }
-"#("                                    { return 'FUNCTION'; }
-"%"\d+                                  { return 'ARGUMENTS_ACCESSOR'; }
 
 "~"                                     { return 'UNQUOTE'; }
 "'"                                     { return 'QUOTE'; }
 "`"                                     { return 'SYNTAX_QUOTE'; }
 "..."                                   { return 'SPLAT'; }
+"#("                                    { return 'FUNCTION'; }
+"%"\d+                                  { return 'ARGUMENTS_ACCESSOR'; }
+"#"                                     { return '#'; }
+"."                                     { return '.'; }
 
 ":"                                     { return 'KEYWORD'; }
-[\w!@#\$%\^&\*\-\+=:'\?\|\/\\<>\.,]+    { return 'IDENTIFIER'; }   //'
+[\w!@\$%\^&\*\-\+=:'\?\|\/\\<>,]{1}[\w!@#\$%\^&\*\-\+=:'\?\|\/\\<>\.,]*    { return 'IDENTIFIER'; }   //'
 
 <<EOF>>                                 { return 'EOF'; }
 .                                       { return 'INVALID'; }
@@ -171,7 +173,11 @@ symbol
   : KEYWORD symbol
     { $$ = [["symbol", "keyword"], $2]; }
   | IDENTIFIER
-    { $$ = ["symbol", yytext]; }
+    { yytext !== "nil" ? $$ = ["symbol", yytext] : $$ = null; }
+  | '.'
+    { $$ = ["symbol", "."]; }
+  | '#'
+    { $$ = ["symbol", "#"]; }
   ;
   
 %%

@@ -120,7 +120,13 @@ task "build:runtime", "Build oppo runtime", (options) ->
         "'#{item}\\n'"
       file_contents = """
       (function () {
-        var oppoString, code, result;
+        var oppoString, code, result, oppo;
+        
+        if (typeof window === 'undefined')
+          oppo = exports;
+        else
+          oppo = window.oppo;
+        
         oppoString = #{code.join " +\n"};
         code = oppo.read(oppoString);
         result = oppo.compile(code);

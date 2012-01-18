@@ -11,10 +11,8 @@
 (defmacro defn (nm argslist ...body)
   `(def ~nm (lambda ~argslist ...body)))
 
-(defn identity (x) x)
-
 ;; Global definitions
-(def ->bool identity)
+(def ->bool (. - 'identity))
 
 (def global (if (undefined? global) window global))
 
@@ -22,7 +20,6 @@
   `(def (. global (quote ~nm)) ~value))
   
 (if (. global 'global) () (gdef global global))
-(gdef identity identity)
   
 (defmacro gdefn (nm argslist ...body)
   `(gdef ~nm (lambda ~argslist ...body)))
@@ -113,48 +110,96 @@
   ())
 
 ;; Set up underscore
-(let (underscore-methods 
-          ;; collections
-        [ ;:each 
-          :map :reduce :reduceRight :find :filter :reject :all 
-                    :any :include :invoke :pluck :max :min :sortBy :groupBy 
-                    :sortedIndex :shuffle :toArray :size
-          ;; arrays
-          :first :initial :last :rest :compact :flatten :without :union 
-              :intersection :difference :uniq :zip :indexOf :lastIndexOf :range
-          ;; functions
-          :bind :bindAll :memoize :delay :defer :throttle :debounce 
-                    :once :after :wrap :compose
-          ;; objects
-          :keys :values :functions :extend :defaults :clone :tap :isEqual 
-                    :isEmpty :isElement :isArray :isArguments :isFunction :isString 
-                    :isNumber :isBoolean :isDate :isRegExp :isNaN :isNull
-                    ;:isUndefined
-          ;; utility
-          :noConflict :identity :times :mixin :uniqueId :escape :template
-          ;; chaining
-          :chain :value])
-  
-  (defmacro -get (m)
-    `(. - ~m))
-  
-  (gdef = (-get :isEqual))
-  (gdef each (-get :each))
-  
-  (defn dasherize (s)
-    (replace s #/([a-z])([A-Z])/ "$1-$2"))
-    
-  (defmacro symbolize (s)
-    (let (dashed (dasherize s)
-          replaced-is (replace dashed #/^is\-(.*)$/ "$1?")
-          replaced-to (if (not=== replaced-is dashed)
-                        (replace replaced-is #/^to\-(.*)$/ "->$1")
-                        replaced-is))
-      `(symbol ~replaced-to)))
-      
-  (each underscore-methods
-    (lambda (nm)
-      (gdef (symbolize nm) (-get nm))))
-  
-  ;; Add all the underscore methods here
-  )
+; (let (_fn (fn (source-name target-names)
+;             (let (targets (if (> (. target-names 'length) 0) target-names [source-name]))
+;               ((. - 'each)  targets
+;                             (fn (nm)
+;                               (def (. global nm) (. - source-name))))))
+;       _fns (fn (name-map)
+;             (apply (. - 'each) name-map _fn)))
+;   
+;   (_fns { ;; Collections
+;           :each []
+;           :map []
+;           :reduce ['reduce 'foldl]
+;           :reduceRight ['reduce-right 'foldr]
+;           :find []
+;           :filter []
+;           :reject []
+;           :all []
+;           :any []
+;           :include []
+;           :invoke []
+;           :pluck []
+;           ; :max []
+;           ; :min []
+;           :sortBy ['sort-by]
+;           :groupBy ['group-by]
+;           :sortedIndex ['sorted-index]
+;           :suffle []
+;           :toArray ['->array]
+;           :size []
+;           
+;           ;; Arrays
+;           :first ['first 'head]
+;           :initial ['initial 'init]
+;           :last []
+;           :rest ['rest 'tail]
+;           :compact []
+;           :flatten []
+;           :without []
+;           :union []
+;           :intersection []
+;           :difference []
+;           :uniq []
+;           :zip []
+;           :indexOf ['index-of]
+;           :lastIndexOf ['last-index-of]
+;           :range []
+;           
+;           ;; Functions
+;           :bind []
+;           :bindAll ['bind-all]
+;           :memoize []
+;           :delay []
+;           :defer []
+;           :throttle []
+;           :debounce []
+;           :once []
+;           :after []
+;           :wrap []
+;           :compose []
+;           
+;           ;; Objects
+;           :keys []
+;           :values []
+;           :functions []
+;           :extend []
+;           :defaults []
+;           :clone []
+;           :tap []
+;           :isEqual ['equal? '=]
+;           :isEmpty ['empty?]
+;           :isElement ['element?]
+;           :isArray ['array?]
+;           :isArguments ['arguments?]
+;           :isFunction ['function?]
+;           :isNumber ['number?]
+;           :isBoolean ['boolean? 'bool?]
+;           :isDate ['date?]
+;           :isRegExp ['regex?]
+;           :isNaN ['nan?]
+;           :isNull ['nil?]
+;           :isUndefined ['undefined?]
+;           
+;           ;; Utility
+;           ; :noConflict []
+;           :identity []
+;           :times []
+;           :uniqueId ['unique-id]
+;           :escape []
+;           :template []
+;           
+;           ;; Chaining
+;           :chain []
+;           :value []}))

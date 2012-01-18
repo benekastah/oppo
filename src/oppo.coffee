@@ -28,11 +28,11 @@ compile = oppo.compile = (sexp = null, init_vars = false) ->
     ret = "\"#{sexp.replace /\n/g, '\\n'}\""
   else if _.isArray sexp
     fn = oppo.compile _.first sexp
+    args = sexp[1..]
     if (macro = compiler[fn])
-      args = sexp[1..]
       ret = macro args...
     else
-      ret = compiler.call.apply null, sexp
+      ret = compiler.call [(to_symbol "js-eval"), fn], args...
   else
     raiseParseError sexp
     
@@ -55,8 +55,10 @@ read_compile = _.compose oppo.compile, oppo.read
 MISC
 ###
 compiler.symbol = (sym) ->
-  e_sym = eval compile sym
+  e_sym = eval compile [(to_symbol "str"), sym]
   compile (to_symbol e_sym)
+
+compiler.gensym = gensym
 
 compiler[to_js_symbol 'var'] = (name, value, current_group=last_var_group()) ->
   c_name = compile name
@@ -110,10 +112,12 @@ compiler[to_js_symbol 'if'] = (test, t, f) ->
   if arguments.length is 2
     Array::push.call arguments, f
   [c_test, c_t, c_f] = _.map arguments, compile
+  sym = gensym "cond"
+  cond = compile [(to_symbol 'var'), (to_symbol sym), test]
   """
-  /* if */ (#{to_js_symbol '->bool'}(#{c_test}) ?
-    #{c_t} :
-    #{c_f})
+  /* if */ ((#{cond}) !== false && #{sym} !== null && #{sym} !== '' ?
+    #{compile t} :
+    #{compile f})
   /* end if */
   """
     
@@ -186,6 +190,10 @@ compiler.regex = (body, modifiers) -> "/#{body}/#{modifiers ? ''}"
 
 compiler.str = (strs...) ->
   first_is_str = null
+  
+  if strs.length is 0
+    strs.push ""
+  
   c_strs = _.map strs, (s) ->
     if (is_quoted s) and is_symbol s[1]
       s = to_js_symbol s[1][1]
@@ -290,7 +298,7 @@ compiler.lambda = (args, body...) ->
   })
   """
   
-compile.fn = compiler.lambda
+compiler.fn = compiler.lambda
   
 compiler.call = (fn, args...) ->
   c_fn = compile fn
@@ -308,7 +316,8 @@ compiler.apply = (fn, args...) ->
 compiler[to_js_symbol 'let'] = (names_vals, body...) ->
   vars = []
   i = 0
-  while i < names_vals.length
+  len = names_vals.length
+  while i < len
     vars.push [(to_symbol "var"), names_vals[i++], names_vals[i++]]
     
   body = vars.concat body
@@ -328,7 +337,7 @@ quote_all = (list) ->
 
 mc_expand = false
 mc_expand_1 = false
-compiler.defmacro = (name, argnames, template) ->
+compiler.defmacro = (name, argnames=[], template) ->
   c_name = compile name
   objectSet compiler, c_name, (args...) ->
     q_args = quote_all args
@@ -356,7 +365,6 @@ compiler.macroexpand_1 = (sexp) ->
   ret = compile quote_all ret
   mc_expand_1 = false
   ret
-    
     
 compiler.syntax_quote = (list) ->
   sym = to_symbol
