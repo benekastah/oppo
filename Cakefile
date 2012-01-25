@@ -53,12 +53,9 @@ task "build:parser", "Generate the Jison parser", (options) ->
 task "build:compiler", "Build the oppo compiler", (options) ->
   dir = options.output ?= "dist"
 
-  scripts = [
-    "helpers"
-    "oppo"
-  ].map (f) -> "src/#{f}"
+  scripts = "src/compiler"
 
-  command = "coffee -j #{dir}/oppo-compiler.js -c #{scripts.join ' '}"
+  command = "coffee -j #{dir}/oppo-compiler.js -c #{scripts}"
   console.log "Building oppo compiler: #{command}"
   
   exec command, post_exec options
@@ -111,29 +108,41 @@ task "build:runtime", "Build oppo runtime", (options) ->
   unless options['omit-runtime']
     dir = options.output ?= "dist"
     file = "#{dir}/oppo-runtime.js"
-    fs.readFile "src/runtime.oppo", "utf8", (err, code) ->
-      if err then throw err
-      code = code.replace /\\/g, "\\\\"
-      code = code.replace /'/g, "\\'"
-      code = code.split "\n"
-      code = for item in code
-        "'#{item}\\n'"
-      file_contents = """
-      (function () {
+    command = "coffee -j #{file} -cb src/runtime"
+    
+    console.log "Building runtime coffeescripts: #{command}"
+    exec command, post_exec ->
+      fs.readFile "src/runtime/runtime.oppo", "utf8", (err, code) ->
+        if err then throw err
+        code = code.replace /\\/g, "\\\\"
+        code = code.replace /'/g, "\\'"
+        code = code.split "\n"
+        code = for item in code
+          "'#{item}\\n'"
+        file_contents = """
         var oppoString, code, result, oppo;
-        
+      
         if (typeof window === 'undefined')
           oppo = exports;
         else
           oppo = window.oppo;
-        
+      
         oppoString = #{code.join " +\n"};
         code = oppo.read(oppoString);
         result = oppo.compile(code);
-        return eval(result);
-      })();
-      """
-      fs.writeFile file, file_contents, 'utf8', options.success
+        eval(result);
+        """
+        fs.readFile file, "utf8", (err, code) ->
+          if err then throw err
+          file_contents = """
+          (function () {
+            #{file_contents}
+            #{code}
+          })();
+          """
+          
+          console.log "Writing runtime file, including oppo code..."
+          fs.writeFile file, file_contents, 'utf8', options.success
   else
     options.success?()
     

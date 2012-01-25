@@ -101,6 +101,15 @@ quote_escape = (x) ->
     ret = x.replace /\\/g, "\\\\"
   ret
 
+get_raw_text = (s) ->
+  if is_quoted s
+    s = oppo.eval s
+    
+  if _.isString s
+    s
+  else
+    s[1]
+
 objectSet = (o, s, v) ->
   [s, v, o] = [o, s, null] if arguments.length < 3
   

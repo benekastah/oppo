@@ -1,6 +1,8 @@
 (function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, initialize_var_groups, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, last_var_group, make_error, math_fn, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _is, _ref, _ref2, _ref3;
-  var __hasProp = Object.prototype.hasOwnProperty, __slice = Array.prototype.slice, __indexOf = Array.prototype.indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (__hasProp.call(this, i) && this[i] === item) return i; } return -1; };
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, get_raw_text, initialize_var_groups, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, last_var_group, make_error, math_fn, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_symbol, trim, _is, _ref, _ref2, _ref3,
+    __hasProp = Object.prototype.hasOwnProperty,
+    __slice = Array.prototype.slice,
+    __indexOf = Array.prototype.indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
   if (typeof global === "undefined" || global === null) global = window;
 
@@ -85,6 +87,15 @@
     ret = x;
     if (_.isString(x)) ret = x.replace(/\\/g, "\\\\");
     return ret;
+  };
+
+  get_raw_text = function(s) {
+    if (is_quoted(s)) s = oppo.eval(s);
+    if (_.isString(s)) {
+      return s;
+    } else {
+      return s[1];
+    }
   };
 
   objectSet = function(o, s, v) {
@@ -361,7 +372,11 @@
     return compile(to_symbol(e_sym));
   };
 
-  compiler.gensym = gensym;
+  compiler.gensym = function() {
+    var ret, sym;
+    sym = gensym.apply(null, arguments);
+    return ret = compile([to_symbol('quote'), to_symbol(sym)]);
+  };
 
   compiler[to_js_symbol('var')] = function(name, value, current_group) {
     var c_name, c_value;
@@ -472,7 +487,9 @@
   compiler.quote = function(sexp) {
     var q_sexp, ret, s_sexp;
     sexp = quote_escape(sexp);
-    if (_.isArray(sexp)) {
+    if (!(sexp != null)) {
+      return null;
+    } else if (_.isArray(sexp)) {
       q_sexp = _.map(sexp, compile);
       return ret = "[" + (q_sexp.join(', ')) + "]";
     } else if (_.isNumber(sexp)) {
@@ -529,6 +546,12 @@
     var c_x;
     c_x = compile(x);
     return "(typeof " + c_x + " === 'undefined')";
+  };
+
+  compiler[to_js_symbol('defined?')] = function(x) {
+    var c_x;
+    c_x = compile(x);
+    return "(typeof " + c_x + " !== 'undefined')";
   };
 
   /*
@@ -689,8 +712,8 @@
       vars.push([to_symbol("var"), names_vals[i++], names_vals[i++]]);
     }
     body = vars.concat(body);
-    let_fn = [[to_symbol("lambda"), []].concat(__slice.call(body))];
-    return ret = compile(let_fn);
+    let_fn = [to_symbol("lambda"), []].concat(__slice.call(body));
+    return ret = "" + (compile(let_fn)) + ".apply(this, typeof arguments !== \"undefined\" ? arguments : [])";
   };
 
   /*
@@ -715,15 +738,16 @@
 
   mc_expand_1 = false;
 
-  compiler.defmacro = function(name, argnames, template) {
-    var c_name;
+  compiler.defmacro = function() {
+    var argnames, c_name, name, template;
+    name = arguments[0], argnames = arguments[1], template = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
     if (argnames == null) argnames = [];
     c_name = compile(name);
     objectSet(compiler, c_name, function() {
       var args, evald, js, q_args;
       args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       q_args = quote_all(args);
-      js = oppo.compile([[['symbol', 'lambda'], argnames, template]].concat(__slice.call(q_args[1])));
+      js = oppo.compile([[['symbol', 'lambda'], argnames].concat(__slice.call(template))].concat(__slice.call(q_args[1])));
       evald = eval(js);
       if (!mc_expand && !mc_expand_1) {
         return oppo.compile(evald);

@@ -1,3 +1,33 @@
+(def global (if (defined? window) window global))
+
+(if (undefined? (. global 'global))
+  (def (. global 'global) global)
+  (set! (. global 'global) global))
+
+(defmacro gdef (nm value)
+  `(def (. global (quote ~nm)) ~value))
+
+(defmacro defn (nm argslist ...body)
+  `(def ~nm (lambda ~argslist ...body)))
+  
+(defmacro gdefn (nm argslist ...body)
+  `(gdef ~nm (lambda ~argslist ...body)))
+
+(defmacro defmodule (nm deps ...body)
+  (let (ensure-deps (|| deps [])
+        -deps ((. - 'map) (print ensure-deps) #(str (. %1 1))))
+    `((. oppo 'module) ~(. nm 1) '~-deps #(do ...body))))
+
+;; Logging / Printing
+(defmacro log (...things)
+  `((. console 'log) ...things))
+
+(defmacro print (item)
+  (let (x (gensym))
+    `(let (~x ~item)
+      (log ~x)
+      ~x)))
+
 ;; Misc macros and functions
 (defmacro eval (sexp)
   `((. oppo 'eval) ~sexp))
@@ -5,24 +35,11 @@
 (defmacro read (s)
   `((. oppo 'read) ~s))
 
-(defmacro println (...things)
+(defmacro log (...things)
   `((. console 'log) ...things))
-
-(defmacro defn (nm argslist ...body)
-  `(def ~nm (lambda ~argslist ...body)))
 
 ;; Global definitions
 (def ->bool (. - 'identity))
-
-(def global (if (undefined? global) window global))
-
-(defmacro gdef (nm value)
-  `(def (. global (quote ~nm)) ~value))
-  
-(if (. global 'global) () (gdef global global))
-  
-(defmacro gdefn (nm argslist ...body)
-  `(gdef ~nm (lambda ~argslist ...body)))
 
 (gdefn println (...things)
   (apply (. console 'log) things))
@@ -32,7 +49,7 @@
   (js-eval "!(x == null || x === false || x === \"\" || x !== x)"))
 
 (gdefn ->num (n)
-  ((. window :Number) n))
+  ((. global :Number) n))
 
 (gdefn ->str (s)
   (str s))

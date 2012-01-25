@@ -58,7 +58,9 @@ compiler.symbol = (sym) ->
   e_sym = eval compile [(to_symbol "str"), sym]
   compile (to_symbol e_sym)
 
-compiler.gensym = gensym
+compiler.gensym = ->
+  sym = gensym arguments...
+  ret = compile [(to_symbol 'quote'), (to_symbol sym)]
 
 compiler[to_js_symbol 'var'] = (name, value, current_group=last_var_group()) ->
   c_name = compile name
@@ -162,7 +164,11 @@ compiler.js_map = (sexp...) ->
        
 compiler.quote = (sexp) ->
   sexp = quote_escape sexp
-  if _.isArray sexp
+  if not sexp?
+    null
+  if _.isBoolean sexp
+    sexp
+  else if _.isArray sexp
     q_sexp = _.map sexp, compile
     ret = "[#{q_sexp.join ', '}]"
   else if _.isNumber sexp
@@ -207,6 +213,10 @@ compiler.str = (strs...) ->
 compiler[to_js_symbol 'undefined?'] = (x) ->
   c_x = compile x
   "(typeof #{c_x} === 'undefined')"
+  
+compiler[to_js_symbol 'defined?'] = (x) ->
+  c_x = compile x
+  "(typeof #{c_x} !== 'undefined')"
 
 ###
 MATH
@@ -321,8 +331,11 @@ compiler[to_js_symbol 'let'] = (names_vals, body...) ->
     vars.push [(to_symbol "var"), names_vals[i++], names_vals[i++]]
     
   body = vars.concat body
-  let_fn = [[(to_symbol "lambda"), [], body...]]
-  ret = compile let_fn
+  let_fn = [(to_symbol "lambda"), [], body...]
+            
+  ret = """
+  #{compile let_fn}.apply(this, typeof arguments !== "undefined" ? arguments : [])
+  """
 
 ###
 MACROS
@@ -337,11 +350,11 @@ quote_all = (list) ->
 
 mc_expand = false
 mc_expand_1 = false
-compiler.defmacro = (name, argnames=[], template) ->
+compiler.defmacro = (name, argnames=[], template...) ->
   c_name = compile name
   objectSet compiler, c_name, (args...) ->
     q_args = quote_all args
-    js = oppo.compile [[['symbol', 'lambda'], argnames, template], q_args[1]...]
+    js = oppo.compile [[['symbol', 'lambda'], argnames, template...], q_args[1]...]
     evald = eval js
     if not mc_expand and not mc_expand_1
       oppo.compile evald
