@@ -57,7 +57,7 @@
 '  (js-eval "!(x == null || x === false || x === \\"\\" || x !== x)"))\n' +
 '\n' +
 '(gdefn ->num (n)\n' +
-'  ((. window :Number) n))\n' +
+'  ((. global :Number) n))\n' +
 '\n' +
 '(gdefn ->str (s)\n' +
 '  (str s))\n' +

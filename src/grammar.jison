@@ -171,7 +171,7 @@ number
   
 symbol
   : KEYWORD symbol
-    { $$ = [["symbol", "keyword"], $2]; }
+    { $$ = [["symbol", "keyword"], [["symbol", "quote"], $2]]; }
   | IDENTIFIER
     { yytext !== "nil" ? $$ = ["symbol", yytext] : $$ = null; }
   | '.'

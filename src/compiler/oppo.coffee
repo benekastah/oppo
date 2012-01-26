@@ -190,7 +190,13 @@ compiler[to_js_symbol "."] = (base, names...) ->
       ret += "[#{compile name}]"
   ret
   
-compiler.keyword = (key) -> compile key[1]
+compiler.keyword = (key) ->
+  if (is_quoted key) and (is_symbol (e_key = oppo.eval key))
+    compile e_key[1]
+  else if _.isString key
+    compile key
+  else
+    compile [(to_symbol 'str'), key]
 
 compiler.regex = (body, modifiers) -> "/#{body}/#{modifiers ? ''}"
 

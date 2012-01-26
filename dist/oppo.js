@@ -98,7 +98,7 @@ var parser = function() {
         }
         break;
       case 39:
-        this.$ = [["symbol", "keyword"], $$[$0]];
+        this.$ = [["symbol", "keyword"], [["symbol", "quote"], $$[$0]]];
         break;
       case 40:
         yytext !== "nil" ? this.$ = ["symbol", yytext] : this.$ = null;
@@ -954,7 +954,10 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     var q_sexp, ret, s_sexp;
     sexp = quote_escape(sexp);
     if(!(sexp != null)) {
-      return null
+      null
+    }
+    if(_.isBoolean(sexp)) {
+      return sexp
     }else {
       if(_.isArray(sexp)) {
         q_sexp = _.map(sexp, compile);
@@ -989,7 +992,16 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     return ret
   };
   compiler.keyword = function(key) {
-    return compile(key[1])
+    var e_key;
+    if(is_quoted(key) && is_symbol(e_key = oppo.eval(key))) {
+      return compile(e_key[1])
+    }else {
+      if(_.isString(key)) {
+        return compile(key)
+      }else {
+        return compile([to_symbol("str"), key])
+      }
+    }
   };
   compiler.regex = function(body, modifiers) {
     return"/" + body + "/" + (modifiers != null ? modifiers : "")

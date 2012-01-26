@@ -487,8 +487,9 @@
   compiler.quote = function(sexp) {
     var q_sexp, ret, s_sexp;
     sexp = quote_escape(sexp);
-    if (!(sexp != null)) {
-      return null;
+    if (!(sexp != null)) null;
+    if (_.isBoolean(sexp)) {
+      return sexp;
     } else if (_.isArray(sexp)) {
       q_sexp = _.map(sexp, compile);
       return ret = "[" + (q_sexp.join(', ')) + "]";
@@ -519,7 +520,14 @@
   };
 
   compiler.keyword = function(key) {
-    return compile(key[1]);
+    var e_key;
+    if ((is_quoted(key)) && (is_symbol((e_key = oppo.eval(key))))) {
+      return compile(e_key[1]);
+    } else if (_.isString(key)) {
+      return compile(key);
+    } else {
+      return compile([to_symbol('str'), key]);
+    }
   };
 
   compiler.regex = function(body, modifiers) {

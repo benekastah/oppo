@@ -74,7 +74,7 @@ case 38:
         this.$ = parseInt(yytext.replace(/^#b/, ''), 2);
     
 break;
-case 39: this.$ = [["symbol", "keyword"], $$[$0]]; 
+case 39: this.$ = [["symbol", "keyword"], [["symbol", "quote"], $$[$0]]]; 
 break;
 case 40: yytext !== "nil" ? this.$ = ["symbol", yytext] : this.$ = null; 
 break;
