@@ -22,8 +22,8 @@
 '  `(gdef ~nm (lambda ~argslist ...body)))\n' +
 '\n' +
 '(defmacro defmodule (nm deps ...body)\n' +
-'  (let (ensure-deps (|| deps [])\n' +
-'        -deps ((. - \'map) (print ensure-deps) #(str (. %1 1))))\n' +
+'  (let (-deps (|| deps [])\n' +
+'        -deps ((. - \'map) -deps #(str (. %1 1))))\n' +
 '    `((. oppo \'module) ~(. nm 1) \'~-deps #(do ...body))))\n' +
 '\n' +
 ';; Logging / Printing\n' +

@@ -362,83 +362,6 @@
 
   read_compile = _.compose(oppo.compile, oppo.read);
 
-  /*
-  MISC
-  */
-
-  compiler.symbol = function(sym) {
-    var e_sym;
-    e_sym = eval(compile([to_symbol("str"), sym]));
-    return compile(to_symbol(e_sym));
-  };
-
-  compiler.gensym = function() {
-    var ret, sym;
-    sym = gensym.apply(null, arguments);
-    return ret = compile([to_symbol('quote'), to_symbol(sym)]);
-  };
-
-  compiler[to_js_symbol('var')] = function(name, value, current_group) {
-    var c_name, c_value;
-    if (current_group == null) current_group = last_var_group();
-    c_name = compile(name);
-    c_value = compile(value);
-    if (__indexOf.call(current_group, c_name) >= 0) raiseDefError(c_name);
-    current_group.push(c_name);
-    return "" + c_name + " = " + c_value;
-  };
-
-  compiler.def = function(name, value) {
-    var c_name, c_value, err, first_group, ret, _var;
-    _var = compiler[to_js_symbol('var')];
-    first_group = first_var_group();
-    c_name = compile(name);
-    if (c_name === to_js_symbol(c_name)) {
-      return ret = _var(name, value, first_group);
-    } else {
-      c_value = compile(value);
-      err = read_compile("(throw \"Can't define variable that is already defined: " + c_name + "\")");
-      return ret = "/* def " + c_name + " */ (typeof " + c_name + " === 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end def " + c_name + " */";
-    }
-  };
-
-  compiler[to_js_symbol('set!')] = function(name, value) {
-    var c_name, c_value, err, ret;
-    c_name = compile(name);
-    c_value = compile(value);
-    err = read_compile("(throw \"Can't set variable that has not been defined: " + c_name + "\")");
-    return ret = "/* set! " + c_name + " */ (typeof " + c_name + " !== 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end set! " + c_name + " */";
-  };
-
-  compiler.js_eval = function(js) {
-    var c_js, e_js, ret;
-    c_js = compile(js);
-    if (is_string(c_js)) {
-      e_js = c_js.substr(1, c_js.length - 2);
-      e_js = e_js.replace(/\\?"/g, '\\"');
-      return ret = eval("\"" + e_js + "\"");
-    } else {
-      return ret = "eval(" + c_js + ")";
-    }
-  };
-
-  compiler[to_js_symbol('do')] = function() {
-    var body, compiled_body, ret;
-    body = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    compiled_body = _.map(arguments, compile);
-    ret = compiled_body.join(',\n');
-    return "(" + ret + ")";
-  };
-
-  compiler[to_js_symbol('if')] = function(test, t, f) {
-    var c_f, c_t, c_test, cond, sym, _ref4;
-    if (arguments.length === 2) Array.prototype.push.call(arguments, f);
-    _ref4 = _.map(arguments, compile), c_test = _ref4[0], c_t = _ref4[1], c_f = _ref4[2];
-    sym = gensym("cond");
-    cond = compile([to_symbol('var'), to_symbol(sym), test]);
-    return "/* if */ ((" + cond + ") !== false && " + sym + " !== null && " + sym + " !== '' ?\n  " + (compile(t)) + " :\n  " + (compile(f)) + ")\n/* end if */";
-  };
-
   compiler.js_map = function() {
     var add_ons, c_value, e_key, i, item, item_added, last, ret, sexp, sym, _len;
     sexp = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
@@ -484,23 +407,6 @@
     }
   };
 
-  compiler.quote = function(sexp) {
-    var q_sexp, ret, s_sexp;
-    sexp = quote_escape(sexp);
-    if (!(sexp != null)) null;
-    if (_.isBoolean(sexp)) {
-      return sexp;
-    } else if (_.isArray(sexp)) {
-      q_sexp = _.map(sexp, compile);
-      return ret = "[" + (q_sexp.join(', ')) + "]";
-    } else if (_.isNumber(sexp)) {
-      return ret = sexp;
-    } else {
-      s_sexp = "" + sexp;
-      return ret = "\"" + (s_sexp.replace(/"/g, '\\"')) + "\"";
-    }
-  };
-
   compiler[to_js_symbol(".")] = function() {
     var base, c_base, e_name, name, names, ret, _i, _len;
     base = arguments[0], names = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
@@ -519,35 +425,129 @@
     return ret;
   };
 
-  compiler.keyword = function(key) {
-    var e_key;
-    if ((is_quoted(key)) && (is_symbol((e_key = oppo.eval(key))))) {
-      return compile(e_key[1]);
-    } else if (_.isString(key)) {
-      return compile(key);
+  get_args = function(args) {
+    var body, destructure, vars, _i, _len, _var;
+    if (args == null) args = [];
+    if (args === "null") args = [];
+    destructure = _.any(args, is_splat);
+    if (destructure) {
+      vars = destructure_list(args, "arguments");
+      args = [];
+      body = [];
+      for (_i = 0, _len = vars.length; _i < _len; _i++) {
+        _var = vars[_i];
+        body.push(read("(var " + _var[0] + " (js-eval \"" + _var[1] + "\"))"));
+      }
     } else {
-      return compile([to_symbol('str'), key]);
+      args = args.map(function(arg) {
+        return compile(arg);
+      });
+      body = [];
     }
+    return [args || [], body || []];
+  };
+
+  compiler.lambda = function() {
+    var args, argsbody, body, ret, var_stmt, vars, _ref4;
+    args = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    new_var_group();
+    _ref4 = get_args(args), args = _ref4[0], argsbody = _ref4[1];
+    body = argsbody.concat(body);
+    body = _.map(body, compile);
+    vars = end_var_group();
+    var_stmt = vars.length ? "var " + (vars.join(', ')) + ";\n" : '';
+    return ret = "(function (" + (args.join(", ")) + ") {\n  " + var_stmt + "return " + (body.join(', ')) + ";\n})";
+  };
+
+  compiler.fn = compiler.lambda;
+
+  compiler.call = function() {
+    var args, c_args, c_fn, fn;
+    fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    c_fn = compile(fn);
+    c_args = _.map(args, compile);
+    return "" + c_fn + "(" + (c_args.join(', ')) + ")";
+  };
+
+  compiler.apply = function() {
+    var args, c_args, c_fn, fn, fn_base, spl_fn;
+    fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    c_fn = compile(fn);
+    spl_fn = c_fn.split('.');
+    spl_fn.pop();
+    fn_base = spl_fn.join('.');
+    c_args = _.map(args, compile);
+    return "" + c_fn + ".apply(" + (fn_base || null) + ", [].concat(" + (c_args.join(', ')) + "))";
+  };
+
+  compiler[to_js_symbol('let')] = function() {
+    var body, i, len, let_fn, names_vals, ret, vars;
+    names_vals = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    vars = [];
+    i = 0;
+    len = names_vals.length;
+    while (i < len) {
+      vars.push([to_symbol("var"), names_vals[i++], names_vals[i++]]);
+    }
+    body = vars.concat(body);
+    let_fn = [to_symbol("lambda"), []].concat(__slice.call(body));
+    return ret = "" + (compile(let_fn)) + ".apply(this, typeof arguments !== \"undefined\" ? arguments : [])";
+  };
+
+  compiler.quote = function(sexp) {
+    var q_sexp, ret, s_sexp;
+    sexp = quote_escape(sexp);
+    if (!(sexp != null)) null;
+    if (_.isBoolean(sexp)) {
+      return sexp;
+    } else if (_.isArray(sexp)) {
+      q_sexp = _.map(sexp, compile);
+      return ret = "[" + (q_sexp.join(', ')) + "]";
+    } else if (_.isNumber(sexp)) {
+      return ret = sexp;
+    } else {
+      s_sexp = "" + sexp;
+      return ret = "\"" + (s_sexp.replace(/"/g, '\\"')) + "\"";
+    }
+  };
+
+  compiler.symbol = function(sym) {
+    var e_sym;
+    e_sym = eval(compile([to_symbol("str"), sym]));
+    return compile(to_symbol(e_sym));
+  };
+
+  compiler.js_eval = function(js) {
+    var c_js, e_js, ret;
+    c_js = compile(js);
+    if (is_string(c_js)) {
+      e_js = c_js.substr(1, c_js.length - 2);
+      e_js = e_js.replace(/\\?"/g, '\\"');
+      return ret = eval("\"" + e_js + "\"");
+    } else {
+      return ret = "eval(" + c_js + ")";
+    }
+  };
+
+  compiler[to_js_symbol('do')] = function() {
+    var body, compiled_body, ret;
+    body = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+    compiled_body = _.map(arguments, compile);
+    ret = compiled_body.join(',\n');
+    return "(" + ret + ")";
+  };
+
+  compiler[to_js_symbol('if')] = function(test, t, f) {
+    var c_f, c_t, c_test, cond, sym, _ref4;
+    if (arguments.length === 2) Array.prototype.push.call(arguments, f);
+    _ref4 = _.map(arguments, compile), c_test = _ref4[0], c_t = _ref4[1], c_f = _ref4[2];
+    sym = gensym("cond");
+    cond = compile([to_symbol('var'), to_symbol(sym), test]);
+    return "/* if */ ((" + cond + ") !== false && " + sym + " !== null && " + sym + " !== '' ?\n  " + (compile(t)) + " :\n  " + (compile(f)) + ")\n/* end if */";
   };
 
   compiler.regex = function(body, modifiers) {
     return "/" + body + "/" + (modifiers != null ? modifiers : '');
-  };
-
-  compiler.str = function() {
-    var c_strs, first_is_str, initial_str, strs;
-    strs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    first_is_str = null;
-    if (strs.length === 0) strs.push("");
-    c_strs = _.map(strs, function(s) {
-      var c_s;
-      if ((is_quoted(s)) && is_symbol(s[1])) s = to_js_symbol(s[1][1]);
-      c_s = compile(s);
-      if (first_is_str == null) first_is_str = is_string(c_s);
-      return c_s;
-    });
-    initial_str = first_is_str ? '' : '"" + ';
-    return "" + initial_str + (c_strs.join(' + '));
   };
 
   compiler[to_js_symbol('undefined?')] = function(x) {
@@ -560,6 +560,56 @@
     var c_x;
     c_x = compile(x);
     return "(typeof " + c_x + " !== 'undefined')";
+  };
+
+  compiler[to_js_symbol('new')] = function() {
+    var args, c_args, c_cls, cls;
+    cls = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    c_cls = compile(cls);
+    c_args = _.map(args, compile);
+    return "new " + c_cls + "(" + (c_args.join(', ')) + ")";
+  };
+
+  /*
+  VARIABLES
+  */
+
+  compiler.gensym = function() {
+    var ret, sym;
+    sym = gensym.apply(null, arguments);
+    return ret = compile([to_symbol('quote'), to_symbol(sym)]);
+  };
+
+  compiler[to_js_symbol('var')] = function(name, value, current_group) {
+    var c_name, c_value;
+    if (current_group == null) current_group = last_var_group();
+    c_name = compile(name);
+    c_value = compile(value);
+    if (__indexOf.call(current_group, c_name) >= 0) raiseDefError(c_name);
+    current_group.push(c_name);
+    return "" + c_name + " = " + c_value;
+  };
+
+  compiler.def = function(name, value) {
+    var c_name, c_value, err, first_group, ret, _var;
+    _var = compiler[to_js_symbol('var')];
+    first_group = first_var_group();
+    c_name = compile(name);
+    if (c_name === to_js_symbol(c_name)) {
+      return ret = _var(name, value, first_group);
+    } else {
+      c_value = compile(value);
+      err = read_compile("(throw \"Can't define variable that is already defined: " + c_name + "\")");
+      return ret = "/* def " + c_name + " */ (typeof " + c_name + " === 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end def " + c_name + " */";
+    }
+  };
+
+  compiler[to_js_symbol('set!')] = function(name, value) {
+    var c_name, c_value, err, ret;
+    c_name = compile(name);
+    c_value = compile(value);
+    err = read_compile("(throw \"Can't set variable that has not been defined: " + c_name + "\")");
+    return ret = "/* set! " + c_name + " */ (typeof " + c_name + " !== 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end set! " + c_name + " */";
   };
 
   /*
@@ -651,83 +701,6 @@
     return "(function () { throw " + c_err + " })()";
   };
 
-  /*
-  FUNCTIONS
-  */
-
-  get_args = function(args) {
-    var body, destructure, vars, _i, _len, _var;
-    if (args == null) args = [];
-    if (args === "null") args = [];
-    destructure = _.any(args, is_splat);
-    if (destructure) {
-      vars = destructure_list(args, "arguments");
-      args = [];
-      body = [];
-      for (_i = 0, _len = vars.length; _i < _len; _i++) {
-        _var = vars[_i];
-        body.push(read("(var " + _var[0] + " (js-eval \"" + _var[1] + "\"))"));
-      }
-    } else {
-      args = args.map(function(arg) {
-        return compile(arg);
-      });
-      body = [];
-    }
-    return [args || [], body || []];
-  };
-
-  compiler.lambda = function() {
-    var args, argsbody, body, ret, var_stmt, vars, _ref4;
-    args = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    new_var_group();
-    _ref4 = get_args(args), args = _ref4[0], argsbody = _ref4[1];
-    body = argsbody.concat(body);
-    body = _.map(body, compile);
-    vars = end_var_group();
-    var_stmt = vars.length ? "var " + (vars.join(', ')) + ";\n" : '';
-    return ret = "(function (" + (args.join(", ")) + ") {\n  " + var_stmt + "return " + (body.join(', ')) + ";\n})";
-  };
-
-  compiler.fn = compiler.lambda;
-
-  compiler.call = function() {
-    var args, c_args, c_fn, fn;
-    fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    c_fn = compile(fn);
-    c_args = _.map(args, compile);
-    return "" + c_fn + "(" + (c_args.join(', ')) + ")";
-  };
-
-  compiler.apply = function() {
-    var args, c_args, c_fn, fn, fn_base, spl_fn;
-    fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    c_fn = compile(fn);
-    spl_fn = c_fn.split('.');
-    spl_fn.pop();
-    fn_base = spl_fn.join('.');
-    c_args = _.map(args, compile);
-    return "" + c_fn + ".apply(" + (fn_base || null) + ", [].concat(" + (c_args.join(', ')) + "))";
-  };
-
-  compiler[to_js_symbol('let')] = function() {
-    var body, i, len, let_fn, names_vals, ret, vars;
-    names_vals = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    vars = [];
-    i = 0;
-    len = names_vals.length;
-    while (i < len) {
-      vars.push([to_symbol("var"), names_vals[i++], names_vals[i++]]);
-    }
-    body = vars.concat(body);
-    let_fn = [to_symbol("lambda"), []].concat(__slice.call(body));
-    return ret = "" + (compile(let_fn)) + ".apply(this, typeof arguments !== \"undefined\" ? arguments : [])";
-  };
-
-  /*
-  MACROS
-  */
-
   quote_all = function(list) {
     var ret, _quote;
     _quote = function(item) {
@@ -795,6 +768,33 @@
     q_list = quote_all(list);
     code = [[sym('lambda'), [sym(ident)], [sym("var")].concat(__slice.call(restructured_list))], q_list];
     return ret = compile(code);
+  };
+
+  compiler.str = function() {
+    var c_strs, first_is_str, initial_str, strs;
+    strs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+    first_is_str = null;
+    if (strs.length === 0) strs.push("");
+    c_strs = _.map(strs, function(s) {
+      var c_s;
+      if ((is_quoted(s)) && is_symbol(s[1])) s = to_js_symbol(s[1][1]);
+      c_s = compile(s);
+      if (first_is_str == null) first_is_str = is_string(c_s);
+      return c_s;
+    });
+    initial_str = first_is_str ? '' : '"" + ';
+    return "" + initial_str + (c_strs.join(' + '));
+  };
+
+  compiler.keyword = function(key) {
+    var e_key;
+    if ((is_quoted(key)) && (is_symbol((e_key = oppo.eval(key))))) {
+      return compile(e_key[1]);
+    } else if (_.isString(key)) {
+      return compile(key);
+    } else {
+      return compile([to_symbol('str'), key]);
+    }
   };
 
 }).call(this);

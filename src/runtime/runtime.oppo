@@ -14,8 +14,8 @@
   `(gdef ~nm (lambda ~argslist ...body)))
 
 (defmacro defmodule (nm deps ...body)
-  (let (ensure-deps (|| deps [])
-        -deps ((. - 'map) (print ensure-deps) #(str (. %1 1))))
+  (let (-deps (|| deps [])
+        -deps ((. - 'map) -deps #(str (. %1 1))))
     `((. oppo 'module) ~(. nm 1) '~-deps #(do ...body))))
 
 ;; Logging / Printing
