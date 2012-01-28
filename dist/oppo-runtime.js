@@ -299,6 +299,7 @@ Module = (function() {
 
   Module.prototype.require = function(force) {
     var deps, previous, required, requiring, _ref, _ref2;
+    if (force == null) force = false;
     _ref = Module.statuses, requiring = _ref.requiring, required = _ref.required;
     previous = (_.last(Module.current)) || {};
     Module.current.push(this);
@@ -355,6 +356,7 @@ Module = (function() {
           name = item[0], action = item[1], arg = item[2];
         } else {
           name = item;
+          action = arg = null;
         }
         mod = module_get(name);
         if (mod instanceof Module) {

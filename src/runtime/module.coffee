@@ -40,7 +40,7 @@ class Module
   constructor: (@name, @imports, @load) ->
     @result = {}
     
-  require: (force) ->
+  require: (force=false) ->
     {requiring, required} = Module.statuses
     previous = (_.last Module.current) or {}
     Module.current.push this
@@ -83,6 +83,7 @@ class Module
           [name, action, arg] = item
         else
           name = item
+          action = arg = null
         
         mod = module_get name
         if mod instanceof Module
