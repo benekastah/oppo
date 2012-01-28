@@ -54,6 +54,64 @@ compiler[to_js_symbol 'defined?'] = (x) ->
   c_x = compile x
   "(typeof #{c_x} !== 'undefined')"
 
+
+###
+MODULES
+###
+do ->
+  get_deps = (deps) ->
+    result = for item in deps
+      item = item[1] if is_quoted item
+      
+      new_item = if is_symbol item
+        get_raw_text item
+      else if is_keyword item
+        item
+      else if _.isArray item
+        get_deps item
+      else
+        raise "ModuleError: Invalid dependency: #{item}"
+        
+      [(to_symbol 'js-eval'), compile new_item]
+    
+    [(to_symbol 'quote'), result]
+    
+  get_args = (deps) ->
+    deps = deps[1] if is_quoted deps
+    args = []
+    for item in deps
+      item = item[1] if is_quoted item
+      if is_symbol item
+        args.push item
+      else if (_.isArray item) and not is_keyword item
+        if (oppo.eval item[1]) is "use"
+          q_a = item[2]
+          args.push q_a[1]...
+          
+    args
+          
+    
+  compiler.defmodule = (name, deps=[], body...) ->
+    r_name = compile get_raw_text name
+    r_deps = get_deps deps
+    c_deps = compile r_deps
+    args = get_args deps
+    c_args = _.map args, compile
+    c_body = compile [(to_symbol 'do'), body...]
+    ret = """
+    oppo.module(#{r_name}, #{c_deps}, function (#{c_args.join ', '}) {
+      with (this) {
+        return #{c_body};
+      }
+    })
+    """
+  
+  compiler.require = (names...) ->
+    c_names = for name in names
+      r_name = get_raw_text name
+      "oppo.module.require(#{compile r_name})"
+    c_names.join ',\n'
+
 ###
 VARIABLES
 ###
@@ -83,7 +141,7 @@ compiler.def = (name, value) ->
       #{err})
     /* end def #{c_name} */
     """
-  
+
 compiler[to_js_symbol 'set!'] = (name, value) ->
   c_name = compile name
   c_value = compile value
@@ -94,7 +152,23 @@ compiler[to_js_symbol 'set!'] = (name, value) ->
     #{err})
   /* end set! #{c_name} */
   """
+
+do ->
+  to_module_name = (name) ->
+    q_name = if is_symbol name
+      [(to_symbol 'quote'), name]
+    else
+      name
+    [(to_symbol '.'), [(to_symbol 'js-eval'), 'this'], q_name]
   
+  compiler[to_js_symbol '@def'] = (name, value) ->
+    _name = to_module_name name
+    ret = compile [(to_symbol 'def'), _name, value]
+  
+  compiler[to_js_symbol '@set!'] = (name, value) ->
+    _name = to_module_name name
+    ret = compile [(to_symbol 'set!'), _name, value]
+
 ###
 MATH
 ###

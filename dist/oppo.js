@@ -516,7 +516,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   }
 }
 ;(function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_args, get_raw_text, initialize_var_groups, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, last_var_group, make_error, math_fn, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, 
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_raw_text, initialize_var_groups, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, last_var_group, make_error, math_fn, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, 
   to_symbol, trim, _is, _ref, _ref2, _ref3, __hasProp = Object.prototype.hasOwnProperty, __slice = Array.prototype.slice, __indexOf = Array.prototype.indexOf || function(item) {
     for(var i = 0, l = this.length;i < l;i++) {
       if(i in this && this[i] === item) {
@@ -898,43 +898,46 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     }
     return ret
   };
-  get_args = function(args) {
-    var body, destructure, vars, _i, _len, _var;
-    if(args == null) {
-      args = []
-    }
-    if(args === "null") {
-      args = []
-    }
-    destructure = _.any(args, is_splat);
-    if(destructure) {
-      vars = destructure_list(args, "arguments");
-      args = [];
-      body = [];
-      for(_i = 0, _len = vars.length;_i < _len;_i++) {
-        _var = vars[_i];
-        body.push(read("(var " + _var[0] + ' (js-eval "' + _var[1] + '"))'))
+  (function() {
+    var get_args;
+    get_args = function(args) {
+      var body, destructure, vars, _i, _len, _var;
+      if(args == null) {
+        args = []
       }
-    }else {
-      args = args.map(function(arg) {
-        return compile(arg)
-      });
-      body = []
-    }
-    return[args || [], body || []]
-  };
-  compiler.lambda = function() {
-    var args, argsbody, body, ret, var_stmt, vars, _ref4;
-    args = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    new_var_group();
-    _ref4 = get_args(args), args = _ref4[0], argsbody = _ref4[1];
-    body = argsbody.concat(body);
-    body = _.map(body, compile);
-    vars = end_var_group();
-    var_stmt = vars.length ? "var " + vars.join(", ") + ";\n" : "";
-    return ret = "(function (" + args.join(", ") + ") {\n  " + var_stmt + "return " + body.join(", ") + ";\n})"
-  };
-  compiler.fn = compiler.lambda;
+      if(args === "null") {
+        args = []
+      }
+      destructure = _.any(args, is_splat);
+      if(destructure) {
+        vars = destructure_list(args, "arguments");
+        args = [];
+        body = [];
+        for(_i = 0, _len = vars.length;_i < _len;_i++) {
+          _var = vars[_i];
+          body.push(read("(var " + _var[0] + ' (js-eval "' + _var[1] + '"))'))
+        }
+      }else {
+        args = args.map(function(arg) {
+          return compile(arg)
+        });
+        body = []
+      }
+      return[args || [], body || []]
+    };
+    compiler.lambda = function() {
+      var args, argsbody, body, ret, var_stmt, vars, _ref4;
+      args = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+      new_var_group();
+      _ref4 = get_args(args), args = _ref4[0], argsbody = _ref4[1];
+      body = argsbody.concat(body);
+      body = _.map(body, compile);
+      vars = end_var_group();
+      var_stmt = vars.length ? "var " + vars.join(", ") + ";\n" : "";
+      return ret = "(function (" + args.join(", ") + ") {\n  " + var_stmt + "return " + body.join(", ") + ";\n})"
+    };
+    return compiler.fn = compiler.lambda
+  })();
   compiler.call = function() {
     var args, c_args, c_fn, fn;
     fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
@@ -964,6 +967,13 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     body = vars.concat(body);
     let_fn = [to_symbol("lambda"), []].concat(__slice.call(body));
     return ret = "" + compile(let_fn) + '.apply(this, typeof arguments !== "undefined" ? arguments : [])'
+  };
+  compiler[to_js_symbol("new")] = function() {
+    var args, c_args, c_cls, cls;
+    cls = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    c_cls = compile(cls);
+    c_args = _.map(args, compile);
+    return"new " + c_cls + "(" + c_args.join(", ") + ")"
   };
   compiler.quote = function(sexp) {
     var q_sexp, ret, s_sexp;
@@ -1033,13 +1043,79 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     c_x = compile(x);
     return"(typeof " + c_x + " !== 'undefined')"
   };
-  compiler[to_js_symbol("new")] = function() {
-    var args, c_args, c_cls, cls;
-    cls = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    c_cls = compile(cls);
-    c_args = _.map(args, compile);
-    return"new " + c_cls + "(" + c_args.join(", ") + ")"
-  };
+  (function() {
+    var get_args, get_deps;
+    get_deps = function(deps) {
+      var item, new_item, result;
+      result = function() {
+        var _i, _len, _results;
+        _results = [];
+        for(_i = 0, _len = deps.length;_i < _len;_i++) {
+          item = deps[_i];
+          if(is_quoted(item)) {
+            item = item[1]
+          }
+          new_item = is_symbol(item) ? get_raw_text(item) : is_keyword(item) ? item : _.isArray(item) ? get_deps(item) : raise("ModuleError: Invalid dependency: " + item);
+          _results.push([to_symbol("js-eval"), compile(new_item)])
+        }
+        return _results
+      }();
+      return[to_symbol("quote"), result]
+    };
+    get_args = function(deps) {
+      var args, item, q_a, _i, _len;
+      if(is_quoted(deps)) {
+        deps = deps[1]
+      }
+      args = [];
+      for(_i = 0, _len = deps.length;_i < _len;_i++) {
+        item = deps[_i];
+        if(is_quoted(item)) {
+          item = item[1]
+        }
+        if(is_symbol(item)) {
+          args.push(item)
+        }else {
+          if(_.isArray(item) && !is_keyword(item)) {
+            if(oppo.eval(item[1]) === "use") {
+              q_a = item[2];
+              args.push.apply(args, q_a[1])
+            }
+          }
+        }
+      }
+      return args
+    };
+    compiler.defmodule = function() {
+      var args, body, c_args, c_body, c_deps, deps, name, r_deps, r_name, ret;
+      name = arguments[0], deps = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
+      if(deps == null) {
+        deps = []
+      }
+      r_name = compile(get_raw_text(name));
+      r_deps = get_deps(deps);
+      c_deps = compile(r_deps);
+      args = get_args(deps);
+      c_args = _.map(args, compile);
+      c_body = compile([to_symbol("do")].concat(__slice.call(body)));
+      return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + c_args.join(", ") + ") {\n  with (this) {\n    return " + c_body + ";\n  }\n})"
+    };
+    return compiler.require = function() {
+      var c_names, name, names, r_name;
+      names = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      c_names = function() {
+        var _i, _len, _results;
+        _results = [];
+        for(_i = 0, _len = names.length;_i < _len;_i++) {
+          name = names[_i];
+          r_name = get_raw_text(name);
+          _results.push("oppo.module.require(" + compile(r_name) + ")")
+        }
+        return _results
+      }();
+      return c_names.join(",\n")
+    }
+  })();
   compiler.gensym = function() {
     var ret, sym;
     sym = gensym.apply(null, arguments);
@@ -1078,6 +1154,24 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     err = read_compile("(throw \"Can't set variable that has not been defined: " + c_name + '")');
     return ret = "/* set! " + c_name + " */ (typeof " + c_name + " !== 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end set! " + c_name + " */"
   };
+  (function() {
+    var to_module_name;
+    to_module_name = function(name) {
+      var q_name;
+      q_name = is_symbol(name) ? [to_symbol("quote"), name] : name;
+      return[to_symbol("."), [to_symbol("js-eval"), "this"], q_name]
+    };
+    compiler[to_js_symbol("@def")] = function(name, value) {
+      var ret, _name;
+      _name = to_module_name(name);
+      return ret = compile([to_symbol("def"), _name, value])
+    };
+    return compiler[to_js_symbol("@set!")] = function(name, value) {
+      var ret, _name;
+      _name = to_module_name(name);
+      return ret = compile([to_symbol("set!"), _name, value])
+    }
+  })();
   math_fn = function(fn, symbol) {
     return compiler[to_js_symbol(fn)] = function() {
       var c_nums, nums;

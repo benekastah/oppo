@@ -13,10 +13,11 @@
 (defmacro gdefn (nm argslist ...body)
   `(gdef ~nm (lambda ~argslist ...body)))
 
-(defmacro defmodule (nm deps ...body)
-  (let (-deps (|| deps [])
-        -deps ((. - 'map) -deps #(str (. %1 1))))
-    `((. oppo 'module) ~(. nm 1) '~-deps #(do ...body))))
+; (defmacro defmodule (nm deps ...body)
+;   (print :deps deps)
+;   (let (ensure-deps (|| deps [])
+;         -deps ((. - 'map) ensure-deps #(str (. %1 1))))
+;     `((. oppo 'module) ~(. nm 1) '~-deps #(do ...body))))
 
 ;; Logging / Printing
 (defmacro log (...things)

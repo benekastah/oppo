@@ -21,10 +21,11 @@
 '(defmacro gdefn (nm argslist ...body)\n' +
 '  `(gdef ~nm (lambda ~argslist ...body)))\n' +
 '\n' +
-'(defmacro defmodule (nm deps ...body)\n' +
-'  (let (-deps (|| deps [])\n' +
-'        -deps ((. - \'map) -deps #(str (. %1 1))))\n' +
-'    `((. oppo \'module) ~(. nm 1) \'~-deps #(do ...body))))\n' +
+'; (defmacro defmodule (nm deps ...body)\n' +
+';   (print :deps deps)\n' +
+';   (let (ensure-deps (|| deps [])\n' +
+';         -deps ((. - \'map) ensure-deps #(str (. %1 1))))\n' +
+';     `((. oppo \'module) ~(. nm 1) \'~-deps #(do ...body))))\n' +
 '\n' +
 ';; Logging / Printing\n' +
 '(defmacro log (...things)\n' +

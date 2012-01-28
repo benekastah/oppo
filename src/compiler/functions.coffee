@@ -1,35 +1,36 @@
-get_args = (args=[]) ->
-  if args is "null"
-    args = []
+do ->
+  get_args = (args=[]) ->
+    if args is "null"
+      args = []
     
-  destructure = _.any args, is_splat
+    destructure = _.any args, is_splat
   
-  if (destructure)
-    vars = destructure_list args, "arguments"
-    args = []
-    body = []
-    (body.push read "(var #{_var[0]} (js-eval \"#{_var[1]}\"))") for _var in vars
-  else
-    args = args.map (arg) -> compile arg
-    body = []
+    if (destructure)
+      vars = destructure_list args, "arguments"
+      args = []
+      body = []
+      (body.push read "(var #{_var[0]} (js-eval \"#{_var[1]}\"))") for _var in vars
+    else
+      args = args.map (arg) -> compile arg
+      body = []
     
-  [args or [], body or []]
+    [args or [], body or []]
 
-compiler.lambda = (args, body...) ->
-  new_var_group()
-  [args, argsbody] = get_args args
-  body = argsbody.concat body
+  compiler.lambda = (args, body...) ->
+    new_var_group()
+    [args, argsbody] = get_args args
+    body = argsbody.concat body
       
-  body = _.map body, compile
-  vars = end_var_group()
-  var_stmt = if vars.length then "var #{vars.join ', '};\n" else ''
-  ret = """
-  (function (#{args.join ", "}) {
-    #{var_stmt}return #{body.join ', '};
-  })
-  """
+    body = _.map body, compile
+    vars = end_var_group()
+    var_stmt = if vars.length then "var #{vars.join ', '};\n" else ''
+    ret = """
+    (function (#{args.join ", "}) {
+      #{var_stmt}return #{body.join ', '};
+    })
+    """
   
-compiler.fn = compiler.lambda
+  compiler.fn = compiler.lambda
   
 compiler.call = (fn, args...) ->
   c_fn = compile fn
