@@ -100,9 +100,7 @@ do ->
     c_body = compile [(to_symbol 'do'), body...]
     ret = """
     oppo.module(#{r_name}, #{c_deps}, function (#{c_args.join ', '}) {
-      with (this) {
-        return #{c_body};
-      }
+      return #{c_body};
     })
     """
   
@@ -153,21 +151,21 @@ compiler[to_js_symbol 'set!'] = (name, value) ->
   /* end set! #{c_name} */
   """
 
-do ->
-  to_module_name = (name) ->
-    q_name = if is_symbol name
-      [(to_symbol 'quote'), name]
-    else
-      name
-    [(to_symbol '.'), [(to_symbol 'js-eval'), 'this'], q_name]
-  
-  compiler[to_js_symbol '@def'] = (name, value) ->
-    _name = to_module_name name
-    ret = compile [(to_symbol 'def'), _name, value]
-  
-  compiler[to_js_symbol '@set!'] = (name, value) ->
-    _name = to_module_name name
-    ret = compile [(to_symbol 'set!'), _name, value]
+# do ->
+#   to_module_name = (name) ->
+#     q_name = if is_symbol name
+#       [(to_symbol 'quote'), name]
+#     else
+#       name
+#     [(to_symbol '.'), [(to_symbol 'js-eval'), 'this'], q_name]
+#   
+#   compiler[to_js_symbol '@def'] = (name, value) ->
+#     _name = to_module_name name
+#     ret = compile [(to_symbol 'def'), _name, value]
+#   
+#   compiler[to_js_symbol '@set!'] = (name, value) ->
+#     _name = to_module_name name
+#     ret = compile [(to_symbol 'set!'), _name, value]
 
 ###
 MATH

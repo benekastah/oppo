@@ -38,11 +38,9 @@
 "..."                                   { return 'SPLAT'; }
 "#("                                    { return 'FUNCTION'; }
 "%"\d+                                  { return 'ARGUMENTS_ACCESSOR'; }
-"#"                                     { return '#'; }
-"."                                     { return '.'; }
 
 ":"                                     { return 'KEYWORD'; }
-[\w!@\$%\^&\*\-\+=:'\?\|\/\\<>,]{1}[\w!@#\$%\^&\*\-\+=:'\?\|\/\\<>\.,]*    { return 'IDENTIFIER'; }   //'
+[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>,]+   { return 'IDENTIFIER'; } //'
 
 <<EOF>>                                 { return 'EOF'; }
 .                                       { return 'INVALID'; }
@@ -70,6 +68,7 @@ s_expression
   : special_form
   | list
   | symbol
+  | keyword
   | literal
   | atom
   ;
@@ -169,15 +168,27 @@ number
     }
   ;
   
-symbol
+keyword
   : KEYWORD symbol
     { $$ = [["symbol", "keyword"], [["symbol", "quote"], $2]]; }
-  | IDENTIFIER
-    { yytext !== "nil" ? $$ = ["symbol", yytext] : $$ = null; }
-  | '.'
-    { $$ = ["symbol", "."]; }
-  | '#'
-    { $$ = ["symbol", "#"]; }
+  ;
+  
+symbol
+  : IDENTIFIER
+    {
+      var _this = [["symbol", "js-eval"], "this"],
+          yytext1_ = yytext.substr(1),
+          yytext0 = yytext.charAt(0);
+          
+      if (yytext === "@")
+        $$ = _this;
+      else if (yytext0 === "@")
+        $$ = [["symbol", "."], _this, [["symbol", "quote"], ["symbol", yytext1_]]];
+      else if (yytext === "nil")
+        $$ = null;
+      else
+        $$ = ["symbol", yytext];
+    }
   ;
   
 %%

@@ -620,7 +620,7 @@
       args = get_args(deps);
       c_args = _.map(args, compile);
       c_body = compile([to_symbol('do')].concat(__slice.call(body)));
-      return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + (c_args.join(', ')) + ") {\n  with (this) {\n    return " + c_body + ";\n  }\n})";
+      return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + (c_args.join(', ')) + ") {\n  return " + c_body + ";\n})";
     };
     return compiler.require = function() {
       var c_names, name, names, r_name;
@@ -680,25 +680,6 @@
     err = read_compile("(throw \"Can't set variable that has not been defined: " + c_name + "\")");
     return ret = "/* set! " + c_name + " */ (typeof " + c_name + " !== 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end set! " + c_name + " */";
   };
-
-  (function() {
-    var to_module_name;
-    to_module_name = function(name) {
-      var q_name;
-      q_name = is_symbol(name) ? [to_symbol('quote'), name] : name;
-      return [to_symbol('.'), [to_symbol('js-eval'), 'this'], q_name];
-    };
-    compiler[to_js_symbol('@def')] = function(name, value) {
-      var ret, _name;
-      _name = to_module_name(name);
-      return ret = compile([to_symbol('def'), _name, value]);
-    };
-    return compiler[to_js_symbol('@set!')] = function(name, value) {
-      var ret, _name;
-      _name = to_module_name(name);
-      return ret = compile([to_symbol('set!'), _name, value]);
-    };
-  })();
 
   /*
   MATH
