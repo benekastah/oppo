@@ -20,9 +20,9 @@
 [+-]?"#x"[0-9a-fA-F]+\b                 { return 'HEXIDECIMAL_NUMBER'; }
 [+-]?"#b"[0-9]+\b                       { return 'BINARY_NUMBER'; }
 
-"#n"                                    { return 'NIL'; }
-"#t"                                    { return 'BOOLEAN_TRUE'; }
-"#f"                                    { return 'BOOLEAN_FALSE'; }
+"#"("n"|"N")                            { return 'NIL'; }
+"#"("t"|"T")                            { return 'BOOLEAN_TRUE'; }
+"#"("f"|"F")                            { return 'BOOLEAN_FALSE'; }
 
 "("                                     { return '('; }
 ")"                                     { return ')'; }
@@ -178,13 +178,14 @@ symbol
     {
       var _this = [["symbol", "js-eval"], "this"],
           yytext1_ = yytext.substr(1),
-          yytext0 = yytext.charAt(0);
+          yytext0 = yytext.charAt(0),
+          yytextLower = yytext.toLowerCase();
           
       if (yytext === "@")
         $$ = _this;
       else if (yytext0 === "@")
         $$ = [["symbol", "."], _this, [["symbol", "quote"], ["symbol", yytext1_]]];
-      else if (yytext === "nil")
+      else if (yytextLower === "nil")
         $$ = null;
       else
         $$ = ["symbol", yytext];

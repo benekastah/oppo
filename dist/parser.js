@@ -79,13 +79,14 @@ break;
 case 41:
       var _this = [["symbol", "js-eval"], "this"],
           yytext1_ = yytext.substr(1),
-          yytext0 = yytext.charAt(0);
+          yytext0 = yytext.charAt(0),
+          yytextLower = yytext.toLowerCase();
           
       if (yytext === "@")
         this.$ = _this;
       else if (yytext0 === "@")
         this.$ = [["symbol", "."], _this, [["symbol", "quote"], ["symbol", yytext1_]]];
-      else if (yytext === "nil")
+      else if (yytextLower === "nil")
         this.$ = null;
       else
         this.$ = ["symbol", yytext];
@@ -472,7 +473,7 @@ case 31: return 'INVALID';
 break;
 }
 };
-lexer.rules = [/^;.*/,/^\s+/,/^"/,/^"/,/^(\\"|[^"])*/,/^#\//,/^\/[a-zA-Z]*/,/^(\\\/|[^\/])*/,/^[+-]?[0-9]+(\.[0-9]+)?\b/,/^[+-]?#0[0-9]+\b/,/^[+-]?#x[0-9a-fA-F]+\b/,/^[+-]?#b[0-9]+\b/,/^#n\b/,/^#t\b/,/^#f\b/,/^\(/,/^\)/,/^\[/,/^\]/,/^#\{/,/^\{/,/^\}/,/^~/,/^'/,/^`/,/^\.\.\./,/^#\(/,/^%\d+/,/^:/,/^[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>,]+/,/^$/,/^./];
+lexer.rules = [/^;.*/,/^\s+/,/^"/,/^"/,/^(\\"|[^"])*/,/^#\//,/^\/[a-zA-Z]*/,/^(\\\/|[^\/])*/,/^[+-]?[0-9]+(\.[0-9]+)?\b/,/^[+-]?#0[0-9]+\b/,/^[+-]?#x[0-9a-fA-F]+\b/,/^[+-]?#b[0-9]+\b/,/^#(n|N)/,/^#(t|T)/,/^#(f|F)/,/^\(/,/^\)/,/^\[/,/^\]/,/^#\{/,/^\{/,/^\}/,/^~/,/^'/,/^`/,/^\.\.\./,/^#\(/,/^%\d+/,/^:/,/^[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>,]+/,/^$/,/^./];
 lexer.conditions = {"string":{"rules":[3,4],"inclusive":false},"regex":{"rules":[6,7],"inclusive":false},"INITIAL":{"rules":[0,1,2,5,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],"inclusive":true}};return lexer;})()
 parser.lexer = lexer;
 return parser;
