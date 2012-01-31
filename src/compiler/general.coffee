@@ -59,48 +59,45 @@ compiler[to_js_symbol 'defined?'] = (x) ->
 MODULES
 ###
 do ->
-  get_deps = (deps) ->
-    result = for item in deps
-      item = item[1] if is_quoted item
-      
-      new_item = if is_symbol item
-        get_raw_text item
-      else if is_keyword item
-        item
-      else if _.isArray item
-        get_deps item
-      else
-        raise "ModuleError: Invalid dependency: #{item}"
-        
-      [(to_symbol 'js-eval'), compile new_item]
+  def = null
+  make_module_def = (self_name) ->
+    def = compiler.def
+    compiler.def = (name, value) ->
+      name = [(to_symbol "."), self_name, [(to_symbol 'quote'), name]]
+      def name, value
     
-    [(to_symbol 'quote'), result]
-    
-  get_args = (deps) ->
-    deps = deps[1] if is_quoted deps
-    args = []
-    for item in deps
-      item = item[1] if is_quoted item
-      if is_symbol item
-        args.push item
-      else if (_.isArray item) and not is_keyword item
-        if (oppo.eval item[1]) is "use"
-          q_a = item[2]
-          args.push q_a[1]...
-          
-    args
-          
-    
+  restore_normal_def = ->
+    ret = compiler.def = def
+    def = null
+    ret
+  
   compiler.defmodule = (name, deps=[], body...) ->
+    new_var_group()
     r_name = compile get_raw_text name
-    r_deps = get_deps deps
-    c_deps = compile r_deps
-    args = get_args deps
-    c_args = _.map args, compile
+    r_deps = _.map deps, _.compose compile, get_raw_text
+    c_deps = compile [(to_symbol "quote"), r_deps]
+    args = _.map deps, compile
+    
+    self_name = to_symbol "self"
+    define_self = compile [(to_symbol "var"), self_name, [(to_symbol 'js-eval'), 'this']]
+    make_module_def self_name
+    
+    body = if body.length then body else [null]
     c_body = compile [(to_symbol 'do'), body...]
+    
+    current_var_group = last_var_group()
+    var_smt = "var #{current_var_group.join ', '};"
+    
+    # No compiling after this point
+    end_var_group()
+    restore_normal_def()
+    
     ret = """
-    oppo.module(#{r_name}, #{c_deps}, function (#{c_args.join ', '}) {
-      return #{c_body};
+    oppo.module(#{r_name}, #{c_deps}, function (#{args.join ', '}) {
+      #{var_smt}
+      with (#{define_self}) {
+        return #{c_body};
+      }
     })
     """
   
@@ -128,7 +125,7 @@ compiler.def = (name, value) ->
   _var = compiler[to_js_symbol 'var']
   first_group = first_var_group()
   c_name = compile name
-  if c_name is to_js_symbol c_name
+  if c_name is (to_js_symbol c_name)
     ret = _var name, value, first_group
   else
     c_value = compile value
@@ -150,22 +147,6 @@ compiler[to_js_symbol 'set!'] = (name, value) ->
     #{err})
   /* end set! #{c_name} */
   """
-
-# do ->
-#   to_module_name = (name) ->
-#     q_name = if is_symbol name
-#       [(to_symbol 'quote'), name]
-#     else
-#       name
-#     [(to_symbol '.'), [(to_symbol 'js-eval'), 'this'], q_name]
-#   
-#   compiler[to_js_symbol '@def'] = (name, value) ->
-#     _name = to_module_name name
-#     ret = compile [(to_symbol 'def'), _name, value]
-#   
-#   compiler[to_js_symbol '@set!'] = (name, value) ->
-#     _name = to_module_name name
-#     ret = compile [(to_symbol 'set!'), _name, value]
 
 ###
 MATH

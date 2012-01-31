@@ -101,18 +101,10 @@ var parser = function() {
         break;
       case 41:
         var _this = [["symbol", "js-eval"], "this"], yytext1_ = yytext.substr(1), yytext0 = yytext.charAt(0), yytextLower = yytext.toLowerCase();
-        if(yytext === "@") {
-          this.$ = _this
+        if(yytextLower === "nil") {
+          this.$ = null
         }else {
-          if(yytext0 === "@") {
-            this.$ = [["symbol", "."], _this, [["symbol", "quote"], ["symbol", yytext1_]]]
-          }else {
-            if(yytextLower === "nil") {
-              this.$ = null
-            }else {
-              this.$ = ["symbol", yytext]
-            }
-          }
+          this.$ = ["symbol", yytext]
         }
         break
     }
@@ -1041,61 +1033,42 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     return"(typeof " + c_x + " !== 'undefined')"
   };
   (function() {
-    var get_args, get_deps;
-    get_deps = function(deps) {
-      var item, new_item, result;
-      result = function() {
-        var _i, _len, _results;
-        _results = [];
-        for(_i = 0, _len = deps.length;_i < _len;_i++) {
-          item = deps[_i];
-          if(is_quoted(item)) {
-            item = item[1]
-          }
-          new_item = is_symbol(item) ? get_raw_text(item) : is_keyword(item) ? item : _.isArray(item) ? get_deps(item) : raise("ModuleError: Invalid dependency: " + item);
-          _results.push([to_symbol("js-eval"), compile(new_item)])
-        }
-        return _results
-      }();
-      return[to_symbol("quote"), result]
+    var def, make_module_def, restore_normal_def;
+    def = null;
+    make_module_def = function(self_name) {
+      def = compiler.def;
+      return compiler.def = function(name, value) {
+        name = [to_symbol("."), self_name, [to_symbol("quote"), name]];
+        return def(name, value)
+      }
     };
-    get_args = function(deps) {
-      var args, item, q_a, _i, _len;
-      if(is_quoted(deps)) {
-        deps = deps[1]
-      }
-      args = [];
-      for(_i = 0, _len = deps.length;_i < _len;_i++) {
-        item = deps[_i];
-        if(is_quoted(item)) {
-          item = item[1]
-        }
-        if(is_symbol(item)) {
-          args.push(item)
-        }else {
-          if(_.isArray(item) && !is_keyword(item)) {
-            if(oppo.eval(item[1]) === "use") {
-              q_a = item[2];
-              args.push.apply(args, q_a[1])
-            }
-          }
-        }
-      }
-      return args
+    restore_normal_def = function() {
+      var ret;
+      ret = compiler.def = def;
+      def = null;
+      return ret
     };
     compiler.defmodule = function() {
-      var args, body, c_args, c_body, c_deps, deps, name, r_deps, r_name, ret;
+      var args, body, c_body, c_deps, current_var_group, define_self, deps, name, r_deps, r_name, ret, self_name, var_smt;
       name = arguments[0], deps = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
       if(deps == null) {
         deps = []
       }
+      new_var_group();
       r_name = compile(get_raw_text(name));
-      r_deps = get_deps(deps);
-      c_deps = compile(r_deps);
-      args = get_args(deps);
-      c_args = _.map(args, compile);
+      r_deps = _.map(deps, _.compose(compile, get_raw_text));
+      c_deps = compile([to_symbol("quote"), r_deps]);
+      args = _.map(deps, compile);
+      self_name = to_symbol("self");
+      define_self = compile([to_symbol("var"), self_name, [to_symbol("js-eval"), "this"]]);
+      make_module_def(self_name);
+      body = body.length ? body : [null];
       c_body = compile([to_symbol("do")].concat(__slice.call(body)));
-      return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + c_args.join(", ") + ") {\n  return " + c_body + ";\n})"
+      current_var_group = last_var_group();
+      var_smt = "var " + current_var_group.join(", ") + ";";
+      end_var_group();
+      restore_normal_def();
+      return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + args.join(", ") + ") {\n  " + var_smt + "\n  with (" + define_self + ") {\n    return " + c_body + ";\n  }\n})"
     };
     return compiler.require = function() {
       var c_names, name, names, r_name;

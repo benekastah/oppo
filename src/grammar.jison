@@ -181,11 +181,11 @@ symbol
           yytext0 = yytext.charAt(0),
           yytextLower = yytext.toLowerCase();
           
-      if (yytext === "@")
+      /*if (yytext === "@")
         $$ = _this;
       else if (yytext0 === "@")
         $$ = [["symbol", "."], _this, [["symbol", "quote"], ["symbol", yytext1_]]];
-      else if (yytextLower === "nil")
+      else */if (yytextLower === "nil")
         $$ = null;
       else
         $$ = ["symbol", yytext];

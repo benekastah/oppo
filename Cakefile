@@ -112,35 +112,34 @@ task "build:runtime", "Build oppo runtime", (options) ->
     
     console.log "Building runtime coffeescripts: #{command}"
     exec command, post_exec ->
-      fs.readFile "src/runtime/runtime.oppo", "utf8", (err, code) ->
+      fs.readFile file, "utf8", (err, file_contents) ->
         if err then throw err
-        code = code.replace /\\/g, "\\\\"
-        code = code.replace /'/g, "\\'"
-        code = code.split "\n"
-        code = for item in code
-          "'#{item}\\n'"
-        file_contents = """
-        var oppoString, code, result, oppo;
-      
-        if (typeof window === 'undefined')
-          oppo = exports;
-        else
-          oppo = window.oppo;
-      
-        oppoString = #{code.join " +\n"};
-        code = oppo.read(oppoString);
-        result = oppo.compile(code);
-        eval(result);
-        """
-        fs.readFile file, "utf8", (err, code) ->
+        
+        fs.readFile "src/runtime/runtime.oppo", "utf8", (err, code) ->
           if err then throw err
+          code = code.replace /\\/g, "\\\\"
+          code = code.replace /'/g, "\\'"
+          code = code.split "\n"
+          code = for item in code
+            "'#{item}\\n'"
           file_contents = """
           (function () {
+            var oppoString, code, result, oppo;
+
+            if (typeof window === 'undefined')
+              oppo = exports;
+            else
+              oppo = window.oppo;
+              
             #{file_contents}
-            #{code}
+              
+            oppoString = #{code.join " +\n"};
+            code = oppo.read(oppoString);
+            result = oppo.compile(code);
+            eval(result);
           })();
           """
-          
+        
           console.log "Writing runtime file, including oppo code..."
           fs.writeFile file, file_contents, 'utf8', options.success
   else

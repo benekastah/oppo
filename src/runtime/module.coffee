@@ -61,41 +61,17 @@ class Module
     Module.current.pop()
     @result
     
-  get_deps: do ->
-    use = (obj, props) ->
-      args = []
-      props = [].concat props
-      for item in props
-        if _.isArray item
-          if item[1] isnt "use"
-            module_error "Bad :use syntax: expected keyword :use, got :#{item[1]}"
-          args = args.concat (use obj[item[0]] item[2])
-        else if _.isString item
-          args.push obj[item]
-        else
-          module_error "Bad :use syntax: #{item} should be string"
-      args
-    
-    ->
-      args = []
-      for item in @imports
-        if _.isArray item
-          [name, action, arg] = item
-        else
-          name = item
-          action = arg = null
-        
-        mod = module_get name
-        if mod instanceof Module
-          imported = mod.require()
-        else
-          module_error "Cannot require non-module: #{item}"
-        
-        if action is "use"
-          args.push.apply args, (use imported, arg)
-        else
-          args.push imported
-      args
+  get_deps: ->
+    args = []
+    for name in @imports
+      mod = module_get name
+      if mod instanceof Module
+        imported = mod.require()
+      else
+        module_error "Cannot require non-module: #{item}"
+      
+      args.push imported
+    args
     
   status: null
   @statuses:

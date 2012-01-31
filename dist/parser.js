@@ -82,11 +82,11 @@ case 41:
           yytext0 = yytext.charAt(0),
           yytextLower = yytext.toLowerCase();
           
-      if (yytext === "@")
+      /*if (yytext === "@")
         this.$ = _this;
       else if (yytext0 === "@")
         this.$ = [["symbol", "."], _this, [["symbol", "quote"], ["symbol", yytext1_]]];
-      else if (yytextLower === "nil")
+      else */if (yytextLower === "nil")
         this.$ = null;
       else
         this.$ = ["symbol", yytext];
