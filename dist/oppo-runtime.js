@@ -8,6 +8,8 @@
     
   var Module, module_error, module_get, module_get_path, module_set, modules;
 
+oppo.compile(oppo.read("\n(defmacro defn (nm argslist ...body)\n  `(def ~nm (lambda ~argslist ...body)))\n\n(defmacro log (...things)\n  `((. console 'log) ...things))\n\n;; Strings\n(defmacro replace (base ...items)\n  `((. ~base 'replace) ...items))\n\n(defmacro remove (base pattern)\n  `(replace base pattern \"\"))\n\n(defmacro match (base pattern)\n  `((. ~base 'match) pattern))\n"));
+
 modules = oppo.modules = {};
 
 module_error = function(msg) {
@@ -142,205 +144,235 @@ oppo.module.require = function(name, force) {
 };
 
     
-  oppoString = '(defmodule oppo/core ()\n' +
-'\n' +
-'  (def global (if (defined? window) window global))\n' +
-'\n' +
-'  (defmacro defn (nm argslist ...body)\n' +
-'    `(def ~nm (lambda ~argslist ...body)))\n' +
-'\n' +
-'  ;; Logging / Printing\n' +
-'  (defmacro log (...things)\n' +
-'    `((. console \'log) ...things))\n' +
-'        \n' +
-'  (defn print (...items)\n' +
-'    (apply (. console \'log) items)\n' +
-'    (last items))\n' +
-'\n' +
-'  ;; Misc macros and functions\n' +
-'  (defn eval (sexp)\n' +
-'    ((. oppo \'eval) sexp))\n' +
-'  \n' +
-'  (defn read (s)\n' +
-'    ((. oppo \'read) s))\n' +
-'    \n' +
-'  ;; Type conversion\n' +
-'  (defn ->bool (x)\n' +
-'    (js-eval "!(x == null || x === false || x === \\"\\" || x !== x)"))\n' +
-'\n' +
-'  (defn ->num (n)\n' +
-'    ((. @global :Number) n))\n' +
-'\n' +
-'  (defn ->str (s)\n' +
-'    (str s))\n' +
-'\n' +
-'  ;; Binary functions\n' +
-'  (defn not (x)\n' +
-'    (let (bx (->bool x))\n' +
-'      (js-eval "!bx")))\n' +
-'\n' +
-'  (let (binary-each\n' +
-'          (lambda (type ls)\n' +
-'            (let (item (nth ls 1))\n' +
-'              (if (|| (&& (=== type :or) (->bool item))\n' +
-'                      (&& (=== type :and) (not item))\n' +
-'                      (=== (. ls \'length) 0))\n' +
-'                item\n' +
-'                (binary-each type ((. ls \'slice) 1))))))\n' +
-'                \n' +
-'    (defn or (...items)\n' +
-'      (binary-each :or items))\n' +
-'    \n' +
-'    (defn and (...items)\n' +
-'      (binary-each :and items)))\n' +
-'\n' +
-'  (defn js-type (x)\n' +
-'    (let (cls ((. (. global :Object) \'prototype :toString \'call) x)\n' +
-'          type-arr ((. cls \'match) #/\\s([a-zA-Z]+)/)\n' +
-'          type (. type-arr 1))\n' +
-'      ((. type \'toLowerCase))))\n' +
-'\n' +
-'  ;(defmacro .. (...items)\n' +
-'  ;  (if (= 2 (size items))\n' +
-'  ;    ))\n' +
-'\n' +
-'  ;; Collections    \n' +
-'  (defn nth (a n)\n' +
-'    (if (=== n 0)\n' +
-'      (throw "nth treats collections as one-based; cannot get zeroth item"))\n' +
-'    (let (i (if (< n 0)\n' +
-'              (+ (. a \'length) n)\n' +
-'              (- n 1)))\n' +
-'      (. a i)))\n' +
-'  \n' +
-'  (defn first (a) (nth a 1))\n' +
-'  \n' +
-'  (defn second (a) (nth a 2))\n' +
-'  \n' +
-'  (defn last (a) (nth a -1))\n' +
-'\n' +
-'  (defn concat (base ...items)\n' +
-'    (apply (. base \'concat) ...items))\n' +
-'  \n' +
-'  (defn join (a s)\n' +
-'    ((. a \'join) s))\n' +
-'  \n' +
-'  ;(defmacro slice ())\n' +
-'\n' +
-'  ;; Lists\n' +
-'\n' +
-'  ;; Strings\n' +
-'  (defmacro replace (base ...items)\n' +
-'    `((. ~base \'replace) ...items))\n' +
-'  \n' +
-'  (defmacro remove (base pattern)\n' +
-'    `(replace base pattern ""))\n' +
-'  \n' +
-'  (defmacro match (base pattern)\n' +
-'    `((. ~base \'match) pattern))\n' +
-'\n' +
-'  ;; Regex\n' +
-'  (defmacro re-match ())\n' +
-'\n' +
-'  ;; Math\n' +
-'  ;(defn + (...nums)\n' +
-'  ;  ())\n' +
-'\n' +
-'  ;; Set up underscore\n' +
-'  ; (let (underscore-methods {;; Collections\n' +
-'  ;                           :each ()\n' +
-'  ;                           :map ()\n' +
-'  ;                           :reduce [\'reduce \'foldl]\n' +
-'  ;                           :reduceRight [\'reduce-right \'foldr]\n' +
-'  ;                           :find ()\n' +
-'  ;                           :filter ()\n' +
-'  ;                           :reject ()\n' +
-'  ;                           :all ()\n' +
-'  ;                           :any ()\n' +
-'  ;                           :include ()\n' +
-'  ;                           :invoke ()\n' +
-'  ;                           :pluck ()\n' +
-'  ;                           ; :max ()\n' +
-'  ;                           ; :min ()\n' +
-'  ;                           :sortBy [\'sort-by]\n' +
-'  ;                           :groupBy [\'group-by]\n' +
-'  ;                           :sortedIndex [\'sorted-index]\n' +
-'  ;                           :suffle ()\n' +
-'  ;                           :toArray [\'->array]\n' +
-'  ;                           :size ()\n' +
-'  ;       \n' +
-'  ;                           ;; Arrays\n' +
-'  ;                           :first [\'first \'head]\n' +
-'  ;                           :initial [\'initial \'init]\n' +
-'  ;                           :last ()\n' +
-'  ;                           :rest [\'rest \'tail]\n' +
-'  ;                           :compact ()\n' +
-'  ;                           :flatten ()\n' +
-'  ;                           :without ()\n' +
-'  ;                           :union ()\n' +
-'  ;                           :intersection ()\n' +
-'  ;                           :difference ()\n' +
-'  ;                           :uniq ()\n' +
-'  ;                           :zip ()\n' +
-'  ;                           :indexOf [\'index-of]\n' +
-'  ;                           :lastIndexOf [\'last-index-of]\n' +
-'  ;                           :range ()\n' +
-'  ;       \n' +
-'  ;                           ;; Functions\n' +
-'  ;                           :bind ()\n' +
-'  ;                           :bindAll [\'bind-all]\n' +
-'  ;                           :memoize ()\n' +
-'  ;                           :delay ()\n' +
-'  ;                           :defer ()\n' +
-'  ;                           :throttle ()\n' +
-'  ;                           :debounce ()\n' +
-'  ;                           :once ()\n' +
-'  ;                           :after ()\n' +
-'  ;                           :wrap ()\n' +
-'  ;                           :compose ()\n' +
-'  ;       \n' +
-'  ;                           ;; Objects\n' +
-'  ;                           :keys ()\n' +
-'  ;                           :values ()\n' +
-'  ;                           :functions ()\n' +
-'  ;                           :extend ()\n' +
-'  ;                           :defaults ()\n' +
-'  ;                           :clone ()\n' +
-'  ;                           :tap ()\n' +
-'  ;                           :isEqual [\'equal? \'=]\n' +
-'  ;                           :isEmpty [\'empty?]\n' +
-'  ;                           :isElement [\'element?]\n' +
-'  ;                           :isArray [\'array?]\n' +
-'  ;                           :isArguments [\'arguments?]\n' +
-'  ;                           :isFunction [\'function?]\n' +
-'  ;                           :isNumber [\'number?]\n' +
-'  ;                           :isBoolean [\'boolean? \'bool?]\n' +
-'  ;                           :isDate [\'date?]\n' +
-'  ;                           :isRegExp [\'regex?]\n' +
-'  ;                           :isNaN [\'nan?]\n' +
-'  ;                           :isNull [\'nil?]\n' +
-'  ;                           :isUndefined [\'undefined?]\n' +
-'  ;       \n' +
-'  ;                           ;; Utility\n' +
-'  ;                           ; :noConflict ()\n' +
-'  ;                           :identity ()\n' +
-'  ;                           :times ()\n' +
-'  ;                           :uniqueId [\'unique-id]\n' +
-'  ;                           :escape ()\n' +
-'  ;                           :template ()\n' +
-'  ;       \n' +
-'  ;                           ;; Chaining\n' +
-'  ;                           :chain ()\n' +
-'  ;                           :value ()})\n' +
-'  ;   \n' +
-'  ;   ((. - \'each)  underscore-methods\n' +
-'  ;                 (fn (k v)\n' +
-'  ;                   (if ((. - :isArray) v)\n' +
-'  ;                     ((. - \'each)  v\n' +
-'  ;                                   (fn (i v)\n' +
-'  ;                                     (def (. self k) (. - v))))))))\n' +
-'                                      )\n';
-  code = oppo.read(oppoString);
-  result = oppo.compile(code);
-  eval(result);
+  (oppo.module("oppo/core", [], function () {
+  var self, cond_16l0v7vpk_40784ms;
+  with (self = this) {
+    return (/* def self.global */ (typeof self.global === 'undefined' ?
+  (self.global = /* if */ ((cond_16l0v7vpk_40784ms = (typeof window !== 'undefined')) !== false && cond_16l0v7vpk_40784ms !== null && cond_16l0v7vpk_40784ms !== '' ?
+  window :
+  global)
+/* end if */) :
+  ((function () { throw "Can't define variable that is already defined: self.global" })()))
+/* end def self.global */,
+eval((function (list_16l0v7vpl_sb6nrm) {
+  var list_16l0v7vpl_sb6nrm_16l0v7vpl_5m14jrv;
+return list_16l0v7vpl_sb6nrm_16l0v7vpl_5m14jrv = [].concat(list_16l0v7vpl_sb6nrm.slice(0, 1));
+})([["symbol", "do"]])),
+/* defmacro defn */ null,
+/* def self.print */ (typeof self.print === 'undefined' ?
+  (self.print = (function () {
+  var items;
+return (items = Array.prototype.slice.call(arguments, 0, arguments.length)), console.log.apply(console, [].concat(items)), last(items);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.print" })()))
+/* end def self.print */,
+/* def self.eval */ (typeof self.eval === 'undefined' ?
+  (self.eval = (function (sexp) {
+  return oppo.eval(sexp);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.eval" })()))
+/* end def self.eval */,
+/* def self.read */ (typeof self.read === 'undefined' ?
+  (self.read = (function (s) {
+  return oppo.read(s);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.read" })()))
+/* end def self.read */,
+/* def self.__rangle_bool */ (typeof self.__rangle_bool === 'undefined' ?
+  (self.__rangle_bool = (function (x) {
+  return !(x == null || x === false || x === "" || x !== x);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.__rangle_bool" })()))
+/* end def self.__rangle_bool */,
+/* def self.__rangle_num */ (typeof self.__rangle_num === 'undefined' ?
+  (self.__rangle_num = (function (n) {
+  return global["Number"](n);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.__rangle_num" })()))
+/* end def self.__rangle_num */,
+/* def self.__rangle_str */ (typeof self.__rangle_str === 'undefined' ?
+  (self.__rangle_str = (function (s) {
+  return "" + s;
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.__rangle_str" })()))
+/* end def self.__rangle_str */,
+/* def self.not */ (typeof self.not === 'undefined' ?
+  (self.not = (function (x) {
+  return (function () {
+  var bx;
+return bx = __rangle_bool(x), !bx;
+}).apply(this, typeof arguments !== "undefined" ? arguments : []);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.not" })()))
+/* end def self.not */,
+(function () {
+  var binary_each;
+return binary_each = (function (type, ls) {
+  return (function () {
+  var item, cond_16l0v7vq3_1jb56rf;
+return item = nth(ls, 1), /* if */ ((cond_16l0v7vq3_1jb56rf = (((type === "or") && __rangle_bool(item)) || ((type === "and") && not(item)) || (ls.length === 0))) !== false && cond_16l0v7vq3_1jb56rf !== null && cond_16l0v7vq3_1jb56rf !== '' ?
+  item :
+  binary_each(type, ls.slice(1)))
+/* end if */;
+}).apply(this, typeof arguments !== "undefined" ? arguments : []);
+}), /* def self.or */ (typeof self.or === 'undefined' ?
+  (self.or = (function () {
+  var items;
+return (items = Array.prototype.slice.call(arguments, 0, arguments.length)), binary_each("or", items);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.or" })()))
+/* end def self.or */, /* def self.and */ (typeof self.and === 'undefined' ?
+  (self.and = (function () {
+  var items;
+return (items = Array.prototype.slice.call(arguments, 0, arguments.length)), binary_each("and", items);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.and" })()))
+/* end def self.and */;
+}).apply(this, typeof arguments !== "undefined" ? arguments : []),
+/* def self.js_type */ (typeof self.js_type === 'undefined' ?
+  (self.js_type = (function (x) {
+  return (function () {
+  var cls, type_arr, type;
+return cls = global["Object"].prototype["toString"].call(x), type_arr = cls.match(/\s([a-zA-Z]+)/), type = type_arr[1], type.tolowercase();
+}).apply(this, typeof arguments !== "undefined" ? arguments : []);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.js_type" })()))
+/* end def self.js_type */,
+/* def self.nth */ (typeof self.nth === 'undefined' ?
+  (self.nth = (function (a, n) {
+  var cond_16l0v7vqd_80bv5o6;
+return /* if */ ((cond_16l0v7vqd_80bv5o6 = (n === 0)) !== false && cond_16l0v7vqd_80bv5o6 !== null && cond_16l0v7vqd_80bv5o6 !== '' ?
+  (function () { throw "nth treats collections as one-based; cannot get zeroth item" })() :
+  null)
+/* end if */, (function () {
+  var cond_16l0v7vqe_52thnua, i;
+return i = /* if */ ((cond_16l0v7vqe_52thnua = (n < 0)) !== false && cond_16l0v7vqe_52thnua !== null && cond_16l0v7vqe_52thnua !== '' ?
+  a.length + n :
+  n - 1)
+/* end if */, a[i];
+}).apply(this, typeof arguments !== "undefined" ? arguments : []);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.nth" })()))
+/* end def self.nth */,
+/* def self.first */ (typeof self.first === 'undefined' ?
+  (self.first = (function (a) {
+  return nth(a, 1);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.first" })()))
+/* end def self.first */,
+/* def self.second */ (typeof self.second === 'undefined' ?
+  (self.second = (function (a) {
+  return nth(a, 2);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.second" })()))
+/* end def self.second */,
+/* def self.last */ (typeof self.last === 'undefined' ?
+  (self.last = (function (a) {
+  return nth(a, -1);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.last" })()))
+/* end def self.last */,
+/* def self.concat */ (typeof self.concat === 'undefined' ?
+  (self.concat = (function () {
+  var base, items;
+return (base = arguments[0]), (items = Array.prototype.slice.call(arguments, 1, arguments.length)), base.concat.apply(base, [].concat(splat(items)));
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.concat" })()))
+/* end def self.concat */,
+/* def self.join */ (typeof self.join === 'undefined' ?
+  (self.join = (function (a, s) {
+  return a.join(s);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.join" })()))
+/* end def self.join */,
+(function () {
+  var underscore_methods, each, array_qmark_;
+return underscore_methods = { "each" : null,
+"map" : null,
+"reduce" : [["symbol", "reduce"], ["symbol", "foldl"]],
+"reduceRight" : [["symbol", "reduce-right"], ["symbol", "foldr"]],
+"find" : null,
+"filter" : null,
+"reject" : null,
+"all" : null,
+"any" : null,
+"include" : null,
+"invoke" : null,
+"pluck" : null,
+"sortBy" : [["symbol", "sort-by"]],
+"groupBy" : [["symbol", "group-by"]],
+"sortedIndex" : [["symbol", "sorted-index"]],
+"suffle" : null,
+"toArray" : [["symbol", "->array"]],
+"size" : null,
+"first" : [["symbol", "first"], ["symbol", "head"]],
+"initial" : [["symbol", "initial"], ["symbol", "init"]],
+"last" : null,
+"rest" : [["symbol", "rest"], ["symbol", "tail"]],
+"compact" : null,
+"flatten" : null,
+"without" : null,
+"union" : null,
+"intersection" : null,
+"difference" : null,
+"uniq" : null,
+"zip" : null,
+"indexOf" : [["symbol", "index-of"]],
+"lastIndexOf" : [["symbol", "last-index-of"]],
+"range" : null,
+"bind" : null,
+"bindAll" : [["symbol", "bind-all"]],
+"memoize" : null,
+"delay" : null,
+"defer" : null,
+"throttle" : null,
+"debounce" : null,
+"once" : null,
+"after" : null,
+"wrap" : null,
+"compose" : null,
+"keys" : null,
+"values" : null,
+"functions" : null,
+"extend" : null,
+"defaults" : null,
+"clone" : null,
+"tap" : null,
+"isEqual" : [["symbol", "equal?"], ["symbol", "="]],
+"isEmpty" : [["symbol", "empty?"]],
+"isElement" : [["symbol", "element?"]],
+"isArray" : [["symbol", "array?"]],
+"isArguments" : [["symbol", "arguments?"]],
+"isFunction" : [["symbol", "function?"]],
+"isNumber" : [["symbol", "number?"]],
+"isBoolean" : [["symbol", "boolean?"], ["symbol", "bool?"]],
+"isDate" : [["symbol", "date?"]],
+"isRegExp" : [["symbol", "regex?"]],
+"isNaN" : [["symbol", "nan?"]],
+"isNull" : [["symbol", "nil?"]],
+"isUndefined" : [["symbol", "undefined?"]],
+"identity" : null,
+"times" : null,
+"uniqueId" : [["symbol", "unique-id"]],
+"escape" : null,
+"template" : null,
+"chain" : null,
+"value" : null }, each = _.each, array_qmark_ = _["isArray"], each(underscore_methods, (function (v, k) {
+  var cond_16l0v7vqv_tm7344;
+return /* if */ ((cond_16l0v7vqv_tm7344 = array_qmark_(v)) !== false && cond_16l0v7vqv_tm7344 !== null && cond_16l0v7vqv_tm7344 !== '' ?
+  each(v, (function (i, v) {
+  return /* def self.v */ (typeof self.v === 'undefined' ?
+  (self.v = _.k) :
+  ((function () { throw "Can't define variable that is already defined: self.v" })()))
+/* end def self.v */;
+})) :
+  /* def self.v */ (typeof self.v === 'undefined' ?
+  (self.v = _.k) :
+  ((function () { throw "Can't define variable that is already defined: self.v" })()))
+/* end def self.v */)
+/* end if */;
+}));
+}).apply(this, typeof arguments !== "undefined" ? arguments : []));
+  }
+}))
 })();

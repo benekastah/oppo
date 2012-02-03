@@ -3,6 +3,7 @@ process.chdir __dirname
 exec = (require 'child_process').exec
 fs = require 'fs'
 path = require 'path'
+oppo = require 'dist/oppo'
 
 post_exec = (options, error) ->
   if typeof options is "function"
@@ -117,11 +118,11 @@ task "build:runtime", "Build oppo runtime", (options) ->
         
         fs.readFile "src/runtime/runtime.oppo", "utf8", (err, code) ->
           if err then throw err
-          code = code.replace /\\/g, "\\\\"
-          code = code.replace /'/g, "\\'"
-          code = code.split "\n"
-          code = for item in code
-            "'#{item}\\n'"
+          # code = code.replace /\\/g, "\\\\"
+          # code = code.replace /'/g, "\\'"
+          # code = code.split "\n"
+          # code = for item in code
+          #   "'#{item}\\n'"
           file_contents = """
           (function () {
             var oppoString, code, result, oppo;
@@ -133,10 +134,7 @@ task "build:runtime", "Build oppo runtime", (options) ->
               
             #{file_contents}
               
-            oppoString = #{code.join " +\n"};
-            code = oppo.read(oppoString);
-            result = oppo.compile(code);
-            eval(result);
+            #{oppo.compile oppo.read code}
           })();
           """
         

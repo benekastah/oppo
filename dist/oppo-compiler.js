@@ -576,19 +576,37 @@
   */
 
   (function() {
-    var def, make_module_def, restore_normal_def;
+    var def, make_module_def, make_module_set, restore_normal_def, restore_normal_set, set;
     def = null;
+    set = null;
     make_module_def = function(self_name) {
       def = compiler.def;
       return compiler.def = function(name, value) {
-        name = [to_symbol("."), self_name, [to_symbol('quote'), name]];
-        return def(name, value);
+        var _name;
+        _name = is_symbol(name) ? [to_symbol("."), self_name, [to_symbol('quote'), name]] : name;
+        return def(_name, value);
+      };
+    };
+    make_module_set = function(self_name) {
+      set = compiler[to_js_symbol("set!")];
+      return compiler[to_js_symbol("set!")] = function(name, value) {
+        if (_.isEqual(name, self_name)) {
+          throw "Can't redefine 'self' in a module.";
+        } else {
+          return set(name, value);
+        }
       };
     };
     restore_normal_def = function() {
       var ret;
       ret = compiler.def = def;
       def = null;
+      return ret;
+    };
+    restore_normal_set = function() {
+      var ret;
+      ret = compiler[to_js_symbol("set!")] = set;
+      set = null;
       return ret;
     };
     compiler.defmodule = function() {
@@ -603,12 +621,14 @@
       self_name = to_symbol("self");
       define_self = compile([to_symbol("var"), self_name, [to_symbol('js-eval'), 'this']]);
       make_module_def(self_name);
+      make_module_set(self_name);
       body = body.length ? body : [null];
       c_body = compile([to_symbol('do')].concat(__slice.call(body)));
       current_var_group = last_var_group();
       var_smt = "var " + (current_var_group.join(', ')) + ";";
       end_var_group();
       restore_normal_def();
+      restore_normal_set();
       return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + (args.join(', ')) + ") {\n  " + var_smt + "\n  with (" + define_self + ") {\n    return " + c_body + ";\n  }\n})";
     };
     return compiler.require = function() {

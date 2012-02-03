@@ -60,15 +60,33 @@ MODULES
 ###
 do ->
   def = null
+  set = null
   make_module_def = (self_name) ->
     def = compiler.def
     compiler.def = (name, value) ->
-      name = [(to_symbol "."), self_name, [(to_symbol 'quote'), name]]
-      def name, value
+      _name = if is_symbol name
+        [(to_symbol "."), self_name, [(to_symbol 'quote'), name]]
+      else
+        name
+        
+      def _name, value
+    
+  make_module_set = (self_name) ->
+    set = compiler[to_js_symbol "set!"]
+    compiler[to_js_symbol "set!"] = (name, value) ->
+      if _.isEqual name, self_name
+        throw "Can't redefine 'self' in a module."
+      else
+        set name, value
     
   restore_normal_def = ->
     ret = compiler.def = def
     def = null
+    ret
+    
+  restore_normal_set = ->
+    ret = compiler[to_js_symbol "set!"] = set
+    set = null
     ret
   
   compiler.defmodule = (name, deps=[], body...) ->
@@ -81,6 +99,7 @@ do ->
     self_name = to_symbol "self"
     define_self = compile [(to_symbol "var"), self_name, [(to_symbol 'js-eval'), 'this']]
     make_module_def self_name
+    make_module_set self_name
     
     body = if body.length then body else [null]
     c_body = compile [(to_symbol 'do'), body...]
@@ -91,6 +110,7 @@ do ->
     # No compiling after this point
     end_var_group()
     restore_normal_def()
+    restore_normal_set()
     
     ret = """
     oppo.module(#{r_name}, #{c_deps}, function (#{args.join ', '}) {

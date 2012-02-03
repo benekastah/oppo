@@ -1,14 +1,13 @@
 (defmodule oppo/core ()
 
   (def global (if (defined? window) window global))
-
+  
+  ;; Set up some macros
+  (eval `(do))
+  
   (defmacro defn (nm argslist ...body)
     `(def ~nm (lambda ~argslist ...body)))
 
-  ;; Logging / Printing
-  (defmacro log (...things)
-    `((. console 'log) ...things))
-        
   (defn print (...items)
     (apply (. console 'log) items)
     (last items))
@@ -25,7 +24,7 @@
     (js-eval "!(x == null || x === false || x === \"\" || x !== x)"))
 
   (defn ->num (n)
-    ((. @global :Number) n))
+    ((. global :Number) n))
 
   (defn ->str (s)
     (str s))
@@ -80,27 +79,12 @@
   
   (defn join (a s)
     ((. a 'join) s))
-  
-  ;(defmacro slice ())
 
   ;; Lists
 
   ;; Strings
-  (defmacro replace (base ...items)
-    `((. ~base 'replace) ...items))
-  
-  (defmacro remove (base pattern)
-    `(replace base pattern ""))
-  
-  (defmacro match (base pattern)
-    `((. ~base 'match) pattern))
 
   ;; Regex
-  (defmacro re-match ())
-
-  ;; Math
-  ;(defn + (...nums)
-  ;  ())
 
   ;; Set up underscore
   (let (underscore-methods {;; Collections
@@ -187,12 +171,15 @@
         
                             ;; Chaining
                             :chain ()
-                            :value ()})
+                            :value ()}
+       each (. - 'each)
+       array? (. - :isArray))
     
-    ((. - 'each)  underscore-methods
-                  (fn (k v)
-                    (if ((. - :isArray) v)
-                      ((. - 'each)  v
-                                    (fn (i v)
-                                      (def (. self v) (. - k))))))))
+    (each underscore-methods
+          (fn (v k)
+            (if (array? v)
+              (each v
+                    (fn (i v)
+                      (def (. self 'v) (. - 'k))))
+              (def (. self 'v) (. - 'k))))))
                                       )
