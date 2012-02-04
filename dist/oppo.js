@@ -505,8 +505,8 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   }
 }
 ;(function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_raw_text, initialize_var_groups, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, last_var_group, make_error, math_fn, new_var_group, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_quoted, to_symbol, trim, _is, 
-  _ref, _ref2, _ref3, __hasProp = Object.prototype.hasOwnProperty, __slice = Array.prototype.slice, __indexOf = Array.prototype.indexOf || function(item) {
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_raw_text, initialize_var_groups, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, last_var_group, make_error, math_fn, new_var_group, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_list, to_quoted, to_symbol, trim, 
+  _is, _ref, _ref2, _ref3, __slice = Array.prototype.slice, __hasProp = Object.prototype.hasOwnProperty, __indexOf = Array.prototype.indexOf || function(item) {
     for(var i = 0, l = this.length;i < l;i++) {
       if(i in this && this[i] === item) {
         return i
@@ -550,6 +550,9 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   };
   to_quoted = function(x) {
     return[to_symbol("quote"), x]
+  };
+  to_list = function(ls) {
+    return[to_symbol("list")].concat(__slice.call(ls))
   };
   quote_escape = function(x) {
     var ret;
@@ -973,20 +976,24 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     c_args = _.map(args, compile);
     return"new " + c_cls + "(" + c_args.join(", ") + ")"
   };
+  compiler.eval = function(sexp) {
+    var c_sexp;
+    c_sexp = compile(sexp);
+    return"eval(oppo.compile(" + c_sexp + "))"
+  };
   compiler.quote = function(sexp) {
-    var c_sexp, q_sexp, ret, s_sexp;
+    var q_sexp, ret, s_sexp;
     sexp = quote_escape(sexp);
     ret = !(sexp != null) ? null : void 0;
     if(_.isBoolean(sexp)) {
       return sexp
     }else {
       if(is_symbol(sexp)) {
-        return compile([to_symbol("list")].concat(__slice.call(sexp)))
+        return compile(to_list(sexp))
       }else {
         if(_.isArray(sexp)) {
           q_sexp = _.map(sexp, to_quoted);
-          c_sexp = _.map(q_sexp, compile);
-          return"[" + c_sexp.join(", ") + "]"
+          return compile(to_list(q_sexp))
         }else {
           if(_.isNumber(sexp)) {
             return sexp
@@ -1211,10 +1218,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     return"(function () { throw " + c_err + " })()"
   };
   (function() {
-    var mc_expand, mc_expand_1, quote_all;
-    quote_all = function(ls) {
-      return[to_symbol("quote")]
-    };
+    var mc_expand, mc_expand_1;
     mc_expand = false;
     mc_expand_1 = false;
     compiler.defmacro = function() {
@@ -1225,10 +1229,11 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       }
       c_name = compile(name);
       objectSet(compiler, c_name, function() {
-        var args, evald, js, q_args;
+        var args, evald, js, q_args, sexp;
         args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-        q_args = quote_all(args);
-        js = oppo.compile([[["symbol", "lambda"], argnames].concat(__slice.call(template))].concat(__slice.call(q_args[1])));
+        q_args = _.map(args, to_quoted);
+        sexp = [[to_symbol("lambda"), argnames].concat(__slice.call(template))].concat(__slice.call(q_args));
+        js = oppo.compile(sexp);
         evald = eval(js);
         if(!mc_expand && !mc_expand_1) {
           return oppo.compile(evald)
@@ -1244,7 +1249,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       old_mc_expand = mc_expand;
       mc_expand = true;
       ret = compile(sexp);
-      ret = compile(quote_all(ret));
+      ret = compile(to_quoted(ret));
       mc_expand = old_mc_expand;
       return ret
     };
@@ -1252,7 +1257,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       var ret;
       mc_expand_1 = true;
       ret = compile(sexp);
-      ret = compile(quote_all(ret));
+      ret = compile(to_quoted(ret));
       mc_expand_1 = false;
       return ret
     };
@@ -1262,7 +1267,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       ident = gensym("list");
       restructured_list = restructure_list(list, ident);
       restructured_list[1] = [sym("js-eval"), restructured_list[1]];
-      q_list = quote_all(list);
+      q_list = to_quoted(list);
       code = [[sym("lambda"), [sym(ident)], [sym("var")].concat(__slice.call(restructured_list))], q_list];
       return ret = compile(code)
     }

@@ -1,15 +1,18 @@
+compiler.eval = (sexp) ->
+  c_sexp = compile sexp
+  "eval(oppo.compile(#{c_sexp}))"
+
 compiler.quote = (sexp) ->
   sexp = quote_escape sexp
   ret = if not sexp?
     null
   if _.isBoolean sexp
     sexp
-  else if is_symbol sexp
-    compile [(to_symbol "list"), sexp...]
+  else if (is_symbol sexp)
+    compile to_list sexp
   else if _.isArray sexp
     q_sexp = _.map sexp, to_quoted
-    c_sexp = _.map q_sexp, compile
-    "[#{c_sexp.join ', '}]"
+    compile to_list q_sexp
   else if _.isNumber sexp
     sexp
   else

@@ -145,52 +145,135 @@ oppo.module.require = function(name, force) {
 
     
   (oppo.module("oppo/core", [], function () {
-  var self, cond_16l4kevng_5o0vaer;
+  var self, cond_16l4qtkgl_40ftbk1;
   with (self = this) {
     return (/* def self.global */ (typeof self.global === 'undefined' ?
-  (self.global = /* if */ ((cond_16l4kevng_5o0vaer = (typeof window !== 'undefined')) !== false && cond_16l4kevng_5o0vaer !== null && cond_16l4kevng_5o0vaer !== '' ?
+  (self.global = /* if */ ((cond_16l4qtkgl_40ftbk1 = (typeof window !== 'undefined')) !== false && cond_16l4qtkgl_40ftbk1 !== null && cond_16l4qtkgl_40ftbk1 !== '' ?
   window :
   global)
 /* end if */) :
   ((function () { throw "Can't define variable that is already defined: self.global" })()))
 /* end def self.global */,
-eval((function (list_16l4kevng_8l1hfc1) {
-  var list_16l4kevng_8l1hfc1_16l4kevnh_802hdmp;
-return list_16l4kevng_8l1hfc1_16l4kevnh_802hdmp = [].concat(list_16l4kevng_8l1hfc1.slice(0, 1));
-})([[["symbol", "quote"], ["symbol", "do"]]])),
 /* defmacro defn */ null,
-["symbol", "def"](print, [[["symbol", "quote"], [[["symbol", "quote"], ["symbol", "splat"]], [["symbol", "quote"], ["symbol", "items"]]]]]),
-["symbol", "def"](eval, [[["symbol", "quote"], ["symbol", "sexp"]]]),
-["symbol", "def"](read, [[["symbol", "quote"], ["symbol", "s"]]]),
-["symbol", "def"](__rangle_bool, [[["symbol", "quote"], ["symbol", "x"]]]),
-["symbol", "def"](__rangle_num, [[["symbol", "quote"], ["symbol", "n"]]]),
-["symbol", "def"](__rangle_str, [[["symbol", "quote"], ["symbol", "s"]]]),
-["symbol", "def"](not, [[["symbol", "quote"], ["symbol", "x"]]]),
+/* def self.read */ (typeof self.read === 'undefined' ?
+  (self.read = (function (s) {
+  return oppo.read(s);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.read" })()))
+/* end def self.read */,
+/* def self.__rangle_bool */ (typeof self.__rangle_bool === 'undefined' ?
+  (self.__rangle_bool = (function (x) {
+  return !(x == null || x === false || x === "" || x !== x);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.__rangle_bool" })()))
+/* end def self.__rangle_bool */,
+/* def self.__rangle_num */ (typeof self.__rangle_num === 'undefined' ?
+  (self.__rangle_num = (function (n) {
+  return global["Number"](n);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.__rangle_num" })()))
+/* end def self.__rangle_num */,
+/* def self.__rangle_str */ (typeof self.__rangle_str === 'undefined' ?
+  (self.__rangle_str = (function (s) {
+  return "" + s;
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.__rangle_str" })()))
+/* end def self.__rangle_str */,
+/* def self.not */ (typeof self.not === 'undefined' ?
+  (self.not = (function (x) {
+  return (function () {
+  var bx;
+return bx = __rangle_bool(x), !bx;
+}).apply(this, typeof arguments !== "undefined" ? arguments : []);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.not" })()))
+/* end def self.not */,
 (function () {
   var binary_each;
 return binary_each = (function (type, ls) {
   return (function () {
-  var item, cond_16l4kevo2_7hleqna;
-return item = nth(ls, 1), /* if */ ((cond_16l4kevo2_7hleqna = (((type === "or") && __rangle_bool(item)) || ((type === "and") && not(item)) || (ls.length === 0))) !== false && cond_16l4kevo2_7hleqna !== null && cond_16l4kevo2_7hleqna !== '' ?
+  var item, cond_16l4qtkh2_r5b8bc;
+return item = nth(ls, 1), /* if */ ((cond_16l4qtkh2_r5b8bc = (((type === "or") && __rangle_bool(item)) || ((type === "and") && not(item)) || (ls.length === 0))) !== false && cond_16l4qtkh2_r5b8bc !== null && cond_16l4qtkh2_r5b8bc !== '' ?
   item :
   binary_each(type, ls.slice(1)))
 /* end if */;
 }).apply(this, typeof arguments !== "undefined" ? arguments : []);
-}), ["symbol", "def"](or, [[["symbol", "quote"], [[["symbol", "quote"], ["symbol", "splat"]], [["symbol", "quote"], ["symbol", "items"]]]]]), ["symbol", "def"](and, [[["symbol", "quote"], [[["symbol", "quote"], ["symbol", "splat"]], [["symbol", "quote"], ["symbol", "items"]]]]]);
+}), /* def self.or */ (typeof self.or === 'undefined' ?
+  (self.or = (function () {
+  var items;
+return (items = Array.prototype.slice.call(arguments, 0, arguments.length)), binary_each("or", items);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.or" })()))
+/* end def self.or */, /* def self.and */ (typeof self.and === 'undefined' ?
+  (self.and = (function () {
+  var items;
+return (items = Array.prototype.slice.call(arguments, 0, arguments.length)), binary_each("and", items);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.and" })()))
+/* end def self.and */;
 }).apply(this, typeof arguments !== "undefined" ? arguments : []),
-["symbol", "def"](js_type, [[["symbol", "quote"], ["symbol", "x"]]]),
-["symbol", "def"](nth, [[["symbol", "quote"], ["symbol", "a"]], [["symbol", "quote"], ["symbol", "n"]]]),
-["symbol", "def"](first, [[["symbol", "quote"], ["symbol", "a"]]]),
-["symbol", "def"](second, [[["symbol", "quote"], ["symbol", "a"]]]),
-["symbol", "def"](last, [[["symbol", "quote"], ["symbol", "a"]]]),
-["symbol", "def"](concat, [[["symbol", "quote"], ["symbol", "base"]], [["symbol", "quote"], [[["symbol", "quote"], ["symbol", "splat"]], [["symbol", "quote"], ["symbol", "items"]]]]]),
-["symbol", "def"](join, [[["symbol", "quote"], ["symbol", "a"]], [["symbol", "quote"], ["symbol", "s"]]]),
+/* def self.js_type */ (typeof self.js_type === 'undefined' ?
+  (self.js_type = (function (x) {
+  return (function () {
+  var cls, type_arr, type;
+return cls = global["Object"].prototype["toString"].call(x), type_arr = cls.match(/\s([a-zA-Z]+)/), type = type_arr[1], type.tolowercase();
+}).apply(this, typeof arguments !== "undefined" ? arguments : []);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.js_type" })()))
+/* end def self.js_type */,
+/* def self.nth */ (typeof self.nth === 'undefined' ?
+  (self.nth = (function (a, n) {
+  var cond_16l4qtkhd_2433kav;
+return /* if */ ((cond_16l4qtkhd_2433kav = (n === 0)) !== false && cond_16l4qtkhd_2433kav !== null && cond_16l4qtkhd_2433kav !== '' ?
+  (function () { throw "nth treats collections as one-based; cannot get zeroth item" })() :
+  null)
+/* end if */, (function () {
+  var cond_16l4qtkhe_78a6h3m, i;
+return i = /* if */ ((cond_16l4qtkhe_78a6h3m = (n < 0)) !== false && cond_16l4qtkhe_78a6h3m !== null && cond_16l4qtkhe_78a6h3m !== '' ?
+  a.length + n :
+  n - 1)
+/* end if */, a[i];
+}).apply(this, typeof arguments !== "undefined" ? arguments : []);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.nth" })()))
+/* end def self.nth */,
+/* def self.first */ (typeof self.first === 'undefined' ?
+  (self.first = (function (a) {
+  return nth(a, 1);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.first" })()))
+/* end def self.first */,
+/* def self.second */ (typeof self.second === 'undefined' ?
+  (self.second = (function (a) {
+  return nth(a, 2);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.second" })()))
+/* end def self.second */,
+/* def self.last */ (typeof self.last === 'undefined' ?
+  (self.last = (function (a) {
+  return nth(a, -1);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.last" })()))
+/* end def self.last */,
+/* def self.concat */ (typeof self.concat === 'undefined' ?
+  (self.concat = (function () {
+  var base, items;
+return (base = arguments[0]), (items = Array.prototype.slice.call(arguments, 1, arguments.length)), base.concat.apply(base, [].concat(splat(items)));
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.concat" })()))
+/* end def self.concat */,
+/* def self.join */ (typeof self.join === 'undefined' ?
+  (self.join = (function (a, s) {
+  return a.join(s);
+})) :
+  ((function () { throw "Can't define variable that is already defined: self.join" })()))
+/* end def self.join */,
 (function () {
   var underscore_methods, each, array_qmark_;
 return underscore_methods = { "each" : null,
 "map" : null,
-"reduce" : [[["symbol", "quote"], ["symbol", "reduce"]], [["symbol", "quote"], ["symbol", "foldl"]]],
-"reduceRight" : [[["symbol", "quote"], ["symbol", "reduce-right"]], [["symbol", "quote"], ["symbol", "foldr"]]],
+"reduce" : [["symbol", "reduce"], ["symbol", "foldl"]],
+"reduceRight" : [["symbol", "reduce-right"], ["symbol", "foldr"]],
 "find" : null,
 "filter" : null,
 "reject" : null,
@@ -199,16 +282,16 @@ return underscore_methods = { "each" : null,
 "include" : null,
 "invoke" : null,
 "pluck" : null,
-"sortBy" : [[["symbol", "quote"], ["symbol", "sort-by"]]],
-"groupBy" : [[["symbol", "quote"], ["symbol", "group-by"]]],
-"sortedIndex" : [[["symbol", "quote"], ["symbol", "sorted-index"]]],
+"sortBy" : [["symbol", "sort-by"]],
+"groupBy" : [["symbol", "group-by"]],
+"sortedIndex" : [["symbol", "sorted-index"]],
 "suffle" : null,
-"toArray" : [[["symbol", "quote"], ["symbol", "->array"]]],
+"toArray" : [["symbol", "->array"]],
 "size" : null,
-"first" : [[["symbol", "quote"], ["symbol", "first"]], [["symbol", "quote"], ["symbol", "head"]]],
-"initial" : [[["symbol", "quote"], ["symbol", "initial"]], [["symbol", "quote"], ["symbol", "init"]]],
+"first" : [["symbol", "first"], ["symbol", "head"]],
+"initial" : [["symbol", "initial"], ["symbol", "init"]],
 "last" : null,
-"rest" : [[["symbol", "quote"], ["symbol", "rest"]], [["symbol", "quote"], ["symbol", "tail"]]],
+"rest" : [["symbol", "rest"], ["symbol", "tail"]],
 "compact" : null,
 "flatten" : null,
 "without" : null,
@@ -217,11 +300,11 @@ return underscore_methods = { "each" : null,
 "difference" : null,
 "uniq" : null,
 "zip" : null,
-"indexOf" : [[["symbol", "quote"], ["symbol", "index-of"]]],
-"lastIndexOf" : [[["symbol", "quote"], ["symbol", "last-index-of"]]],
+"indexOf" : [["symbol", "index-of"]],
+"lastIndexOf" : [["symbol", "last-index-of"]],
 "range" : null,
 "bind" : null,
-"bindAll" : [[["symbol", "quote"], ["symbol", "bind-all"]]],
+"bindAll" : [["symbol", "bind-all"]],
 "memoize" : null,
 "delay" : null,
 "defer" : null,
@@ -238,28 +321,28 @@ return underscore_methods = { "each" : null,
 "defaults" : null,
 "clone" : null,
 "tap" : null,
-"isEqual" : [[["symbol", "quote"], ["symbol", "equal?"]], [["symbol", "quote"], ["symbol", "="]]],
-"isEmpty" : [[["symbol", "quote"], ["symbol", "empty?"]]],
-"isElement" : [[["symbol", "quote"], ["symbol", "element?"]]],
-"isArray" : [[["symbol", "quote"], ["symbol", "array?"]]],
-"isArguments" : [[["symbol", "quote"], ["symbol", "arguments?"]]],
-"isFunction" : [[["symbol", "quote"], ["symbol", "function?"]]],
-"isNumber" : [[["symbol", "quote"], ["symbol", "number?"]]],
-"isBoolean" : [[["symbol", "quote"], ["symbol", "boolean?"]], [["symbol", "quote"], ["symbol", "bool?"]]],
-"isDate" : [[["symbol", "quote"], ["symbol", "date?"]]],
-"isRegExp" : [[["symbol", "quote"], ["symbol", "regex?"]]],
-"isNaN" : [[["symbol", "quote"], ["symbol", "nan?"]]],
-"isNull" : [[["symbol", "quote"], ["symbol", "nil?"]]],
-"isUndefined" : [[["symbol", "quote"], ["symbol", "undefined?"]]],
+"isEqual" : [["symbol", "equal?"], ["symbol", "="]],
+"isEmpty" : [["symbol", "empty?"]],
+"isElement" : [["symbol", "element?"]],
+"isArray" : [["symbol", "array?"]],
+"isArguments" : [["symbol", "arguments?"]],
+"isFunction" : [["symbol", "function?"]],
+"isNumber" : [["symbol", "number?"]],
+"isBoolean" : [["symbol", "boolean?"], ["symbol", "bool?"]],
+"isDate" : [["symbol", "date?"]],
+"isRegExp" : [["symbol", "regex?"]],
+"isNaN" : [["symbol", "nan?"]],
+"isNull" : [["symbol", "nil?"]],
+"isUndefined" : [["symbol", "undefined?"]],
 "identity" : null,
 "times" : null,
-"uniqueId" : [[["symbol", "quote"], ["symbol", "unique-id"]]],
+"uniqueId" : [["symbol", "unique-id"]],
 "escape" : null,
 "template" : null,
 "chain" : null,
 "value" : null }, each = _.each, array_qmark_ = _["isArray"], each(underscore_methods, (function (v, k) {
-  var cond_16l4kevp2_3bpk0ga;
-return /* if */ ((cond_16l4kevp2_3bpk0ga = array_qmark_(v)) !== false && cond_16l4kevp2_3bpk0ga !== null && cond_16l4kevp2_3bpk0ga !== '' ?
+  var cond_16l4qtkhu_6fo30km;
+return /* if */ ((cond_16l4qtkhu_6fo30km = array_qmark_(v)) !== false && cond_16l4qtkhu_6fo30km !== null && cond_16l4qtkhu_6fo30km !== '' ?
   each(v, (function (i, v) {
   return /* def self.v */ (typeof self.v === 'undefined' ?
   (self.v = _.k) :

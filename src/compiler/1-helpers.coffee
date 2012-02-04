@@ -96,6 +96,7 @@ is_symbol = (s) -> s?[0] is "symbol"
 
 to_symbol = (s) -> ['symbol', s]
 to_quoted = (x) -> [(to_symbol "quote"), x]
+to_list = (ls) -> [(to_symbol "list"), ls...]
 
 quote_escape = (x) ->
   ret = x

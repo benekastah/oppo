@@ -15,7 +15,6 @@ $.domReady ->
         if typeof result isnt "string"
           throw ""
       catch e
-        console.trace()
         result = evald
     catch e then result = e
     

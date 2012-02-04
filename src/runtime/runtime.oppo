@@ -3,18 +3,18 @@
   (def global (if (defined? window) window global))
   
   ;; Set up some macros
-  (eval `(do))
+  ;(eval `(do))
   
   (defmacro defn (nm argslist ...body)
     `(def ~nm (lambda ~argslist ...body)))
 
-  (defn print (...items)
-    (apply (. console 'log) items)
-    (last items))
+  ; (defn print (...items)
+  ;   (apply (. console 'log) items)
+  ;   (last items))
 
   ;; Misc macros and functions
-  (defn eval (sexp)
-    ((. oppo 'eval) sexp))
+  ; (defn eval (sexp)
+  ;   ((. oppo 'eval) sexp))
   
   (defn read (s)
     ((. oppo 'read) s))
