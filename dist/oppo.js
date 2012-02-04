@@ -25,10 +25,10 @@ var parser = function() {
         this.$ = null;
         break;
       case 16:
-        this.$ = [["symbol", "quote"], $$[$0 - 1]];
+        this.$ = [["symbol", "list"]].concat($$[$0 - 1]);
         break;
       case 17:
-        this.$ = [["symbol", "quote"], []];
+        this.$ = [["symbol", "list"]];
         break;
       case 18:
         this.$ = [["symbol", "js-map"]].concat($$[$0 - 1]);
@@ -505,8 +505,8 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   }
 }
 ;(function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_raw_text, initialize_var_groups, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, last_var_group, make_error, math_fn, mc_expand, mc_expand_1, new_var_group, objectSet, oppo, quote_all, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, 
-  to_symbol, trim, _is, _ref, _ref2, _ref3, __hasProp = Object.prototype.hasOwnProperty, __slice = Array.prototype.slice, __indexOf = Array.prototype.indexOf || function(item) {
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_raw_text, initialize_var_groups, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, last_var_group, make_error, math_fn, new_var_group, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_quoted, to_symbol, trim, _is, 
+  _ref, _ref2, _ref3, __hasProp = Object.prototype.hasOwnProperty, __slice = Array.prototype.slice, __indexOf = Array.prototype.indexOf || function(item) {
     for(var i = 0, l = this.length;i < l;i++) {
       if(i in this && this[i] === item) {
         return i
@@ -547,6 +547,9 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   };
   to_symbol = function(s) {
     return["symbol", s]
+  };
+  to_quoted = function(x) {
+    return[to_symbol("quote"), x]
   };
   quote_escape = function(x) {
     var ret;
@@ -868,6 +871,12 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       return ret = "(function (" + sym + ") {\n  return " + compile(add_ons) + ";\n})(" + ret + ")"
     }
   };
+  compiler.list = function() {
+    var c_sexp, sexp;
+    sexp = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+    c_sexp = _.map(sexp, compile);
+    return"[" + c_sexp.join(", ") + "]"
+  };
   compiler[to_js_symbol(".")] = function() {
     var base, c_base, e_name, name, names, ret, _i, _len;
     base = arguments[0], names = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
@@ -965,23 +974,26 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     return"new " + c_cls + "(" + c_args.join(", ") + ")"
   };
   compiler.quote = function(sexp) {
-    var q_sexp, ret, s_sexp;
+    var c_sexp, q_sexp, ret, s_sexp;
     sexp = quote_escape(sexp);
-    if(!(sexp != null)) {
-      null
-    }
+    ret = !(sexp != null) ? null : void 0;
     if(_.isBoolean(sexp)) {
       return sexp
     }else {
-      if(_.isArray(sexp)) {
-        q_sexp = _.map(sexp, compile);
-        return ret = "[" + q_sexp.join(", ") + "]"
+      if(is_symbol(sexp)) {
+        return compile([to_symbol("list")].concat(__slice.call(sexp)))
       }else {
-        if(_.isNumber(sexp)) {
-          return ret = sexp
+        if(_.isArray(sexp)) {
+          q_sexp = _.map(sexp, to_quoted);
+          c_sexp = _.map(q_sexp, compile);
+          return"[" + c_sexp.join(", ") + "]"
         }else {
-          s_sexp = "" + sexp;
-          return ret = '"' + s_sexp.replace(/"/g, '\\"') + '"'
+          if(_.isNumber(sexp)) {
+            return sexp
+          }else {
+            s_sexp = "" + sexp;
+            return'"' + s_sexp.replace(/"/g, '\\"') + '"'
+          }
         }
       }
     }
@@ -1198,70 +1210,63 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     c_err = compile(err);
     return"(function () { throw " + c_err + " })()"
   };
-  quote_all = function(list) {
-    var ret, _quote;
-    _quote = function(item) {
-      return[to_symbol("quote"), item]
+  (function() {
+    var mc_expand, mc_expand_1, quote_all;
+    quote_all = function(ls) {
+      return[to_symbol("quote")]
     };
-    return ret = _quote(_.map(list, function(item) {
-      if(_.isArray(item) && !is_symbol(item)) {
-        return quote_all(item)
-      }else {
-        return _quote(item)
-      }
-    }))
-  };
-  mc_expand = false;
-  mc_expand_1 = false;
-  compiler.defmacro = function() {
-    var argnames, c_name, name, template;
-    name = arguments[0], argnames = arguments[1], template = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
-    if(argnames == null) {
-      argnames = []
-    }
-    c_name = compile(name);
-    objectSet(compiler, c_name, function() {
-      var args, evald, js, q_args;
-      args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-      q_args = quote_all(args);
-      js = oppo.compile([[["symbol", "lambda"], argnames].concat(__slice.call(template))].concat(__slice.call(q_args[1])));
-      evald = eval(js);
-      if(!mc_expand && !mc_expand_1) {
-        return oppo.compile(evald)
-      }else {
-        mc_expand_1 = false;
-        return evald
-      }
-    });
-    return"/* defmacro " + c_name + " */ null"
-  };
-  compiler.macroexpand = function(sexp) {
-    var old_mc_expand, ret;
-    old_mc_expand = mc_expand;
-    mc_expand = true;
-    ret = compile(sexp);
-    ret = compile(quote_all(ret));
-    mc_expand = old_mc_expand;
-    return ret
-  };
-  compiler.macroexpand_1 = function(sexp) {
-    var ret;
-    mc_expand_1 = true;
-    ret = compile(sexp);
-    ret = compile(quote_all(ret));
+    mc_expand = false;
     mc_expand_1 = false;
-    return ret
-  };
-  compiler.syntax_quote = function(list) {
-    var code, ident, q_list, restructured_list, ret, sym;
-    sym = to_symbol;
-    ident = gensym("list");
-    restructured_list = restructure_list(list, ident);
-    restructured_list[1] = [sym("js-eval"), restructured_list[1]];
-    q_list = quote_all(list);
-    code = [[sym("lambda"), [sym(ident)], [sym("var")].concat(__slice.call(restructured_list))], q_list];
-    return ret = compile(code)
-  };
+    compiler.defmacro = function() {
+      var argnames, c_name, name, template;
+      name = arguments[0], argnames = arguments[1], template = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
+      if(argnames == null) {
+        argnames = []
+      }
+      c_name = compile(name);
+      objectSet(compiler, c_name, function() {
+        var args, evald, js, q_args;
+        args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+        q_args = quote_all(args);
+        js = oppo.compile([[["symbol", "lambda"], argnames].concat(__slice.call(template))].concat(__slice.call(q_args[1])));
+        evald = eval(js);
+        if(!mc_expand && !mc_expand_1) {
+          return oppo.compile(evald)
+        }else {
+          mc_expand_1 = false;
+          return evald
+        }
+      });
+      return"/* defmacro " + c_name + " */ null"
+    };
+    compiler.macroexpand = function(sexp) {
+      var old_mc_expand, ret;
+      old_mc_expand = mc_expand;
+      mc_expand = true;
+      ret = compile(sexp);
+      ret = compile(quote_all(ret));
+      mc_expand = old_mc_expand;
+      return ret
+    };
+    compiler.macroexpand_1 = function(sexp) {
+      var ret;
+      mc_expand_1 = true;
+      ret = compile(sexp);
+      ret = compile(quote_all(ret));
+      mc_expand_1 = false;
+      return ret
+    };
+    return compiler.syntax_quote = function(list) {
+      var code, ident, q_list, restructured_list, ret, sym;
+      sym = to_symbol;
+      ident = gensym("list");
+      restructured_list = restructure_list(list, ident);
+      restructured_list[1] = [sym("js-eval"), restructured_list[1]];
+      q_list = quote_all(list);
+      code = [[sym("lambda"), [sym(ident)], [sym("var")].concat(__slice.call(restructured_list))], q_list];
+      return ret = compile(code)
+    }
+  })();
   compiler.str = function() {
     var c_strs, first_is_str, initial_str, strs;
     strs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];

@@ -88,9 +88,9 @@ callable_list
 
 quoted_list
   : '[' element_list ']'
-    { $$ = [["symbol", "quote"], $2]; }
+    { $$ = [["symbol", "list"]].concat($2); }
   | '[' ']'
-    { $$ = [["symbol", "quote"], []]; }
+    { $$ = [["symbol", "list"]]; }
   ;
   
 js_map

@@ -37,6 +37,10 @@ compiler.js_map = (sexp...) ->
     })(#{ret})
     """
     
+compiler.list = (sexp...) ->
+  c_sexp = _.map sexp, compile
+  "[#{c_sexp.join ', '}]"
+    
 ## Member access
 compiler[to_js_symbol "."] = (base, names...) ->
   c_base = compile base

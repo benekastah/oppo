@@ -1,17 +1,20 @@
 compiler.quote = (sexp) ->
   sexp = quote_escape sexp
-  if not sexp?
+  ret = if not sexp?
     null
   if _.isBoolean sexp
     sexp
+  else if is_symbol sexp
+    compile [(to_symbol "list"), sexp...]
   else if _.isArray sexp
-    q_sexp = _.map sexp, compile
-    ret = "[#{q_sexp.join ', '}]"
+    q_sexp = _.map sexp, to_quoted
+    c_sexp = _.map q_sexp, compile
+    "[#{c_sexp.join ', '}]"
   else if _.isNumber sexp
-    ret = sexp
+    sexp
   else
     s_sexp = "#{sexp}"
-    ret = "\"#{s_sexp.replace /"/g, '\\"'}\""
+    "\"#{s_sexp.replace /"/g, '\\"'}\""
 
 compiler.symbol = (sym) ->
   e_sym = eval compile [(to_symbol "str"), sym]

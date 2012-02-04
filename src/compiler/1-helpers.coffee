@@ -95,6 +95,8 @@ is_string = (s) -> (_.isString s) and (/^"/.test s) and /"$/.test s
 is_symbol = (s) -> s?[0] is "symbol"
 
 to_symbol = (s) -> ['symbol', s]
+to_quoted = (x) -> [(to_symbol "quote"), x]
+
 quote_escape = (x) ->
   ret = x
   if _.isString x
