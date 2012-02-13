@@ -1,4 +1,4 @@
-compiler.js_map = (sexp...) ->
+DEFMACRO "js-map", (sexp...) ->
   sym = gensym "obj"
   add_ons = []
   item_added = false
@@ -36,13 +36,13 @@ compiler.js_map = (sexp...) ->
       return #{compile add_ons};
     })(#{ret})
     """
-    
-compiler.list = (sexp...) ->
+
+DEFMACRO 'list', (sexp...) ->
   c_sexp = _.map sexp, compile
   "[#{c_sexp.join ', '}]"
     
 ## Member access
-compiler[to_js_symbol "."] = (base, names...) ->
+DEFMACRO '.', (base, names...) ->
   c_base = compile base
   ret = c_base
   for name in names

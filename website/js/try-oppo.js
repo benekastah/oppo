@@ -1,3 +1,4 @@
+(function() {
 
   $.domReady(function() {
     var $js, $oppo, $result, cache, compile, compile_and_compute_result, compute_result, oppo_code_cache_key, timeout;
@@ -15,7 +16,6 @@
           result = JSON.stringify(evald);
           if (typeof result !== "string") throw "";
         } catch (e) {
-          console.trace();
           result = evald;
         }
       } catch (e) {
@@ -34,9 +34,8 @@
       cache.set(oppo_code_cache_key, code);
       try {
         ast = oppo.read(code);
-        js = oppo.compile(ast, true);
+        js = oppo.compile(ast);
       } catch (e) {
-        console.trace();
         js = "/* " + e + " */";
       }
       return $js.val(js);
@@ -49,3 +48,5 @@
     });
     return $oppo.val(cache.get(oppo_code_cache_key || '')).keyup();
   });
+
+}).call(this);

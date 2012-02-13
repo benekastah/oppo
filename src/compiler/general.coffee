@@ -1,8 +1,8 @@
-compiler.eval = (sexp) ->
+DEFMACRO 'eval', (sexp) ->
   c_sexp = compile sexp
   "eval(oppo.compile(#{c_sexp}))"
 
-compiler.quote = (sexp) ->
+DEFMACRO 'quote', (sexp) ->
   sexp = quote_escape sexp
   ret = if not sexp?
     null
@@ -19,11 +19,11 @@ compiler.quote = (sexp) ->
     s_sexp = "#{sexp}"
     "\"#{s_sexp.replace /"/g, '\\"'}\""
 
-compiler.symbol = (sym) ->
+DEFMACRO 'symbol', (sym) ->
   e_sym = eval compile [(to_symbol "str"), sym]
   compile (to_symbol e_sym)
 
-compiler.js_eval = (js) ->
+DEFMACRO 'js-eval', (js) ->
   c_js = compile js
   if is_string c_js
     e_js = c_js.substr 1, c_js.length - 2
@@ -32,12 +32,12 @@ compiler.js_eval = (js) ->
   else
     ret = "eval(#{c_js})"
 
-compiler[to_js_symbol 'do'] = (body...) ->
+DEFMACRO 'do', (body...) ->
   compiled_body = _.map arguments, compile
   ret = compiled_body.join ',\n'
   "(#{ret})"
 
-compiler[to_js_symbol 'if'] = (test, t, f) ->
+DEFMACRO 'if', (test, t, f) ->
   if arguments.length is 2
     Array::push.call arguments, f
   [c_test, c_t, c_f] = _.map arguments, compile
@@ -50,13 +50,13 @@ compiler[to_js_symbol 'if'] = (test, t, f) ->
   /* end if */
   """
 
-compiler.regex = (body, modifiers) -> "/#{body}/#{modifiers ? ''}"
+DEFMACRO 'regex', (body, modifiers) -> "/#{body}/#{modifiers ? ''}"
 
-compiler[to_js_symbol 'undefined?'] = (x) ->
+DEFMACRO 'undefined?', (x) ->
   c_x = compile x
   "(typeof #{c_x} === 'undefined')"
 
-compiler[to_js_symbol 'defined?'] = (x) ->
+DEFMACRO 'defined?', (x) ->
   c_x = compile x
   "(typeof #{c_x} !== 'undefined')"
 
@@ -66,37 +66,43 @@ MODULES
 ###
 do ->
   def = null
+  defmacro = null
   set = null
-  make_module_def = (self_name) ->
-    def = compiler.def
-    compiler.def = (name, value) ->
+  
+  adjust_environment = (module_name, self_name) ->
+    def = GETMACRO 'def'
+    DEFMACRO 'def', (name, value) ->
       _name = if is_symbol name
         [(to_symbol "."), self_name, [(to_symbol 'quote'), name]]
       else
         name
         
       def _name, value
-    
-  make_module_set = (self_name) ->
-    set = compiler[to_js_symbol "set!"]
-    compiler[to_js_symbol "set!"] = (name, value) ->
+      
+    defmacro = GETMACRO 'defmacro'
+    DEFMACRO 'defmacro', (name, rest...) ->
+      _name = if is_symbol name
+        [(to_symbol "."), module_name, [(to_symbol 'quote'), name]]
+      else
+        name
+        
+      defmacro name, rest...
+      
+    set = GETMACRO 'set!'
+    DEFMACRO 'set!', (name, value) ->
       if _.isEqual name, self_name
         throw "Can't redefine 'self' in a module."
       else
         set name, value
-    
-  restore_normal_def = ->
-    ret = compiler.def = def
-    def = null
-    ret
-    
-  restore_normal_set = ->
-    ret = compiler[to_js_symbol "set!"] = set
-    set = null
-    ret
   
-  compiler.defmodule = (name, deps=[], body...) ->
-    new_var_group()
+  restore_environment = ->
+    DEFMACRO 'def', def
+    DEFMACRO 'defmacro', defmacro
+    DEFMACRO 'set!', set
+    def = defmacro = set = null
+  
+  DEFMACRO 'defmodule', (name, deps=[], body...) ->
+    scope = Scope.make_new()
     r_name = compile get_raw_text name
     r_deps = _.map deps, _.compose compile, get_raw_text
     c_deps = compile [(to_symbol "quote"), r_deps]
@@ -104,19 +110,18 @@ do ->
     
     self_name = to_symbol "self"
     define_self = compile [(to_symbol "var"), self_name, [(to_symbol 'js-eval'), 'this']]
-    make_module_def self_name
-    make_module_set self_name
+    adjust_environment name, self_name
+    # All the body must be compiled after this point
     
     body = if body.length then body else [null]
     c_body = compile [(to_symbol 'do'), body...]
     
-    current_var_group = last_var_group()
+    # No compiling after this point
+    current_var_group = get_keys scope
     var_smt = "var #{current_var_group.join ', '};"
     
-    # No compiling after this point
-    end_var_group()
-    restore_normal_def()
-    restore_normal_set()
+    Scope.end_current()
+    restore_environment()
     
     ret = """
     oppo.module(#{r_name}, #{c_deps}, function (#{args.join ', '}) {
@@ -127,7 +132,7 @@ do ->
     })
     """
   
-  compiler.require = (names...) ->
+  DEFMACRO 'require', (names...) ->
     c_names = for name in names
       r_name = get_raw_text name
       "oppo.module.require(#{compile r_name})"
@@ -136,49 +141,39 @@ do ->
 ###
 VARIABLES
 ###
-compiler.gensym = ->
+DEFMACRO 'gensym', ->
   sym = gensym arguments...
   ret = compile [(to_symbol 'quote'), (to_symbol sym)]
 
-compiler[to_js_symbol 'var'] = (name, value, current_group=last_var_group()) ->
+DEFMACRO 'var', (name, value) ->
   c_name = compile name
   c_value = compile value
-  raiseDefError c_name if c_name in current_group
-  current_group.push c_name
+  Scope.def c_name, "variable"
   "#{c_name} = #{c_value}"
   
-compiler.def = (name, value) ->
-  _var = compiler[to_js_symbol 'var']
-  first_group = first_var_group()
+DEFMACRO 'def', (name, value) ->
+  _var = GETMACRO 'var'
+  first_group = first_scope()
   c_name = compile name
   if c_name is (to_js_symbol c_name)
     ret = _var name, value, first_group
   else
-    c_value = compile value
-    err = read_compile "(throw \"Can't define variable that is already defined: #{c_name}\")"
-    ret = """
-    /* def #{c_name} */ (typeof #{c_name} === 'undefined' ?
-      (#{c_name} = #{c_value}) :
-      #{err})
-    /* end def #{c_name} */
-    """
+    raise "DefError", "Can't define complex symbol: #{c_name}"
 
-compiler[to_js_symbol 'set!'] = (name, value) ->
+DEFMACRO 'set!', (name, value) ->
   c_name = compile name
   c_value = compile value
-  err = read_compile "(throw \"Can't set variable that has not been defined: #{c_name}\")"
-  ret = """
-  /* set! #{c_name} */ (typeof #{c_name} !== 'undefined' ?
-    (#{c_name} = #{c_value}) :
-    #{err})
-  /* end set! #{c_name} */
-  """
+  if c_name is (to_js_symbol c_name)
+    Scope.set c_name, "variable"
+    ret = "#{c_name} = #{c_value}"
+  else
+    raise "SetError", "Can't set complex symbol: #{c_name}"
 
 ###
 MATH
 ###
 math_fn = (fn, symbol) ->
-  compiler[to_js_symbol fn] = (nums...) ->
+  DEFMACRO fn, (nums...) ->
     c_nums = _.map nums, compile
     c_nums.join " #{symbol or fn} "
 
@@ -192,7 +187,7 @@ math_fn "%"
 BINARY
 ###
 binary_fn = (fn, symbol) ->
-  compiler[to_js_symbol fn] = (nums...) ->
+  DEFMACRO fn, (nums...) ->
     c_nums = _.map nums, compile
     ret = c_nums.join " #{symbol or fn} "
     "(#{ret})"
@@ -204,7 +199,7 @@ binary_fn "&&"
 COMPARISONS
 ###
 compare_fn = (fn, symbol) ->
-  compiler[to_js_symbol fn] = (items...) ->
+  DEFMACRO fn, (items...) ->
     c_items = _.map items, compile
     ret = []
     last = c_items[0]
@@ -226,6 +221,6 @@ compare_fn "not===", "!=="
 ###
 ERRORS
 ###
-compiler[to_js_symbol 'throw'] = (err) ->
+DEFMACRO 'throw', (err) ->
   c_err = compile err
   "(function () { throw #{c_err} })()"

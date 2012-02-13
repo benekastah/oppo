@@ -781,13 +781,10 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     return parser.parse(string)
   };
   began = false;
-  compile = oppo.compile = function(sexp, init_vars) {
-    var args, fn, macro, ret, top_level, vars;
+  oppo.compile = function(sexp, with_oppo_core) {
+    var args, corename, fn, macro, ret, top_level, vars;
     if(sexp == null) {
       sexp = null
-    }
-    if(init_vars == null) {
-      init_vars = false
     }
     if(!began) {
       top_level = began = true
@@ -801,19 +798,27 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
         if(_.isString(sexp)) {
           ret = '"' + sexp.replace(/\n/g, "\\n") + '"'
         }else {
-          if(_.isArray(sexp)) {
-            fn = oppo.compile(_.first(sexp));
-            args = sexp.slice(1);
-            if(macro = compiler[fn]) {
-              ret = macro.apply(null, args)
-            }else {
-              ret = compiler.call.apply(compiler, [[to_symbol("js-eval"), fn]].concat(__slice.call(args)))
-            }
+          if(_.isFunction(sexp)) {
+            ret = "" + sexp
           }else {
-            raiseParseError(sexp)
+            if(_.isArray(sexp)) {
+              fn = compile(_.first(sexp));
+              args = sexp.slice(1);
+              if(macro = compiler[fn]) {
+                ret = macro.apply(null, args)
+              }else {
+                ret = compiler.call.apply(compiler, [[to_symbol("js-eval"), fn]].concat(__slice.call(args)))
+              }
+            }else {
+              raiseParseError(sexp)
+            }
           }
         }
       }
+    }
+    if(with_oppo_core !== false) {
+      corename = "oppo/core";
+      ret = "with (oppo.module.require('" + corename + "')) {\n  " + ret + "\n}"
     }
     if(top_level || !began) {
       began = false;
@@ -824,8 +829,11 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     }
     return ret
   };
-  oppo.eval = _.compose(_.bind(global.eval, global), oppo.compile);
-  read_compile = _.compose(oppo.compile, oppo.read);
+  compile = function(sexp) {
+    return oppo.compile(sexp, false)
+  };
+  oppo.eval = _.compose(_.bind(global.eval, global), compile);
+  read_compile = _.compose(compile, oppo.read);
   compiler.js_map = function() {
     var add_ons, c_value, e_key, i, item, item_added, last, ret, sexp, sym, _len;
     sexp = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
@@ -1052,18 +1060,24 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     return"(typeof " + c_x + " !== 'undefined')"
   };
   (function() {
-    var def, make_module_def, make_module_set, restore_normal_def, restore_normal_set, set;
+    var adjust_environment, def, defmacro, restore_environment, set;
     def = null;
+    defmacro = null;
     set = null;
-    make_module_def = function(self_name) {
+    adjust_environment = function(module_name, self_name) {
       def = compiler.def;
-      return compiler.def = function(name, value) {
+      compiler.def = function(name, value) {
         var _name;
         _name = is_symbol(name) ? [to_symbol("."), self_name, [to_symbol("quote"), name]] : name;
         return def(_name, value)
-      }
-    };
-    make_module_set = function(self_name) {
+      };
+      defmacro = compiler.defmacro;
+      compiler.defmacro = function() {
+        var name, rest, _name;
+        name = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+        _name = is_symbol(name) ? [to_symbol("."), module_name, [to_symbol("quote"), name]] : name;
+        return defmacro.apply(null, [name].concat(__slice.call(rest)))
+      };
       set = compiler[to_js_symbol("set!")];
       return compiler[to_js_symbol("set!")] = function(name, value) {
         if(_.isEqual(name, self_name)) {
@@ -1073,17 +1087,11 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
         }
       }
     };
-    restore_normal_def = function() {
-      var ret;
-      ret = compiler.def = def;
-      def = null;
-      return ret
-    };
-    restore_normal_set = function() {
-      var ret;
-      ret = compiler[to_js_symbol("set!")] = set;
-      set = null;
-      return ret
+    restore_environment = function() {
+      var _ref4, _ref5, _ref6;
+      _ref4 = [def], compiler.def = _ref4[0], def = _ref4[1];
+      _ref5 = [defmacro], compiler.defmacro = _ref5[0], defmacro = _ref5[1];
+      return _ref6 = [set], compiler[to_js_symbol("set!")] = _ref6[0], set = _ref6[1], _ref6
     };
     compiler.defmodule = function() {
       var args, body, c_body, c_deps, current_var_group, define_self, deps, name, r_deps, r_name, ret, self_name, var_smt;
@@ -1098,15 +1106,13 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       args = _.map(deps, compile);
       self_name = to_symbol("self");
       define_self = compile([to_symbol("var"), self_name, [to_symbol("js-eval"), "this"]]);
-      make_module_def(self_name);
-      make_module_set(self_name);
+      adjust_environment(name, self_name);
       body = body.length ? body : [null];
       c_body = compile([to_symbol("do")].concat(__slice.call(body)));
       current_var_group = last_var_group();
       var_smt = "var " + current_var_group.join(", ") + ";";
       end_var_group();
-      restore_normal_def();
-      restore_normal_set();
+      restore_environment();
       return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + args.join(", ") + ") {\n  " + var_smt + "\n  with (" + define_self + ") {\n    return " + c_body + ";\n  }\n})"
     };
     return compiler.require = function() {
@@ -1228,11 +1234,10 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
         argnames = []
       }
       c_name = compile(name);
-      objectSet(compiler, c_name, function() {
-        var args, evald, js, q_args, sexp;
-        args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-        q_args = _.map(args, to_quoted);
-        sexp = [[to_symbol("lambda"), argnames].concat(__slice.call(template))].concat(__slice.call(q_args));
+      compiler[c_name] = function() {
+        var evald, js, q_args, sexp;
+        q_args = _.map(arguments, to_quoted);
+        sexp = [[to_symbol("lambda"), argnames].concat(template)].concat(q_args);
         js = oppo.compile(sexp);
         evald = eval(js);
         if(!mc_expand && !mc_expand_1) {
@@ -1241,8 +1246,8 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
           mc_expand_1 = false;
           return evald
         }
-      });
-      return"/* defmacro " + c_name + " */ null"
+      };
+      return compile([to_symbol("def"), name, [to_symbol("js-eval"), "(function () {\n  return eval(oppo.compiler." + c_name + ".apply(this, arguments));\n})"]])
     };
     compiler.macroexpand = function(sexp) {
       var old_mc_expand, ret;

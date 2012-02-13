@@ -1,6 +1,18 @@
 global ?= window
 _ ?= require 'underscore'
 
+create_object = do ->
+  if Object.create
+    (o) -> Object.create o
+  else
+    (o) ->
+      class Object
+      Object:: = o
+      new Object
+      
+get_keys = Object.keys or (o) ->
+  for own prop of o then prop
+
 JS_KEYWORDS = [
   "break"
   "class"
@@ -173,39 +185,50 @@ raise = -> throw make_error arguments...
 raiseParseError = (expr) -> raise "ParseError", "Can't parse expression: #{expr}"
 
 raiseDefError = (name) -> raise "DefError", "Can't define previously defined value: #{name}"
+raiseSetError = (name) -> raise "SetError", "Can't set value that has not been defined: #{name}"
   
 ###
-Vars
-###
-# Define our variables to export from anonymous function scope
-[new_var_group, first_var_group, last_var_group, end_var_group, end_final_var_group, initialize_var_groups] = []
+Scope management
+### 
+Scope = {}
 do ->
-  # initial array in var_groups is for the main scope
-  var_groups = null
-  initialize_var_groups = ->
-    # console.log "initializing var groups."
-    var_groups = [ [] ]
-  initialize_var_groups()
+  scopes = [{}]
   
-  new_var_group = ->
-    var_groups.push (ret = [])
-    # console.log "Created var group; #{var_groups.length} total."
-    ret
-  first_var_group = -> var_groups[0]
-  last_var_group = -> _.last var_groups
+  Scope.def = (name, type, scope = Scope.current()) ->
+    raiseDefError name if scope.hasOwnProperty name
+    scope[name] = type
+    
+  Scope.set = (name, type) ->
+    index = scopes.length
+    while index
+      scope = scopes[--index]
+      found = scope.hasOwnProperty name
+      break if found
+    raiseSetError name if not found
+    scope[name] = type
   
-  end_var_group = ->
-    ret = var_groups.pop()
-    # console.log "Ended var group;   #{var_groups.length} remaining."
+  Scope.type = (name) ->
+    scope = Scope.current()
+    scope[name].toString()
+  
+  Scope.global = _.bind _.first, _, scopes
+  Scope.current = _.bind _.last, _, scopes
+  
+  Scope.make_new = ->
+    scope = Scope.current()
+    scopes.push (ret = create_object scope)
     ret
     
-  end_final_var_group = ->
-    if var_groups.length isnt 1
-      raise "VarGroupsError", "Expecting 1 final var group, got #{var_groups.length} instead"
-    # console.log "Ending final var group."
-    ret = end_var_group()
-    initialize_var_groups()
+  Scope.end_current = ->
+    scopes.pop()
+    
+  Scope.end_final = ->
+    if  scopes.length isnt 1
+      raise "VarGroupsError", "Expecting 1 final scope, got #{scopes.length} instead"
+    ret = Scope.end_current
+    scopes.push {}
     ret
+    
   
   
 ###

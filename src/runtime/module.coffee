@@ -15,7 +15,8 @@ module_get = (name) ->
   for item in path
     value = value?[item]
     if not value?
-      module_error "Undefined module: #{name}"
+      console.warn "Trying to get undefined module: #{name}"
+      {}
   value
   
 module_set = (name, value) ->

@@ -1,4 +1,4 @@
-compiler.str = (strs...) ->
+DEFMACRO 'str', (strs...) ->
   first_is_str = null
   
   if strs.length is 0
@@ -14,7 +14,7 @@ compiler.str = (strs...) ->
   initial_str = if first_is_str then '' else '"" + '
   "#{initial_str}#{c_strs.join ' + '}"
   
-compiler.keyword = (key) ->
+DEFMACRO 'keyword', (key) ->
   if (is_quoted key) and (is_symbol (e_key = oppo.eval key))
     compile e_key[1]
   else if _.isString key

@@ -118,11 +118,6 @@ task "build:runtime", "Build oppo runtime", (options) ->
         
         fs.readFile "src/runtime/runtime.oppo", "utf8", (err, code) ->
           if err then throw err
-          # code = code.replace /\\/g, "\\\\"
-          # code = code.replace /'/g, "\\'"
-          # code = code.split "\n"
-          # code = for item in code
-          #   "'#{item}\\n'"
           file_contents = """
           (function () {
             var oppoString, code, result, oppo;
@@ -134,7 +129,7 @@ task "build:runtime", "Build oppo runtime", (options) ->
               
             #{file_contents}
               
-            #{oppo.compile oppo.read code}
+            #{oppo.compile (oppo.read code), false}
           })();
           """
         

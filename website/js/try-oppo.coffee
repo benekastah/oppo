@@ -30,9 +30,8 @@ $.domReady ->
     cache.set oppo_code_cache_key, code
     try
       ast = oppo.read code
-      js = oppo.compile ast, true
+      js = oppo.compile ast
     catch e
-      console.trace()
       js = "/* #{e} */"
     $js.val js
   

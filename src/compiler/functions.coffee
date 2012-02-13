@@ -16,13 +16,15 @@ do ->
     
     [args or [], body or []]
 
-  compiler.lambda = (args, body...) ->
-    new_var_group()
+  DEFMACRO 'lambda', (args, body...) ->
+    scope = Scope.make_new()
     [args, argsbody] = get_args args
     body = argsbody.concat body
       
     body = _.map body, compile
-    vars = end_var_group()
+    Scope.end_current()
+    
+    vars = get_keys scope
     var_stmt = if vars.length then "var #{vars.join ', '};\n" else ''
     ret = """
     (function (#{args.join ", "}) {
@@ -30,14 +32,14 @@ do ->
     })
     """
   
-  compiler.fn = compiler.lambda
+  DEFMACRO 'fn', compiler.lambda
   
-compiler.call = (fn, args...) ->
+DEFMACRO 'call', (fn, args...) ->
   c_fn = compile fn
   c_args = _.map args, compile
   "#{c_fn}(#{c_args.join ', '})"
   
-compiler.apply = (fn, args...) ->
+DEFMACRO 'apply', (fn, args...) ->
   c_fn = compile fn
   spl_fn = c_fn.split '.'
   spl_fn.pop()
@@ -45,7 +47,7 @@ compiler.apply = (fn, args...) ->
   c_args = _.map args, compile
   "#{c_fn}.apply(#{fn_base or null}, [].concat(#{c_args.join ', '}))"
   
-compiler[to_js_symbol 'let'] = (names_vals, body...) ->
+DEFMACRO 'let', (names_vals, body...) ->
   vars = []
   i = 0
   len = names_vals.length
@@ -59,7 +61,7 @@ compiler[to_js_symbol 'let'] = (names_vals, body...) ->
   #{compile let_fn}.apply(this, typeof arguments !== "undefined" ? arguments : [])
   """
   
-compiler[to_js_symbol 'new'] = (cls, args...) ->
+DEFMACRO 'new', (cls, args...) ->
   c_cls = compile cls
   c_args = _.map args, compile
   "new #{c_cls}(#{c_args.join ', '})"

@@ -3,8 +3,17 @@ parser ?= require './parser'
 oppo = exports ? (global.oppo = {})
 compiler = oppo.compiler ?= {}
 
+DEFMACRO = (name, fn) ->
+  c_name = compile name
+  Scope.def name, "macro", Scope.global()
+  compiler[c_name] = fn
+  
+GETMACRO = (name) ->
+  c_name = compile name
+  compiler[c_name]
+
 ###
-READER, EVAL, COMPILE
+READ, EVAL, COMPILE
 ###
 read = oppo.read = (string) ->
   # trimmed = trim.call string
@@ -12,11 +21,7 @@ read = oppo.read = (string) ->
   parser.parse string
 
 began = false
-compile = oppo.compile = (sexp = null, init_vars = false) ->
-  # if init_vars
-  #   initialize_var_groups()
-  #   init_vars = false
-  
+oppo.compile = (sexp = null, with_oppo_core) ->
   if not began
     top_level = began = true
   
@@ -26,8 +31,10 @@ compile = oppo.compile = (sexp = null, init_vars = false) ->
     ret = to_js_symbol sexp[1]
   else if _.isString sexp
     ret = "\"#{sexp.replace /\n/g, '\\n'}\""
+  else if _.isFunction sexp
+    ret = "#{sexp}"
   else if _.isArray sexp
-    fn = oppo.compile _.first sexp
+    fn = compile _.first sexp
     args = sexp[1..]
     if (macro = compiler[fn])
       ret = macro args...
@@ -36,9 +43,17 @@ compile = oppo.compile = (sexp = null, init_vars = false) ->
   else
     raiseParseError sexp
     
+  if with_oppo_core isnt false
+    corename = "oppo/core"
+    ret = """
+    with (oppo.module.require('#{corename}')) {
+      #{ret}
+    }
+    """
+    
   if top_level or not began
     began = false
-    vars = end_final_var_group()
+    vars = end_final_scope()
     if vars.length
       ret = """
       var #{vars.join ', '};
@@ -46,7 +61,10 @@ compile = oppo.compile = (sexp = null, init_vars = false) ->
       """
     
   ret
+  
+compile = (sexp) ->
+  oppo.compile sexp, false
     
-oppo.eval = _.compose (_.bind global.eval, global), oppo.compile
+oppo.eval = _.compose (_.bind global.eval, global), compile
 
-read_compile = _.compose oppo.compile, oppo.read
+read_compile = _.compose compile, oppo.read
