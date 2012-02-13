@@ -1,12 +1,42 @@
 (function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, began, binary_fn, compare_fn, compile, compiler, destructure_list, end_final_var_group, end_var_group, first_var_group, gensym, get_raw_text, initialize_var_groups, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, last_var_group, make_error, math_fn, new_var_group, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_list, to_quoted, to_symbol, trim, _is, _ref, _ref2, _ref3,
-    __slice = Array.prototype.slice,
+  var DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_keys, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, make_error, math_fn, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_list, to_quoted, to_symbol, trim, _is, _ref, _ref2,
     __hasProp = Object.prototype.hasOwnProperty,
-    __indexOf = Array.prototype.indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
+    __slice = Array.prototype.slice;
 
   if (typeof global === "undefined" || global === null) global = window;
 
   if (typeof _ === "undefined" || _ === null) _ = require('underscore');
+
+  create_object = (function() {
+    if (Object.create) {
+      return function(o) {
+        return Object.create(o);
+      };
+    } else {
+      return function(o) {
+        var Object;
+        Object = (function() {
+
+          function Object() {}
+
+          return Object;
+
+        })();
+        Object.prototype = o;
+        return new Object;
+      };
+    }
+  })();
+
+  get_keys = Object.keys || function(o) {
+    var prop, _results;
+    _results = [];
+    for (prop in o) {
+      if (!__hasProp.call(o, prop)) continue;
+      _results.push(prop);
+    }
+    return _results;
+  };
 
   JS_KEYWORDS = ["break", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "finally", "for", "function", "if", "implements", "import", "in", "instanceof", "interface", "label", "let", "new", "package", "private", "protected", "public", "return", "static", "switch", "super", "this", "throw", "try", "catch", "typeof", "undefined", "var", "void", "while", "with", "yield"];
 
@@ -195,42 +225,77 @@
     return raise("DefError", "Can't define previously defined value: " + name);
   };
 
+  raiseSetError = function(name) {
+    return raise("SetError", "Can't set value that has not been defined: " + name);
+  };
+
   /*
-  Vars
+  Scope management
   */
 
-  _ref2 = [], new_var_group = _ref2[0], first_var_group = _ref2[1], last_var_group = _ref2[2], end_var_group = _ref2[3], end_final_var_group = _ref2[4], initialize_var_groups = _ref2[5];
+  Scope = {};
 
   (function() {
-    var var_groups;
-    var_groups = null;
-    initialize_var_groups = function() {
-      return var_groups = [[]];
+    var global_scope, initialize_scopes, scopes;
+    global_scope = {};
+    scopes = null;
+    initialize_scopes = function() {
+      return scopes = [create_object(global_scope)];
     };
-    initialize_var_groups();
-    new_var_group = function() {
-      var ret;
-      var_groups.push((ret = []));
-      return ret;
+    initialize_scopes();
+    Scope.top = function() {
+      return _.first(scopes);
     };
-    first_var_group = function() {
-      return var_groups[0];
+    Scope.current = function() {
+      return _.last(scopes);
     };
-    last_var_group = function() {
-      return _.last(var_groups);
+    Scope.def = function(name, type, scope) {
+      if (scope == null) scope = Scope.current();
+      if (scope === "global") scope = global_scope;
+      if (scope.hasOwnProperty(name)) raiseDefError(name);
+      return scope[name] = type;
     };
-    end_var_group = function() {
-      var ret;
-      ret = var_groups.pop();
-      return ret;
-    };
-    return end_final_var_group = function() {
-      var ret;
-      if (var_groups.length !== 1) {
-        raise("VarGroupsError", "Expecting 1 final var group, got " + var_groups.length + " instead");
+    Scope.set = function(name, type) {
+      var found, index, scope;
+      index = scopes.length;
+      while (index) {
+        scope = scopes[--index];
+        found = scope.hasOwnProperty(name);
+        if (found) break;
       }
-      ret = end_var_group();
-      initialize_var_groups();
+      if (!found) raiseSetError(name);
+      return scope[name] = type;
+    };
+    Scope.type = function(name) {
+      var scope;
+      scope = Scope.current();
+      return "" + scope[name];
+    };
+    Scope.make_new = function() {
+      var ret, scope;
+      scope = Scope.current();
+      scopes.push((ret = create_object(scope)));
+      return ret;
+    };
+    Scope.end_current = function(get_vars) {
+      var ret;
+      if (get_vars == null) get_vars = true;
+      ret = scopes.pop();
+      if (get_vars) {
+        return get_keys(ret);
+      } else {
+        return ret;
+      }
+    };
+    return Scope.end_final = function(get_vars) {
+      var len, ret;
+      if (get_vars == null) get_vars = true;
+      len = scopes.length;
+      ret = Scope.end_current(get_vars);
+      initialize_scopes();
+      if (len !== 1) {
+        raise("VarGroupsError", "Expecting 1 final scope, got " + scopes.length + " instead");
+      }
       return ret;
     };
   })();
@@ -324,62 +389,81 @@
 
   oppo = typeof exports !== "undefined" && exports !== null ? exports : (global.oppo = {});
 
-  compiler = (_ref3 = oppo.compiler) != null ? _ref3 : oppo.compiler = {};
+  compiler = (_ref2 = oppo.compiler) != null ? _ref2 : oppo.compiler = {};
+
+  DEFMACRO = function(name, fn) {
+    var c_name;
+    c_name = compile(to_symbol(name));
+    Scope.def(c_name, "macro", "global");
+    return compiler[c_name] = fn;
+  };
+
+  GETMACRO = function(name) {
+    var c_name;
+    c_name = compile(to_symbol(name));
+    return compiler[c_name];
+  };
 
   /*
-  READER, EVAL, COMPILE
+  READ, EVAL, COMPILE
   */
 
   read = oppo.read = function(string) {
     return parser.parse(string);
   };
 
-  began = false;
+  compile = null;
 
-  oppo.compile = function(sexp, with_oppo_core) {
-    var args, corename, fn, macro, ret, top_level, vars;
-    if (sexp == null) sexp = null;
-    if (!began) top_level = began = true;
-    if ((sexp === null || sexp === true || sexp === false) || _.isNumber(sexp)) {
-      ret = "" + sexp;
-    } else if (is_symbol(sexp)) {
-      ret = to_js_symbol(sexp[1]);
-    } else if (_.isString(sexp)) {
-      ret = "\"" + (sexp.replace(/\n/g, '\\n')) + "\"";
-    } else if (_.isFunction(sexp)) {
-      ret = "" + sexp;
-    } else if (_.isArray(sexp)) {
-      fn = compile(_.first(sexp));
-      args = sexp.slice(1);
-      if ((macro = compiler[fn])) {
-        ret = macro.apply(null, args);
+  (function() {
+    var _compile;
+    _compile = function(sexp, top_level, with_oppo_core) {
+      var args, corename, fn, macro, ret, vars;
+      if (sexp == null) sexp = null;
+      if (top_level == null) top_level = false;
+      if (with_oppo_core == null) with_oppo_core = false;
+      if ((sexp === null || sexp === true || sexp === false) || _.isNumber(sexp)) {
+        ret = "" + sexp;
+      } else if (is_symbol(sexp)) {
+        ret = to_js_symbol(sexp[1]);
+      } else if (_.isString(sexp)) {
+        ret = "\"" + (sexp.replace(/\n/g, '\\n')) + "\"";
+      } else if (_.isFunction(sexp)) {
+        ret = "" + sexp;
+      } else if (_.isArray(sexp)) {
+        fn = compile(_.first(sexp));
+        args = sexp.slice(1);
+        if ((Scope.type(fn)) === "macro") {
+          macro = compiler[fn];
+          ret = macro.apply(null, args);
+        } else {
+          ret = compiler.call.apply(compiler, [[to_symbol("js-eval"), fn]].concat(__slice.call(args)));
+        }
       } else {
-        ret = compiler.call.apply(compiler, [[to_symbol("js-eval"), fn]].concat(__slice.call(args)));
+        raiseParseError(sexp);
       }
-    } else {
-      raiseParseError(sexp);
-    }
-    if (with_oppo_core !== false) {
-      corename = "oppo/core";
-      ret = "with (oppo.module.require('" + corename + "')) {\n  " + ret + "\n}";
-    }
-    if (top_level || !began) {
-      began = false;
-      vars = end_final_var_group();
-      if (vars.length) ret = "var " + (vars.join(', ')) + ";\n" + ret + ";";
-    }
-    return ret;
-  };
-
-  compile = function(sexp) {
-    return oppo.compile(sexp, false);
-  };
+      if (with_oppo_core !== false) {
+        corename = "oppo/core";
+        ret = "with (oppo.module.require('" + corename + "')) {\n  " + ret + "\n}";
+      }
+      if (top_level) {
+        vars = Scope.end_final();
+        if (vars.length) ret = "var " + (vars.join(', ')) + ";\n" + ret + ";";
+      }
+      return ret;
+    };
+    compile = function(sexp) {
+      return _compile(sexp, false);
+    };
+    return oppo.compile = function(sexp) {
+      return _compile(sexp, true);
+    };
+  })();
 
   oppo.eval = _.compose(_.bind(global.eval, global), compile);
 
   read_compile = _.compose(compile, oppo.read);
 
-  compiler.js_map = function() {
+  DEFMACRO("js-map", function() {
     var add_ons, c_value, e_key, i, item, item_added, last, ret, sexp, sym, _len;
     sexp = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     sym = gensym("obj");
@@ -422,16 +506,16 @@
       add_ons.push(["symbol", sym]);
       return ret = "(function (" + sym + ") {\n  return " + (compile(add_ons)) + ";\n})(" + ret + ")";
     }
-  };
+  });
 
-  compiler.list = function() {
+  DEFMACRO('list', function() {
     var c_sexp, sexp;
     sexp = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     c_sexp = _.map(sexp, compile);
     return "[" + (c_sexp.join(', ')) + "]";
-  };
+  });
 
-  compiler[to_js_symbol(".")] = function() {
+  DEFMACRO('.', function() {
     var base, c_base, e_name, name, names, ret, _i, _len;
     base = arguments[0], names = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     c_base = compile(base);
@@ -447,7 +531,7 @@
       }
     }
     return ret;
-  };
+  });
 
   (function() {
     var get_args;
@@ -472,29 +556,29 @@
       }
       return [args || [], body || []];
     };
-    compiler.lambda = function() {
-      var args, argsbody, body, ret, var_stmt, vars, _ref4;
+    DEFMACRO('lambda', function() {
+      var args, argsbody, body, ret, scope, var_stmt, vars, _ref3;
       args = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      new_var_group();
-      _ref4 = get_args(args), args = _ref4[0], argsbody = _ref4[1];
+      scope = Scope.make_new();
+      _ref3 = get_args(args), args = _ref3[0], argsbody = _ref3[1];
       body = argsbody.concat(body);
       body = _.map(body, compile);
-      vars = end_var_group();
+      vars = Scope.end_current();
       var_stmt = vars.length ? "var " + (vars.join(', ')) + ";\n" : '';
       return ret = "(function (" + (args.join(", ")) + ") {\n  " + var_stmt + "return " + (body.join(', ')) + ";\n})";
-    };
-    return compiler.fn = compiler.lambda;
+    });
+    return DEFMACRO('fn', compiler.lambda);
   })();
 
-  compiler.call = function() {
+  DEFMACRO('call', function() {
     var args, c_args, c_fn, fn;
     fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     c_fn = compile(fn);
     c_args = _.map(args, compile);
     return "" + c_fn + "(" + (c_args.join(', ')) + ")";
-  };
+  });
 
-  compiler.apply = function() {
+  DEFMACRO('apply', function() {
     var args, c_args, c_fn, fn, fn_base, spl_fn;
     fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     c_fn = compile(fn);
@@ -503,9 +587,9 @@
     fn_base = spl_fn.join('.');
     c_args = _.map(args, compile);
     return "" + c_fn + ".apply(" + (fn_base || null) + ", [].concat(" + (c_args.join(', ')) + "))";
-  };
+  });
 
-  compiler[to_js_symbol('let')] = function() {
+  DEFMACRO('let', function() {
     var body, i, len, let_fn, names_vals, ret, vars;
     names_vals = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     vars = [];
@@ -517,23 +601,23 @@
     body = vars.concat(body);
     let_fn = [to_symbol("lambda"), []].concat(__slice.call(body));
     return ret = "" + (compile(let_fn)) + ".apply(this, typeof arguments !== \"undefined\" ? arguments : [])";
-  };
+  });
 
-  compiler[to_js_symbol('new')] = function() {
+  DEFMACRO('new', function() {
     var args, c_args, c_cls, cls;
     cls = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     c_cls = compile(cls);
     c_args = _.map(args, compile);
     return "new " + c_cls + "(" + (c_args.join(', ')) + ")";
-  };
+  });
 
-  compiler.eval = function(sexp) {
+  DEFMACRO('eval', function(sexp) {
     var c_sexp;
     c_sexp = compile(sexp);
     return "eval(oppo.compile(" + c_sexp + "))";
-  };
+  });
 
-  compiler.quote = function(sexp) {
+  DEFMACRO('quote', function(sexp) {
     var q_sexp, ret, s_sexp;
     sexp = quote_escape(sexp);
     ret = !(sexp != null) ? null : void 0;
@@ -550,15 +634,15 @@
       s_sexp = "" + sexp;
       return "\"" + (s_sexp.replace(/"/g, '\\"')) + "\"";
     }
-  };
+  });
 
-  compiler.symbol = function(sym) {
+  DEFMACRO('symbol', function(sym) {
     var e_sym;
     e_sym = eval(compile([to_symbol("str"), sym]));
     return compile(to_symbol(e_sym));
-  };
+  });
 
-  compiler.js_eval = function(js) {
+  DEFMACRO('js-eval', function(js) {
     var c_js, e_js, ret;
     c_js = compile(js);
     if (is_string(c_js)) {
@@ -568,40 +652,40 @@
     } else {
       return ret = "eval(" + c_js + ")";
     }
-  };
+  });
 
-  compiler[to_js_symbol('do')] = function() {
+  DEFMACRO('do', function() {
     var body, compiled_body, ret;
     body = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     compiled_body = _.map(arguments, compile);
     ret = compiled_body.join(',\n');
     return "(" + ret + ")";
-  };
+  });
 
-  compiler[to_js_symbol('if')] = function(test, t, f) {
-    var c_f, c_t, c_test, cond, sym, _ref4;
+  DEFMACRO('if', function(test, t, f) {
+    var c_f, c_t, c_test, cond, sym, _ref3;
     if (arguments.length === 2) Array.prototype.push.call(arguments, f);
-    _ref4 = _.map(arguments, compile), c_test = _ref4[0], c_t = _ref4[1], c_f = _ref4[2];
+    _ref3 = _.map(arguments, compile), c_test = _ref3[0], c_t = _ref3[1], c_f = _ref3[2];
     sym = gensym("cond");
     cond = compile([to_symbol('var'), to_symbol(sym), test]);
     return "/* if */ ((" + cond + ") !== false && " + sym + " !== null && " + sym + " !== '' ?\n  " + (compile(t)) + " :\n  " + (compile(f)) + ")\n/* end if */";
-  };
+  });
 
-  compiler.regex = function(body, modifiers) {
+  DEFMACRO('regex', function(body, modifiers) {
     return "/" + body + "/" + (modifiers != null ? modifiers : '');
-  };
+  });
 
-  compiler[to_js_symbol('undefined?')] = function(x) {
+  DEFMACRO('undefined?', function(x) {
     var c_x;
     c_x = compile(x);
     return "(typeof " + c_x + " === 'undefined')";
-  };
+  });
 
-  compiler[to_js_symbol('defined?')] = function(x) {
+  DEFMACRO('defined?', function(x) {
     var c_x;
     c_x = compile(x);
     return "(typeof " + c_x + " !== 'undefined')";
-  };
+  });
 
   /*
   MODULES
@@ -613,39 +697,39 @@
     defmacro = null;
     set = null;
     adjust_environment = function(module_name, self_name) {
-      def = compiler.def;
-      compiler.def = function(name, value) {
+      def = GETMACRO('def');
+      DEFMACRO('def', function(name, value) {
         var _name;
         _name = is_symbol(name) ? [to_symbol("."), self_name, [to_symbol('quote'), name]] : name;
         return def(_name, value);
-      };
-      defmacro = compiler.defmacro;
-      compiler.defmacro = function() {
+      });
+      defmacro = GETMACRO('defmacro');
+      DEFMACRO('defmacro', function() {
         var name, rest, _name;
         name = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
         _name = is_symbol(name) ? [to_symbol("."), module_name, [to_symbol('quote'), name]] : name;
         return defmacro.apply(null, [name].concat(__slice.call(rest)));
-      };
-      set = compiler[to_js_symbol("set!")];
-      return compiler[to_js_symbol("set!")] = function(name, value) {
+      });
+      set = GETMACRO('set!');
+      return DEFMACRO('set!', function(name, value) {
         if (_.isEqual(name, self_name)) {
           throw "Can't redefine 'self' in a module.";
         } else {
           return set(name, value);
         }
-      };
+      });
     };
     restore_environment = function() {
-      var _ref4, _ref5, _ref6;
-      _ref4 = [def], compiler.def = _ref4[0], def = _ref4[1];
-      _ref5 = [defmacro], compiler.defmacro = _ref5[0], defmacro = _ref5[1];
-      return _ref6 = [set], compiler[to_js_symbol("set!")] = _ref6[0], set = _ref6[1], _ref6;
+      DEFMACRO('def', def);
+      DEFMACRO('defmacro', defmacro);
+      DEFMACRO('set!', set);
+      return def = defmacro = set = null;
     };
-    compiler.defmodule = function() {
-      var args, body, c_body, c_deps, current_var_group, define_self, deps, name, r_deps, r_name, ret, self_name, var_smt;
+    DEFMACRO('defmodule', function() {
+      var args, body, c_body, c_deps, current_var_group, define_self, deps, name, r_deps, r_name, ret, scope, self_name, var_smt;
       name = arguments[0], deps = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
       if (deps == null) deps = [];
-      new_var_group();
+      scope = Scope.make_new();
       r_name = compile(get_raw_text(name));
       r_deps = _.map(deps, _.compose(compile, get_raw_text));
       c_deps = compile([to_symbol("quote"), r_deps]);
@@ -655,13 +739,13 @@
       adjust_environment(name, self_name);
       body = body.length ? body : [null];
       c_body = compile([to_symbol('do')].concat(__slice.call(body)));
-      current_var_group = last_var_group();
+      current_var_group = get_keys(scope);
       var_smt = "var " + (current_var_group.join(', ')) + ";";
-      end_var_group();
+      Scope.end_current();
       restore_environment();
       return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + (args.join(', ')) + ") {\n  " + var_smt + "\n  with (" + define_self + ") {\n    return " + c_body + ";\n  }\n})";
-    };
-    return compiler.require = function() {
+    });
+    return DEFMACRO('require', function() {
       var c_names, name, names, r_name;
       names = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       c_names = (function() {
@@ -675,62 +759,62 @@
         return _results;
       })();
       return c_names.join(',\n');
-    };
+    });
   })();
 
   /*
   VARIABLES
   */
 
-  compiler.gensym = function() {
+  DEFMACRO('gensym', function() {
     var ret, sym;
     sym = gensym.apply(null, arguments);
     return ret = compile([to_symbol('quote'), to_symbol(sym)]);
-  };
+  });
 
-  compiler[to_js_symbol('var')] = function(name, value, current_group) {
+  DEFMACRO('var', function(name, value) {
     var c_name, c_value;
-    if (current_group == null) current_group = last_var_group();
     c_name = compile(name);
     c_value = compile(value);
-    if (__indexOf.call(current_group, c_name) >= 0) raiseDefError(c_name);
-    current_group.push(c_name);
+    Scope.def(c_name, "variable");
     return "" + c_name + " = " + c_value;
-  };
+  });
 
-  compiler.def = function(name, value) {
-    var c_name, c_value, err, first_group, ret, _var;
-    _var = compiler[to_js_symbol('var')];
-    first_group = first_var_group();
+  DEFMACRO('def', function(name, value) {
+    var c_name, first_group, ret, _var;
+    _var = GETMACRO('var');
+    first_group = Scope.top();
     c_name = compile(name);
     if (c_name === (to_js_symbol(c_name))) {
       return ret = _var(name, value, first_group);
     } else {
-      c_value = compile(value);
-      err = read_compile("(throw \"Can't define variable that is already defined: " + c_name + "\")");
-      return ret = "/* def " + c_name + " */ (typeof " + c_name + " === 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end def " + c_name + " */";
+      return raise("DefError", "Can't define complex symbol: " + c_name);
     }
-  };
+  });
 
-  compiler[to_js_symbol('set!')] = function(name, value) {
-    var c_name, c_value, err, ret;
+  DEFMACRO('set!', function(name, value) {
+    var c_name, c_value, ret;
     c_name = compile(name);
     c_value = compile(value);
-    err = read_compile("(throw \"Can't set variable that has not been defined: " + c_name + "\")");
-    return ret = "/* set! " + c_name + " */ (typeof " + c_name + " !== 'undefined' ?\n  (" + c_name + " = " + c_value + ") :\n  " + err + ")\n/* end set! " + c_name + " */";
-  };
+    if (c_name === (to_js_symbol(c_name))) {
+      Scope.set(c_name, "variable");
+      return ret = "" + c_name + " = " + c_value;
+    } else {
+      return raise("SetError", "Can't set complex symbol: " + c_name);
+    }
+  });
 
   /*
   MATH
   */
 
   math_fn = function(fn, symbol) {
-    return compiler[to_js_symbol(fn)] = function() {
+    return DEFMACRO(fn, function() {
       var c_nums, nums;
       nums = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       c_nums = _.map(nums, compile);
       return c_nums.join(" " + (symbol || fn) + " ");
-    };
+    });
   };
 
   math_fn("+");
@@ -748,13 +832,13 @@
   */
 
   binary_fn = function(fn, symbol) {
-    return compiler[to_js_symbol(fn)] = function() {
+    return DEFMACRO(fn, function() {
       var c_nums, nums, ret;
       nums = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       c_nums = _.map(nums, compile);
       ret = c_nums.join(" " + (symbol || fn) + " ");
       return "(" + ret + ")";
-    };
+    });
   };
 
   binary_fn("||");
@@ -766,21 +850,21 @@
   */
 
   compare_fn = function(fn, symbol) {
-    return compiler[to_js_symbol(fn)] = function() {
-      var c_items, item, items, last, ret, _i, _len, _ref4;
+    return DEFMACRO(fn, function() {
+      var c_items, item, items, last, ret, _i, _len, _ref3;
       items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       c_items = _.map(items, compile);
       ret = [];
       last = c_items[0];
-      _ref4 = c_items.slice(1);
-      for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
-        item = _ref4[_i];
+      _ref3 = c_items.slice(1);
+      for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
+        item = _ref3[_i];
         ret.push("" + last + " " + (symbol || fn) + " " + item);
         last = item;
       }
       ret.join(" && ");
       return "(" + ret + ")";
-    };
+    });
   };
 
   compare_fn("<");
@@ -803,21 +887,23 @@
   ERRORS
   */
 
-  compiler[to_js_symbol('throw')] = function(err) {
+  DEFMACRO('throw', function(err) {
     var c_err;
     c_err = compile(err);
     return "(function () { throw " + c_err + " })()";
-  };
+  });
 
   (function() {
     var mc_expand, mc_expand_1;
     mc_expand = false;
     mc_expand_1 = false;
-    compiler.defmacro = function() {
-      var argnames, c_name, name, template;
+    DEFMACRO('defmacro', function() {
+      var argnames, c_name, c_value, name, template;
       name = arguments[0], argnames = arguments[1], template = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
       if (argnames == null) argnames = [];
       c_name = compile(name);
+      c_value = "(function () {\n  return eval(oppo.compiler." + c_name + ".apply(this, arguments));\n})";
+      Scope.def(c_name, "macro");
       compiler[c_name] = function() {
         var evald, js, q_args, sexp;
         q_args = _.map(arguments, to_quoted);
@@ -831,9 +917,9 @@
           return evald;
         }
       };
-      return compile([to_symbol("def"), name, [to_symbol('js-eval'), "(function () {\n  return eval(oppo.compiler." + c_name + ".apply(this, arguments));\n})"]]);
-    };
-    compiler.macroexpand = function(sexp) {
+      return "" + c_name + " = " + c_value;
+    });
+    DEFMACRO('macroexpand', function(sexp) {
       var old_mc_expand, ret;
       old_mc_expand = mc_expand;
       mc_expand = true;
@@ -841,16 +927,16 @@
       ret = compile(to_quoted(ret));
       mc_expand = old_mc_expand;
       return ret;
-    };
-    compiler.macroexpand_1 = function(sexp) {
+    });
+    DEFMACRO('macroexpand-1', function(sexp) {
       var ret;
       mc_expand_1 = true;
       ret = compile(sexp);
       ret = compile(to_quoted(ret));
       mc_expand_1 = false;
       return ret;
-    };
-    return compiler.syntax_quote = function(list) {
+    });
+    return DEFMACRO('syntax-quote', function(list) {
       var code, ident, q_list, restructured_list, ret, sym;
       sym = to_symbol;
       ident = gensym('list');
@@ -859,10 +945,10 @@
       q_list = to_quoted(list);
       code = [[sym('lambda'), [sym(ident)], [sym("var")].concat(__slice.call(restructured_list))], q_list];
       return ret = compile(code);
-    };
+    });
   })();
 
-  compiler.str = function() {
+  DEFMACRO('str', function() {
     var c_strs, first_is_str, initial_str, strs;
     strs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     first_is_str = null;
@@ -876,9 +962,9 @@
     });
     initial_str = first_is_str ? '' : '"" + ';
     return "" + initial_str + (c_strs.join(' + '));
-  };
+  });
 
-  compiler.keyword = function(key) {
+  DEFMACRO('keyword', function(key) {
     var e_key;
     if ((is_quoted(key)) && (is_symbol((e_key = oppo.eval(key))))) {
       return compile(e_key[1]);
@@ -887,6 +973,6 @@
     } else {
       return compile([to_symbol('str'), key]);
     }
-  };
+  });
 
 }).call(this);

@@ -3,7 +3,7 @@ process.chdir __dirname
 exec = (require 'child_process').exec
 fs = require 'fs'
 path = require 'path'
-oppo = require 'dist/oppo'
+try oppo = require 'dist/oppo'
 
 post_exec = (options, error) ->
   if typeof options is "function"

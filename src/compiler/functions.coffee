@@ -22,9 +22,8 @@ do ->
     body = argsbody.concat body
       
     body = _.map body, compile
-    Scope.end_current()
+    vars = Scope.end_current()
     
-    vars = get_keys scope
     var_stmt = if vars.length then "var #{vars.join ', '};\n" else ''
     ret = """
     (function (#{args.join ", "}) {

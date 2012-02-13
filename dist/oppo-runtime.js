@@ -1,12 +1,4 @@
-(function () {
-  var oppoString, code, result, oppo;
-
-  if (typeof window === 'undefined')
-    oppo = exports;
-  else
-    oppo = window.oppo;
-    
-  var Module, module_error, module_get, module_get_path, module_set, modules;
+var Module, module_error, module_get, module_get_path, module_set, modules;
 
 modules = oppo.modules = {};
 
@@ -143,18 +135,3 @@ oppo.module.require = function(name, force) {
   mod = module_get(name);
   return mod != null ? mod.require(force) : void 0;
 };
-
-    
-  (oppo.module("oppo/core", [], function () {
-  var self, cond_16le0dvji_59s9fd0;
-  with (self = this) {
-    return (/* def self.global */ (typeof self.global === 'undefined' ?
-  (self.global = /* if */ ((cond_16le0dvji_59s9fd0 = (typeof window !== 'undefined')) !== false && cond_16le0dvji_59s9fd0 !== null && cond_16le0dvji_59s9fd0 !== '' ?
-  window :
-  global)
-/* end if */) :
-  ((function () { throw "Can't define variable that is already defined: self.global" })()))
-/* end def self.global */);
-  }
-}))
-})();

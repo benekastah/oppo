@@ -153,7 +153,7 @@ DEFMACRO 'var', (name, value) ->
   
 DEFMACRO 'def', (name, value) ->
   _var = GETMACRO 'var'
-  first_group = first_scope()
+  first_group = Scope.top()
   c_name = compile name
   if c_name is (to_js_symbol c_name)
     ret = _var name, value, first_group

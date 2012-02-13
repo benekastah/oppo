@@ -192,9 +192,18 @@ Scope management
 ### 
 Scope = {}
 do ->
-  scopes = [{}]
+  global_scope = {}
+  
+  scopes = null
+  initialize_scopes = -> scopes = [create_object global_scope]
+  initialize_scopes()
+  
+  Scope.top = -> _.first scopes
+  Scope.current = -> _.last scopes
   
   Scope.def = (name, type, scope = Scope.current()) ->
+    if scope is "global"
+      scope = global_scope
     raiseDefError name if scope.hasOwnProperty name
     scope[name] = type
     
@@ -209,27 +218,27 @@ do ->
   
   Scope.type = (name) ->
     scope = Scope.current()
-    scope[name].toString()
-  
-  Scope.global = _.bind _.first, _, scopes
-  Scope.current = _.bind _.last, _, scopes
+    "#{scope[name]}"
   
   Scope.make_new = ->
     scope = Scope.current()
     scopes.push (ret = create_object scope)
     ret
     
-  Scope.end_current = ->
-    scopes.pop()
+  Scope.end_current = (get_vars = true) ->
+    ret = scopes.pop()
+    if get_vars
+      get_keys ret
+    else
+      ret
     
-  Scope.end_final = ->
-    if  scopes.length isnt 1
+  Scope.end_final = (get_vars = true) ->
+    len = scopes.length
+    ret = Scope.end_current(get_vars)
+    initialize_scopes()
+    if  len isnt 1
       raise "VarGroupsError", "Expecting 1 final scope, got #{scopes.length} instead"
-    ret = Scope.end_current
-    scopes.push {}
     ret
-    
-  
   
 ###
 List (de/re)structuring
