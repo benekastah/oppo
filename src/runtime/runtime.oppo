@@ -2,212 +2,212 @@
 
   (def global (if (defined? window) window global))
   
-  ; ;; Set up some macros
-  ; ; (eval '(do
-  ; ;   (defmacro defn (nm argslist ...body)
-  ; ;     `(def ~nm (lambda ~argslist ...body)))
-  ; ; 
-  ; ;   (defmacro log (...things)
-  ; ;     `((. console 'log) ...things))
-  ; ; 
-  ; ;   ;; Strings
-  ; ;   (defmacro replace (base ...items)
-  ; ;     `((. ~base 'replace) ...items))
-  ; ; 
-  ; ;   (defmacro remove (base pattern)
-  ; ;     `(replace base pattern ""))
-  ; ; 
-  ; ;   (defmacro match (base pattern)
-  ; ;     `((. ~base 'match) pattern))))
-  ;     
-  ; (defmacro defn (nm argslist ...body)
-  ;   `(def ~nm (lambda ~argslist ...body)))
+  ;; Set up some macros
+  ; (eval '(do
+  ;   (defmacro defn (nm argslist ...body)
+  ;     `(def ~nm (lambda ~argslist ...body)))
   ; 
-  ; (defmacro log (...things)
-  ;   `((. console 'log) ...things))
+  ;   (defmacro log (...things)
+  ;     `((. console 'log) ...things))
   ; 
-  ; ;; Strings
-  ; (defmacro replace (base ...items)
-  ;   `((. ~base 'replace) ...items))
+  ;   ;; Strings
+  ;   (defmacro replace (base ...items)
+  ;     `((. ~base 'replace) ...items))
   ; 
-  ; (defmacro remove (base pattern)
-  ;   `(replace base pattern ""))
+  ;   (defmacro remove (base pattern)
+  ;     `(replace base pattern ""))
   ; 
-  ; (defmacro match (base pattern)
-  ;   `((. ~base 'match) pattern))
-  ; 
-  ; ; (defn print (...items)
-  ; ;   (apply (. console 'log) items)
-  ; ;   (last items))
-  ; 
-  ; ;; Misc macros and functions
-  ; ; (defn eval (sexp)
-  ; ;   ((. oppo 'eval) sexp))
-  ; 
-  ; (defn read (s)
-  ;   ((. oppo 'read) s))
-  ;   
-  ; ;; Type conversion
-  ; (defn ->bool (x)
-  ;   (js-eval "!(x == null || x === false || x === \"\" || x !== x)"))
-  ; 
-  ; (defn ->num (n)
-  ;   ((. global :Number) n))
-  ; 
-  ; (defn ->str (s)
-  ;   (str s))
-  ; 
-  ; ;; Binary functions
-  ; (defn not (x)
-  ;   (let (bx (->bool x))
-  ;     (js-eval "!bx")))
-  ; 
-  ; (let (binary-each
-  ;         (lambda (type ls)
-  ;           (let (item (nth ls 1))
-  ;             (if (|| (&& (=== type :or) (->bool item))
-  ;                     (&& (=== type :and) (not item))
-  ;                     (=== (. ls 'length) 0))
-  ;               item
-  ;               (binary-each type ((. ls 'slice) 1))))))
-  ;               
-  ;   (defn or (...items)
-  ;     (binary-each :or items))
-  ;   
-  ;   (defn and (...items)
-  ;     (binary-each :and items)))
-  ; 
-  ; (defn js-type (x)
-  ;   (let (cls ((. (. global :Object) 'prototype :toString 'call) x)
-  ;         type-arr ((. cls 'match) #/\s([a-zA-Z]+)/)
-  ;         type (. type-arr 1))
-  ;     ((. type 'toLowerCase))))
-  ; 
-  ; ;(defmacro .. (...items)
-  ; ;  (if (= 2 (size items))
-  ; ;    ))
-  ; 
-  ; ;; Collections    
-  ; (defn nth (a n)
-  ;   (if (=== n 0)
-  ;     (throw "nth treats collections as one-based; cannot get zeroth item"))
-  ;   (let (i (if (< n 0)
-  ;             (+ (. a 'length) n)
-  ;             (- n 1)))
-  ;     (. a i)))
-  ; 
-  ; (defn first (a) (nth a 1))
-  ; 
-  ; (defn second (a) (nth a 2))
-  ; 
-  ; (defn last (a) (nth a -1))
-  ; 
-  ; (defn concat (base ...items)
-  ;   (apply (. base 'concat) ...items))
-  ; 
-  ; (defn join (a s)
-  ;   ((. a 'join) s))
-  ; 
-  ; ;; Lists
-  ; 
-  ; ;; Strings
-  ; 
-  ; ;; Regex
-  ; 
-  ; ;; Set up underscore
-  ; (let (underscore-methods {;; Collections
-  ;                           :each ()
-  ;                           :map ()
-  ;                           :reduce ['reduce 'foldl]
-  ;                           :reduceRight ['reduce-right 'foldr]
-  ;                           :find ()
-  ;                           :filter ()
-  ;                           :reject ()
-  ;                           :all ()
-  ;                           :any ()
-  ;                           :include ()
-  ;                           :invoke ()
-  ;                           :pluck ()
-  ;                           ; :max ()
-  ;                           ; :min ()
-  ;                           :sortBy ['sort-by]
-  ;                           :groupBy ['group-by]
-  ;                           :sortedIndex ['sorted-index]
-  ;                           :suffle ()
-  ;                           :toArray ['->array]
-  ;                           :size ()
-  ;       
-  ;                           ;; Arrays
-  ;                           :first ['first 'head]
-  ;                           :initial ['initial 'init]
-  ;                           :last ()
-  ;                           :rest ['rest 'tail]
-  ;                           :compact ()
-  ;                           :flatten ()
-  ;                           :without ()
-  ;                           :union ()
-  ;                           :intersection ()
-  ;                           :difference ()
-  ;                           :uniq ()
-  ;                           :zip ()
-  ;                           :indexOf ['index-of]
-  ;                           :lastIndexOf ['last-index-of]
-  ;                           :range ()
-  ;       
-  ;                           ;; Functions
-  ;                           :bind ()
-  ;                           :bindAll ['bind-all]
-  ;                           :memoize ()
-  ;                           :delay ()
-  ;                           :defer ()
-  ;                           :throttle ()
-  ;                           :debounce ()
-  ;                           :once ()
-  ;                           :after ()
-  ;                           :wrap ()
-  ;                           :compose ()
-  ;       
-  ;                           ;; Objects
-  ;                           :keys ()
-  ;                           :values ()
-  ;                           :functions ()
-  ;                           :extend ()
-  ;                           :defaults ()
-  ;                           :clone ()
-  ;                           :tap ()
-  ;                           :isEqual ['equal? '=]
-  ;                           :isEmpty ['empty?]
-  ;                           :isElement ['element?]
-  ;                           :isArray ['array?]
-  ;                           :isArguments ['arguments?]
-  ;                           :isFunction ['function?]
-  ;                           :isNumber ['number?]
-  ;                           :isBoolean ['boolean? 'bool?]
-  ;                           :isDate ['date?]
-  ;                           :isRegExp ['regex?]
-  ;                           :isNaN ['nan?]
-  ;                           :isNull ['nil?]
-  ;                           :isUndefined ['undefined?]
-  ;       
-  ;                           ;; Utility
-  ;                           ; :noConflict ()
-  ;                           :identity ()
-  ;                           :times ()
-  ;                           :uniqueId ['unique-id]
-  ;                           :escape ()
-  ;                           :template ()
-  ;       
-  ;                           ;; Chaining
-  ;                           :chain ()
-  ;                           :value ()}
-  ;      each (. - 'each)
-  ;      array? (. - :isArray))
-  ;   
-  ;   (each underscore-methods
-  ;         (fn (v k)
-  ;           (if (array? v)
-  ;             (each v
-  ;                   (fn (i v)
-  ;                     (def (. self 'v) (. - 'k))))
-  ;             (def (. self 'v) (. - 'k))))))
+  ;   (defmacro match (base pattern)
+  ;     `((. ~base 'match) pattern))))
+      
+  (defmacro defn (nm argslist ...body)
+    `(def ~nm (lambda ~argslist ...body)))
+  
+  (defmacro log (...things)
+    `((. console 'log) ...things))
+  
+  ;; Strings
+  (defmacro replace (base ...items)
+    `((. ~base 'replace) ...items))
+  
+  (defmacro remove (base pattern)
+    `(replace base pattern ""))
+  
+  (defmacro match (base pattern)
+    `((. ~base 'match) pattern))
+  
+  ; (defn print (...items)
+  ;   (apply (. console 'log) items)
+  ;   (last items))
+  
+  ;; Misc macros and functions
+  ; (defn eval (sexp)
+  ;   ((. oppo 'eval) sexp))
+  
+  (defn read (s)
+    ((. oppo 'read) s))
+    
+  ;; Type conversion
+  (defn ->bool (x)
+    (js-eval "!(x == null || x === false || x === \"\" || x !== x)"))
+  
+  (defn ->num (n)
+    ((. global :Number) n))
+  
+  (defn ->str (s)
+    (str s))
+  
+  ;; Binary functions
+  (defn not (x)
+    (let (bx (->bool x))
+      (js-eval "!bx")))
+  
+  (let (binary-each
+          (lambda (type ls)
+            (let (item (nth ls 1))
+              (if (|| (&& (=== type :or) (->bool item))
+                      (&& (=== type :and) (not item))
+                      (=== (. ls 'length) 0))
+                item
+                (binary-each type ((. ls 'slice) 1))))))
+                
+    (defn or (...items)
+      (binary-each :or items))
+    
+    (defn and (...items)
+      (binary-each :and items)))
+  
+  (defn js-type (x)
+    (let (cls ((. (. global :Object) 'prototype :toString 'call) x)
+          type-arr ((. cls 'match) #/\s([a-zA-Z]+)/)
+          type (. type-arr 1))
+      ((. type 'toLowerCase))))
+  
+  ;(defmacro .. (...items)
+  ;  (if (= 2 (size items))
+  ;    ))
+  
+  ;; Collections    
+  (defn nth (a n)
+    (if (=== n 0)
+      (throw "nth treats collections as one-based; cannot get zeroth item"))
+    (let (i (if (< n 0)
+              (+ (. a 'length) n)
+              (- n 1)))
+      (. a i)))
+  
+  (defn first (a) (nth a 1))
+  
+  (defn second (a) (nth a 2))
+  
+  (defn last (a) (nth a -1))
+  
+  (defn concat (base ...items)
+    (apply (. base 'concat) ...items))
+  
+  (defn join (a s)
+    ((. a 'join) s))
+  
+  ;; Lists
+  
+  ;; Strings
+  
+  ;; Regex
+  
+  ;; Set up underscore
+  (let (underscore-methods {;; Collections
+                            :each ()
+                            :map ()
+                            :reduce ['reduce 'foldl]
+                            :reduceRight ['reduce-right 'foldr]
+                            :find ()
+                            :filter ()
+                            :reject ()
+                            :all ()
+                            :any ()
+                            :include ()
+                            :invoke ()
+                            :pluck ()
+                            ; :max ()
+                            ; :min ()
+                            :sortBy ['sort-by]
+                            :groupBy ['group-by]
+                            :sortedIndex ['sorted-index]
+                            :suffle ()
+                            :toArray ['->array]
+                            :size ()
+        
+                            ;; Arrays
+                            :first ['first 'head]
+                            :initial ['initial 'init]
+                            :last ()
+                            :rest ['rest 'tail]
+                            :compact ()
+                            :flatten ()
+                            :without ()
+                            :union ()
+                            :intersection ()
+                            :difference ()
+                            :uniq ()
+                            :zip ()
+                            :indexOf ['index-of]
+                            :lastIndexOf ['last-index-of]
+                            :range ()
+        
+                            ;; Functions
+                            :bind ()
+                            :bindAll ['bind-all]
+                            :memoize ()
+                            :delay ()
+                            :defer ()
+                            :throttle ()
+                            :debounce ()
+                            :once ()
+                            :after ()
+                            :wrap ()
+                            :compose ()
+        
+                            ;; Objects
+                            :keys ()
+                            :values ()
+                            :functions ()
+                            :extend ()
+                            :defaults ()
+                            :clone ()
+                            :tap ()
+                            :isEqual ['equal? '=]
+                            :isEmpty ['empty?]
+                            :isElement ['element?]
+                            :isArray ['array?]
+                            :isArguments ['arguments?]
+                            :isFunction ['function?]
+                            :isNumber ['number?]
+                            :isBoolean ['boolean? 'bool?]
+                            :isDate ['date?]
+                            :isRegExp ['regex?]
+                            :isNaN ['nan?]
+                            :isNull ['nil?]
+                            :isUndefined ['undefined?]
+        
+                            ;; Utility
+                            ; :noConflict ()
+                            :identity ()
+                            :times ()
+                            :uniqueId ['unique-id]
+                            :escape ()
+                            :template ()
+        
+                            ;; Chaining
+                            :chain ()
+                            :value ()}
+       each (. - 'each)
+       array? (. - :isArray))
+    
+    (each underscore-methods
+          (fn (v k)
+            (if (array? v)
+              (each v
+                    (fn (i v)
+                      (def (. self 'v) (. - 'k))))
+              (def (. self 'v) (. - 'k))))))
                                       )

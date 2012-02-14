@@ -57,7 +57,7 @@ class Module
       
     @status = requiring
     deps = @get_deps()
-    @load.apply @result, deps
+    @result = @load deps...
     @status = required
     Module.current.pop()
     @result

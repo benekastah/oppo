@@ -1,5 +1,5 @@
 (function() {
-  var DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, make_error, math_fn, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_list, to_quoted, to_symbol, trim, _is, _ref, _ref2,
+  var DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, make_error, math_fn, modules, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_list, to_quoted, to_symbol, trim, _is, _ref, _ref2,
     __slice = Array.prototype.slice,
     __hasProp = Object.prototype.hasOwnProperty;
 
@@ -382,6 +382,8 @@
 
   compiler = (_ref2 = oppo.compiler) != null ? _ref2 : oppo.compiler = {};
 
+  modules = {};
+
   DEFMACRO = function(name, fn) {
     var c_name;
     c_name = compile(to_symbol(name));
@@ -407,11 +409,25 @@
 
   (function() {
     var _compile;
-    _compile = function(sexp, top_level, with_oppo_core) {
-      var args, corename, fn, macro, ret, vars;
+    _compile = function(sexp, top_level) {
+      var args, corename, fn, from_core, macro, prefix, ret, varname, vars;
       if (sexp == null) sexp = null;
       if (top_level == null) top_level = false;
-      if (with_oppo_core == null) with_oppo_core = false;
+      corename = "oppo/core";
+      from_core = modules[corename];
+      if (top_level && (from_core != null)) {
+        prefix = (function() {
+          var _i, _len, _ref3, _results;
+          _ref3 = from_core.names;
+          _results = [];
+          for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
+            varname = _ref3[_i];
+            _results.push(compile([to_symbol("var"), to_symbol(varname), [to_symbol('.'), to_symbol(corename), to_quoted(to_symbol(varname))]]));
+          }
+          return _results;
+        })();
+        prefix.unshift(compile([to_symbol('require'), to_symbol(corename)]));
+      }
       if ((sexp === null || sexp === true || sexp === false) || _.isNumber(sexp)) {
         ret = "" + sexp;
       } else if (is_symbol(sexp)) {
@@ -432,13 +448,11 @@
       } else {
         raiseParseError(sexp);
       }
-      if (with_oppo_core !== false) {
-        corename = "oppo/core";
-        ret = "with (oppo.module.require('" + corename + "')) {\n  " + ret + "\n}";
-      }
       if (top_level) {
         vars = Scope.end_final();
-        if (vars.length) ret = "var " + (vars.join(', ')) + ";\n" + ret + ";";
+        vars = vars.length ? "var " + (vars.join(', ')) + ";\n" : '';
+        prefix = prefix != null ? "" + (prefix.join(',\n')) + "\n" : '';
+        ret = "" + vars + prefix + ret + ";";
       }
       return ret;
     };
@@ -778,8 +792,7 @@
         ret.push("" + last + " " + (symbol || fn) + " " + item);
         last = item;
       }
-      ret.join(" && ");
-      return "(" + ret + ")";
+      return "(" + (ret.join(' && ')) + ")";
     });
   };
 
@@ -865,41 +878,35 @@
   })();
 
   (function() {
-    var adjust_environment, def, defmacro, restore_environment, set;
-    def = null;
-    defmacro = null;
-    set = null;
-    adjust_environment = function(module_name, self_name) {
-      def = GETMACRO('def');
-      DEFMACRO('def', function(name, value) {
-        var _name;
-        _name = is_symbol(name) ? [to_symbol("."), self_name, [to_symbol('quote'), name]] : name;
-        return def(_name, value);
-      });
-      defmacro = GETMACRO('defmacro');
-      DEFMACRO('defmacro', function() {
-        var name, rest, _name;
+    var adjust_environment, def, defmacro, restore_environment;
+    def = [];
+    defmacro = [];
+    adjust_environment = function(module_name, names, scope) {
+      var _var;
+      modules[module_name[1]] = {
+        names: names,
+        scope: scope
+      };
+      _var = GETMACRO('var');
+      def.push(GETMACRO('def'));
+      compiler.def = function(name, value) {
+        names.push(name);
+        return _var(name, value, scope);
+      };
+      defmacro.push(GETMACRO('defmacro'));
+      return compiler.defmacro = function() {
+        var name, rest;
         name = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-        _name = is_symbol(name) ? [to_symbol("."), module_name, [to_symbol('quote'), name]] : name;
-        return defmacro.apply(null, [name].concat(__slice.call(rest)));
-      });
-      set = GETMACRO('set!');
-      return DEFMACRO('set!', function(name, value) {
-        if (_.isEqual(name, self_name)) {
-          throw "Can't redefine 'self' in a module.";
-        } else {
-          return set(name, value);
-        }
-      });
+        names.push(name);
+        return defmacro.apply(null, arguments);
+      };
     };
     restore_environment = function() {
-      DEFMACRO('def', def);
-      DEFMACRO('defmacro', defmacro);
-      DEFMACRO('set!', set);
-      return def = defmacro = set = null;
+      compiler.def = def.pop();
+      return compiler.defmacro = defmacro.pop();
     };
     DEFMACRO('defmodule', function() {
-      var args, body, c_body, c_deps, current_var_group, define_self, deps, name, r_deps, r_name, ret, scope, self_name, var_smt;
+      var args, body, c_body, c_deps, deps, export_names, js_map_args, name, r_deps, r_name, ret, return_val, scope, symbols, values, var_stmt, vars;
       name = arguments[0], deps = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
       if (deps == null) deps = [];
       scope = Scope.make_new();
@@ -907,27 +914,30 @@
       r_deps = _.map(deps, _.compose(compile, get_raw_text));
       c_deps = compile([to_symbol("quote"), r_deps]);
       args = _.map(deps, compile);
-      self_name = to_symbol("self");
-      define_self = compile([to_symbol("var"), self_name, [to_symbol('js-eval'), 'this']]);
-      adjust_environment(name, self_name);
+      export_names = [];
+      adjust_environment(name, export_names, scope);
       body = body.length ? body : [null];
-      c_body = compile([to_symbol('do')].concat(__slice.call(body)));
-      current_var_group = get_keys(scope);
-      var_smt = "var " + (current_var_group.join(', ')) + ";";
-      Scope.end_current();
+      c_body = _.map(body, compile);
+      values = export_names;
+      symbols = _.map(values, to_quoted);
+      js_map_args = Array.prototype.concat.apply([], _.zip(symbols, values));
+      return_val = compile([to_symbol('js-map')].concat(__slice.call(js_map_args)));
+      vars = Scope.end_current();
       restore_environment();
-      return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + (args.join(', ')) + ") {\n  " + var_smt + "\n  with (" + define_self + ") {\n    return " + c_body + ";\n  }\n})";
+      var_stmt = vars.length ? "var " + (vars.join(', ')) + ";\n" : '';
+      return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + (args.join(', ')) + ") {\n  " + var_stmt + (c_body.join(',\n')) + ";\n  return " + return_val + "\n})";
     });
     return DEFMACRO('require', function() {
-      var c_names, name, names, r_name;
+      var c_names, name, names, r_name, ret, _var;
       names = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      _var = GETMACRO('var');
       c_names = (function() {
         var _i, _len, _results;
         _results = [];
         for (_i = 0, _len = names.length; _i < _len; _i++) {
           name = names[_i];
           r_name = get_raw_text(name);
-          _results.push("oppo.module.require(" + (compile(r_name)) + ")");
+          _results.push(ret = _var(name, [to_symbol('js-eval'), "oppo.module.require(" + (compile(r_name)) + ")"]));
         }
         return _results;
       })();

@@ -128,8 +128,7 @@ compare_fn = (fn, symbol) ->
     for item in c_items[1..]
       ret.push "#{last} #{symbol or fn} #{item}"
       last = item
-    ret.join " && "
-    "(#{ret})"
+    "(#{ret.join ' && '})"
 
 compare_fn "<"
 compare_fn ">"

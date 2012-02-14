@@ -1,4 +1,12 @@
-var Module, module_error, module_get, module_get_path, module_set, modules;
+(function () {
+  var oppoString, code, result, oppo;
+
+  if (typeof window === 'undefined')
+    oppo = exports;
+  else
+    oppo = window.oppo;
+    
+  var Module, module_error, module_get, module_get_path, module_set, modules;
 
 modules = oppo.modules = {};
 
@@ -88,7 +96,7 @@ Module = (function() {
     }
     this.status = requiring;
     deps = this.get_deps();
-    this.load.apply(this.result, deps);
+    this.result = this.load.apply(this, deps);
     this.status = required;
     Module.current.pop();
     return this.result;
@@ -135,3 +143,14 @@ oppo.module.require = function(name, force) {
   mod = module_get(name);
   return mod != null ? mod.require(force) : void 0;
 };
+
+    
+  (oppo.module("oppo/core", [], function () {
+  var cond_16ltdsi3c_85j23k0, global;
+global = /* if */ ((cond_16ltdsi3c_85j23k0 = (typeof window !== 'undefined')) !== false && cond_16ltdsi3c_85j23k0 !== null && cond_16ltdsi3c_85j23k0 !== '' ?
+  window :
+  global)
+/* end if */;
+  return { global : global }
+}))
+})();

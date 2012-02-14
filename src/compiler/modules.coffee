@@ -1,39 +1,24 @@
 do ->
-  def = null
-  defmacro = null
-  set = null
+  def = []
+  defmacro = []
   
-  adjust_environment = (module_name, self_name) ->
-    def = GETMACRO 'def'
-    DEFMACRO 'def', (name, value) ->
-      _name = if is_symbol name
-        [(to_symbol "."), self_name, [(to_symbol 'quote'), name]]
-      else
-        name
-        
-      def _name, value
+  adjust_environment = (module_name, names, scope) ->
+    modules[module_name[1]] = {names, scope}
+    
+    _var = GETMACRO 'var'
+    def.push GETMACRO 'def'
+    compiler.def = (name, value) ->
+      names.push name
+      _var name, value, scope
       
-    defmacro = GETMACRO 'defmacro'
-    DEFMACRO 'defmacro', (name, rest...) ->
-      _name = if is_symbol name
-        [(to_symbol "."), module_name, [(to_symbol 'quote'), name]]
-      else
-        name
-        
-      defmacro name, rest...
-      
-    set = GETMACRO 'set!'
-    DEFMACRO 'set!', (name, value) ->
-      if _.isEqual name, self_name
-        throw "Can't redefine 'self' in a module."
-      else
-        set name, value
+    defmacro.push GETMACRO 'defmacro'
+    compiler.defmacro = (name, rest...) ->
+      names.push name
+      defmacro arguments...
   
   restore_environment = ->
-    DEFMACRO 'def', def
-    DEFMACRO 'defmacro', defmacro
-    DEFMACRO 'set!', set
-    def = defmacro = set = null
+    compiler.def = def.pop()
+    compiler.defmacro = defmacro.pop()
   
   DEFMACRO 'defmodule', (name, deps=[], body...) ->
     scope = Scope.make_new()
@@ -42,32 +27,32 @@ do ->
     c_deps = compile [(to_symbol "quote"), r_deps]
     args = _.map deps, compile
     
-    self_name = to_symbol "self"
-    define_self = compile [(to_symbol "var"), self_name, [(to_symbol 'js-eval'), 'this']]
-    adjust_environment name, self_name
+    export_names = []
+    adjust_environment name, export_names, scope
     # All the body must be compiled after this point
     
     body = if body.length then body else [null]
-    c_body = compile [(to_symbol 'do'), body...]
+    c_body = _.map body, compile
+    values = export_names
+    symbols = _.map values, to_quoted
+    js_map_args = Array::concat.apply [], _.zip symbols, values
+    return_val = compile [(to_symbol 'js-map'), js_map_args...]
     
     # No compiling after this point
-    current_var_group = get_keys scope
-    var_smt = "var #{current_var_group.join ', '};"
-    
-    Scope.end_current()
+    vars = Scope.end_current()
     restore_environment()
     
+    var_stmt = if vars.length then "var #{vars.join ', '};\n" else ''
     ret = """
     oppo.module(#{r_name}, #{c_deps}, function (#{args.join ', '}) {
-      #{var_smt}
-      with (#{define_self}) {
-        return #{c_body};
-      }
+      #{var_stmt}#{c_body.join ',\n'};
+      return #{return_val}
     })
     """
   
   DEFMACRO 'require', (names...) ->
+    _var = GETMACRO 'var'
     c_names = for name in names
       r_name = get_raw_text name
-      "oppo.module.require(#{compile r_name})"
+      ret = _var name, [(to_symbol 'js-eval'), "oppo.module.require(#{compile r_name})"]
     c_names.join ',\n'

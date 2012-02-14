@@ -2,6 +2,7 @@
 parser ?= require './parser'
 oppo = exports ? (global.oppo = {})
 compiler = oppo.compiler ?= {}
+modules = {}
 
 DEFMACRO = (name, fn) ->
   c_name = compile to_symbol name
@@ -22,7 +23,15 @@ read = oppo.read = (string) ->
 
 compile = null
 do ->
-  _compile = (sexp = null, top_level = false, with_oppo_core = false) ->
+  _compile = (sexp = null, top_level = false) ->
+    corename = "oppo/core"
+    from_core = modules[corename]
+    
+    if top_level and from_core?
+      prefix = for varname in from_core.names
+        compile [(to_symbol "var"), (to_symbol varname), [(to_symbol '.'), (to_symbol corename), (to_quoted to_symbol varname)]]
+      prefix.unshift compile [(to_symbol 'require'), (to_symbol corename)]
+    
     if sexp in [null, true, false] or _.isNumber sexp
       ret = "#{sexp}"
     else if is_symbol sexp
@@ -42,21 +51,13 @@ do ->
     else
       raiseParseError sexp
     
-    if with_oppo_core isnt false
-      corename = "oppo/core"
-      ret = """
-      with (oppo.module.require('#{corename}')) {
-        #{ret}
-      }
-      """
-    
     if top_level
       vars = Scope.end_final()
-      if vars.length
-        ret = """
-        var #{vars.join ', '};
-        #{ret};
-        """
+      vars = if vars.length then "var #{vars.join ', '};\n" else ''
+      prefix = if prefix? then "#{prefix.join ',\n'}\n" else ''
+      ret = """
+      #{vars}#{prefix}#{ret};
+      """
     
     ret
   
