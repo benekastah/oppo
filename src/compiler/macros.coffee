@@ -14,10 +14,10 @@ do ->
     compiler[c_name] = ->
       q_args = _.map arguments, to_quoted
       sexp = [[(to_symbol 'lambda'), argnames].concat(template)].concat(q_args)
-      js = oppo.compile sexp
+      js = compile sexp
       evald = eval js
       if not mc_expand and not mc_expand_1
-        oppo.compile evald
+        compile evald
       else
         mc_expand_1 = false
         evald

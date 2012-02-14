@@ -505,8 +505,8 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   }
 }
 ;(function() {
-  var DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_keys, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, make_error, math_fn, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_list, to_quoted, to_symbol, trim, _is, _ref, _ref2, __hasProp = Object.prototype.hasOwnProperty, 
-  __slice = Array.prototype.slice;
+  var DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, make_error, math_fn, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_list, to_quoted, to_symbol, trim, _is, _ref, _ref2, __slice = Array.prototype.slice, __hasProp = 
+  Object.prototype.hasOwnProperty;
   if(typeof global === "undefined" || global === null) {
     global = window
   }
@@ -531,19 +531,8 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       }
     }
   }();
-  get_keys = Object.keys || function(o) {
-    var prop, _results;
-    _results = [];
-    for(prop in o) {
-      if(!__hasProp.call(o, prop)) {
-        continue
-      }
-      _results.push(prop)
-    }
-    return _results
-  };
   JS_KEYWORDS = ["break", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "finally", "for", "function", "if", "implements", "import", "in", "instanceof", "interface", "label", "let", "new", "package", "private", "protected", "public", "return", "static", "switch", "super", "this", "throw", "try", "catch", "typeof", "undefined", "var", "void", "while", "with", "yield"];
-  JS_ILLEGAL_IDENTIFIER_CHARS = {"~":"tilde", "`":"backtick", "!":"exclmark", "@":"at", "#":"pound", "%":"percent", "^":"carat", "&":"amperstand", "*":"star", "(":"oparen", ")":"cparen", "-":"dash", "+":"plus", "=":"equals", "{":"ocurly", "}":"ccurly", "[":"osquare", "]":"csquare", "|":"pipe", "\\":"bslash", '"':"dblquote", "'":"snglquote", ":":"colon", ";":"semicolon", "<":"oangle", ">":"rangle", ",":"comma", ".":"dot", "?":"qmark", "/":"fslash", " ":"space", "\t":"tab", "\n":"newline", "\r":"return", 
+  JS_ILLEGAL_IDENTIFIER_CHARS = {"~":"tilde", "`":"backtick", "!":"exclmark", "@":"at", "#":"pound", "%":"percent", "^":"carat", "&":"amperstand", "*":"star", "(":"oparen", ")":"cparen", "-":"minus", "+":"plus", "=":"equals", "{":"ocurly", "}":"ccurly", "[":"osquare", "]":"csquare", "|":"pipe", "\\":"bslash", '"':"dblquote", "'":"snglquote", ":":"colon", ";":"semicolon", "<":"oangle", ">":"rangle", ",":"comma", ".":"dot", "?":"qmark", "/":"fslash", " ":"space", "\t":"tab", "\n":"newline", "\r":"return", 
   "\u000b":"vertical", "\x00":"null"};
   _is = function(what, x) {
     var _ref;
@@ -630,6 +619,9 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     for(_i = 0, _len = JS_KEYWORDS.length;_i < _len;_i++) {
       keyword = JS_KEYWORDS[_i];
       ident = ident === keyword ? "_" + ident + "_" : ident
+    }
+    if(ident === "-") {
+      ident = "_" + JS_ILLEGAL_IDENTIFIER_CHARS["-"] + "_"
     }
     ident = ident.replace(/\-/g, "_");
     for(_char in JS_ILLEGAL_IDENTIFIER_CHARS) {
@@ -743,7 +735,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       }
       ret = scopes.pop();
       if(get_vars) {
-        return get_keys(ret)
+        return _.keys(ret)
       }else {
         return ret
       }
@@ -1077,7 +1069,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   DEFMACRO("eval", function(sexp) {
     var c_sexp;
     c_sexp = compile(sexp);
-    return"eval(oppo.compile(" + c_sexp + "))"
+    return"eval(compile(" + c_sexp + "))"
   });
   DEFMACRO("quote", function(sexp) {
     var q_sexp, ret, s_sexp;
@@ -1149,78 +1141,6 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     c_x = compile(x);
     return"(typeof " + c_x + " !== 'undefined')"
   });
-  (function() {
-    var adjust_environment, def, defmacro, restore_environment, set;
-    def = null;
-    defmacro = null;
-    set = null;
-    adjust_environment = function(module_name, self_name) {
-      def = GETMACRO("def");
-      DEFMACRO("def", function(name, value) {
-        var _name;
-        _name = is_symbol(name) ? [to_symbol("."), self_name, [to_symbol("quote"), name]] : name;
-        return def(_name, value)
-      });
-      defmacro = GETMACRO("defmacro");
-      DEFMACRO("defmacro", function() {
-        var name, rest, _name;
-        name = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-        _name = is_symbol(name) ? [to_symbol("."), module_name, [to_symbol("quote"), name]] : name;
-        return defmacro.apply(null, [name].concat(__slice.call(rest)))
-      });
-      set = GETMACRO("set!");
-      return DEFMACRO("set!", function(name, value) {
-        if(_.isEqual(name, self_name)) {
-          throw"Can't redefine 'self' in a module.";
-        }else {
-          return set(name, value)
-        }
-      })
-    };
-    restore_environment = function() {
-      DEFMACRO("def", def);
-      DEFMACRO("defmacro", defmacro);
-      DEFMACRO("set!", set);
-      return def = defmacro = set = null
-    };
-    DEFMACRO("defmodule", function() {
-      var args, body, c_body, c_deps, current_var_group, define_self, deps, name, r_deps, r_name, ret, scope, self_name, var_smt;
-      name = arguments[0], deps = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
-      if(deps == null) {
-        deps = []
-      }
-      scope = Scope.make_new();
-      r_name = compile(get_raw_text(name));
-      r_deps = _.map(deps, _.compose(compile, get_raw_text));
-      c_deps = compile([to_symbol("quote"), r_deps]);
-      args = _.map(deps, compile);
-      self_name = to_symbol("self");
-      define_self = compile([to_symbol("var"), self_name, [to_symbol("js-eval"), "this"]]);
-      adjust_environment(name, self_name);
-      body = body.length ? body : [null];
-      c_body = compile([to_symbol("do")].concat(__slice.call(body)));
-      current_var_group = get_keys(scope);
-      var_smt = "var " + current_var_group.join(", ") + ";";
-      Scope.end_current();
-      restore_environment();
-      return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + args.join(", ") + ") {\n  " + var_smt + "\n  with (" + define_self + ") {\n    return " + c_body + ";\n  }\n})"
-    });
-    return DEFMACRO("require", function() {
-      var c_names, name, names, r_name;
-      names = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-      c_names = function() {
-        var _i, _len, _results;
-        _results = [];
-        for(_i = 0, _len = names.length;_i < _len;_i++) {
-          name = names[_i];
-          r_name = get_raw_text(name);
-          _results.push("oppo.module.require(" + compile(r_name) + ")")
-        }
-        return _results
-      }();
-      return c_names.join(",\n")
-    })
-  })();
   DEFMACRO("gensym", function() {
     var ret, sym;
     sym = gensym.apply(null, arguments);
@@ -1326,10 +1246,10 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
         var evald, js, q_args, sexp;
         q_args = _.map(arguments, to_quoted);
         sexp = [[to_symbol("lambda"), argnames].concat(template)].concat(q_args);
-        js = oppo.compile(sexp);
+        js = compile(sexp);
         evald = eval(js);
         if(!mc_expand && !mc_expand_1) {
-          return oppo.compile(evald)
+          return compile(evald)
         }else {
           mc_expand_1 = false;
           return evald
@@ -1363,6 +1283,78 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       q_list = to_quoted(list);
       code = [[sym("lambda"), [sym(ident)], [sym("var")].concat(__slice.call(restructured_list))], q_list];
       return ret = compile(code)
+    })
+  })();
+  (function() {
+    var adjust_environment, def, defmacro, restore_environment, set;
+    def = null;
+    defmacro = null;
+    set = null;
+    adjust_environment = function(module_name, self_name) {
+      def = GETMACRO("def");
+      DEFMACRO("def", function(name, value) {
+        var _name;
+        _name = is_symbol(name) ? [to_symbol("."), self_name, [to_symbol("quote"), name]] : name;
+        return def(_name, value)
+      });
+      defmacro = GETMACRO("defmacro");
+      DEFMACRO("defmacro", function() {
+        var name, rest, _name;
+        name = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+        _name = is_symbol(name) ? [to_symbol("."), module_name, [to_symbol("quote"), name]] : name;
+        return defmacro.apply(null, [name].concat(__slice.call(rest)))
+      });
+      set = GETMACRO("set!");
+      return DEFMACRO("set!", function(name, value) {
+        if(_.isEqual(name, self_name)) {
+          throw"Can't redefine 'self' in a module.";
+        }else {
+          return set(name, value)
+        }
+      })
+    };
+    restore_environment = function() {
+      DEFMACRO("def", def);
+      DEFMACRO("defmacro", defmacro);
+      DEFMACRO("set!", set);
+      return def = defmacro = set = null
+    };
+    DEFMACRO("defmodule", function() {
+      var args, body, c_body, c_deps, current_var_group, define_self, deps, name, r_deps, r_name, ret, scope, self_name, var_smt;
+      name = arguments[0], deps = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
+      if(deps == null) {
+        deps = []
+      }
+      scope = Scope.make_new();
+      r_name = compile(get_raw_text(name));
+      r_deps = _.map(deps, _.compose(compile, get_raw_text));
+      c_deps = compile([to_symbol("quote"), r_deps]);
+      args = _.map(deps, compile);
+      self_name = to_symbol("self");
+      define_self = compile([to_symbol("var"), self_name, [to_symbol("js-eval"), "this"]]);
+      adjust_environment(name, self_name);
+      body = body.length ? body : [null];
+      c_body = compile([to_symbol("do")].concat(__slice.call(body)));
+      current_var_group = get_keys(scope);
+      var_smt = "var " + current_var_group.join(", ") + ";";
+      Scope.end_current();
+      restore_environment();
+      return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + args.join(", ") + ") {\n  " + var_smt + "\n  with (" + define_self + ") {\n    return " + c_body + ";\n  }\n})"
+    });
+    return DEFMACRO("require", function() {
+      var c_names, name, names, r_name;
+      names = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      c_names = function() {
+        var _i, _len, _results;
+        _results = [];
+        for(_i = 0, _len = names.length;_i < _len;_i++) {
+          name = names[_i];
+          r_name = get_raw_text(name);
+          _results.push("oppo.module.require(" + compile(r_name) + ")")
+        }
+        return _results
+      }();
+      return c_names.join(",\n")
     })
   })();
   DEFMACRO("str", function() {

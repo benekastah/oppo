@@ -9,9 +9,6 @@ create_object = do ->
       class Object
       Object:: = o
       new Object
-      
-get_keys = Object.keys or (o) ->
-  for own prop of o then prop
 
 JS_KEYWORDS = [
   "break"
@@ -71,7 +68,7 @@ JS_ILLEGAL_IDENTIFIER_CHARS =
   "*": "star"
   "(": "oparen"
   ")": "cparen"
-  "-": "dash"
+  "-": "minus"
   "+": "plus"
   "=": "equals"
   "{": "ocurly"
@@ -149,6 +146,10 @@ to_js_symbol = (ident) ->
   for keyword in JS_KEYWORDS
     ident = if ident is keyword then "_#{ident}_" else ident
   
+  # Prevent a single dash from being turned into an underscore
+  if ident is '-'
+    ident = "_#{JS_ILLEGAL_IDENTIFIER_CHARS['-']}_"
+    
   # Sanitize special characters
   # Simply convert dashes to underscores
   ident = ident.replace /\-/g, '_'
@@ -228,7 +229,7 @@ do ->
   Scope.end_current = (get_vars = true) ->
     ret = scopes.pop()
     if get_vars
-      get_keys ret
+      _.keys ret
     else
       ret
     
