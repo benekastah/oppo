@@ -410,23 +410,27 @@
   (function() {
     var _compile;
     _compile = function(sexp, top_level) {
-      var args, corename, fn, from_core, macro, prefix, ret, varname, vars;
+      var args, corename, fn, from_core, macro, prefix, ret, varname, vars, _ref3;
       if (sexp == null) sexp = null;
       if (top_level == null) top_level = false;
-      corename = "oppo/core";
-      from_core = modules[corename];
-      if (top_level && (from_core != null)) {
-        prefix = (function() {
-          var _i, _len, _ref3, _results;
-          _ref3 = from_core.names;
-          _results = [];
-          for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
-            varname = _ref3[_i];
-            _results.push(compile([to_symbol("var"), to_symbol(varname), [to_symbol('.'), to_symbol(corename), to_quoted(to_symbol(varname))]]));
-          }
-          return _results;
-        })();
-        prefix.unshift(compile([to_symbol('require'), to_symbol(corename)]));
+      if (top_level) {
+        corename = "oppo/core";
+        from_core = (_ref3 = modules[corename]) != null ? _ref3.names : void 0;
+        if (!(from_core != null)) {
+          from_core = _.keys((oppo.module.require(corename)) || {});
+        }
+        if (from_core.length) {
+          prefix = (function() {
+            var _i, _len, _results;
+            _results = [];
+            for (_i = 0, _len = from_core.length; _i < _len; _i++) {
+              varname = from_core[_i];
+              _results.push(compile([to_symbol("var"), to_symbol(varname), [to_symbol('.'), to_symbol(corename), to_quoted(to_symbol(varname))]]));
+            }
+            return _results;
+          })();
+          prefix.unshift(compile([to_symbol('require'), to_symbol(corename)]));
+        }
       }
       if ((sexp === null || sexp === true || sexp === false) || _.isNumber(sexp)) {
         ret = "" + sexp;

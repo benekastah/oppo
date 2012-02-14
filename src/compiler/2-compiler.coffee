@@ -24,13 +24,15 @@ read = oppo.read = (string) ->
 compile = null
 do ->
   _compile = (sexp = null, top_level = false) ->
-    corename = "oppo/core"
-    from_core = modules[corename]
+    if top_level
+      corename = "oppo/core"
+      from_core = modules[corename]?.names
+      from_core = _.keys (oppo.module.require corename) or {} if not from_core?
     
-    if top_level and from_core?
-      prefix = for varname in from_core.names
-        compile [(to_symbol "var"), (to_symbol varname), [(to_symbol '.'), (to_symbol corename), (to_quoted to_symbol varname)]]
-      prefix.unshift compile [(to_symbol 'require'), (to_symbol corename)]
+      if from_core.length
+        prefix = for varname in from_core
+          compile [(to_symbol "var"), (to_symbol varname), [(to_symbol '.'), (to_symbol corename), (to_quoted to_symbol varname)]]
+        prefix.unshift compile [(to_symbol 'require'), (to_symbol corename)]
     
     if sexp in [null, true, false] or _.isNumber sexp
       ret = "#{sexp}"
