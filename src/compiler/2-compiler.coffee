@@ -31,8 +31,10 @@ do ->
     
       if from_core.length
         prefix = for varname in from_core
-          compile [(to_symbol "var"), (to_symbol varname), [(to_symbol '.'), (to_symbol corename), (to_quoted to_symbol varname)]]
-        prefix.unshift compile [(to_symbol 'require'), (to_symbol corename)]
+          [(to_symbol "var"), (to_symbol varname), [(to_symbol '.'), (to_symbol corename), (to_quoted to_symbol varname)]]
+        prefix.unshift [(to_symbol 'require'), (to_symbol corename)]
+        
+        sexp = [sexp[0], prefix..., sexp[1..]...]
     
     if sexp in [null, true, false] or _.isNumber sexp
       ret = "#{sexp}"
@@ -56,9 +58,8 @@ do ->
     if top_level
       vars = Scope.end_final()
       vars = if vars.length then "var #{vars.join ', '};\n" else ''
-      prefix = if prefix? then "#{prefix.join ',\n'}\n" else ''
       ret = """
-      #{vars}#{prefix}#{ret};
+      #{vars}#{ret};
       """
     
     ret

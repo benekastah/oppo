@@ -425,11 +425,12 @@
             _results = [];
             for (_i = 0, _len = from_core.length; _i < _len; _i++) {
               varname = from_core[_i];
-              _results.push(compile([to_symbol("var"), to_symbol(varname), [to_symbol('.'), to_symbol(corename), to_quoted(to_symbol(varname))]]));
+              _results.push([to_symbol("var"), to_symbol(varname), [to_symbol('.'), to_symbol(corename), to_quoted(to_symbol(varname))]]);
             }
             return _results;
           })();
-          prefix.unshift(compile([to_symbol('require'), to_symbol(corename)]));
+          prefix.unshift([to_symbol('require'), to_symbol(corename)]);
+          sexp = [sexp[0]].concat(__slice.call(prefix), __slice.call(sexp.slice(1)));
         }
       }
       if ((sexp === null || sexp === true || sexp === false) || _.isNumber(sexp)) {
@@ -455,8 +456,7 @@
       if (top_level) {
         vars = Scope.end_final();
         vars = vars.length ? "var " + (vars.join(', ')) + ";\n" : '';
-        prefix = prefix != null ? "" + (prefix.join(',\n')) + "\n" : '';
-        ret = "" + vars + prefix + ret + ";";
+        ret = "" + vars + ret + ";";
       }
       return ret;
     };
