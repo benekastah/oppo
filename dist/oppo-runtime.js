@@ -1,5 +1,5 @@
 (function () {
-  var oppoString, code, result, oppo;
+  var oppo;
 
   if (typeof window === 'undefined')
     oppo = exports;
@@ -29,10 +29,7 @@ module_get = function(name) {
   for (_i = 0, _len = path.length; _i < _len; _i++) {
     item = path[_i];
     value = value != null ? value[item] : void 0;
-    if (!(value != null)) {
-      console.warn("Trying to get undefined module: " + name);
-      ({});
-    }
+    if (!(value != null)) break;
   }
   return value;
 };
@@ -141,16 +138,10 @@ oppo.module = function(name, imports, fn) {
 oppo.module.require = function(name, force) {
   var mod;
   mod = module_get(name);
+  if (!(mod instanceof Module)) {
+    module_error("Trying to get undefined module: " + name);
+  }
   return mod != null ? mod.require(force) : void 0;
 };
 
-    
-  (oppo.module("oppo/core", [], function () {
-  var cond_16ltdsi3c_85j23k0, global;
-global = /* if */ ((cond_16ltdsi3c_85j23k0 = (typeof window !== 'undefined')) !== false && cond_16ltdsi3c_85j23k0 !== null && cond_16ltdsi3c_85j23k0 !== '' ?
-  window :
-  global)
-/* end if */;
-  return { global : global }
-}))
 })();

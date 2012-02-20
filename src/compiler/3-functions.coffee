@@ -64,3 +64,18 @@ DEFMACRO 'new', (cls, args...) ->
   c_cls = compile cls
   c_args = _.map args, compile
   "new #{c_cls}(#{c_args.join ', '})"
+  
+DEFMACRO 'defn', (name, args, body...) ->
+  compile [(to_symbol 'def'), name, [(to_symbol 'lambda'), args, body...]]
+  
+DEFMACRO 'curry', (fn, args...) ->
+  if (_.isArray fn) and (get_raw_text fn[0]) is '.'
+    base = fn[0..]
+    base.pop()
+    if base.length is 2
+      base = base[1]
+  else
+    base = null
+    
+  ret = compile [(to_symbol "bind"), fn, base, args...]
+    

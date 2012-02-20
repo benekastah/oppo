@@ -115,26 +115,21 @@ task "build:runtime", "Build oppo runtime", (options) ->
     exec command, post_exec ->
       fs.readFile file, "utf8", (err, file_contents) ->
         if err then throw err
-        
-        fs.readFile "src/runtime/runtime.oppo", "utf8", (err, code) ->
-          if err then throw err
-          file_contents = """
-          (function () {
-            var oppoString, code, result, oppo;
+        file_contents = """
+        (function () {
+          var oppo;
 
-            if (typeof window === 'undefined')
-              oppo = exports;
-            else
-              oppo = window.oppo;
-              
-            #{file_contents}
-              
-            #{oppo.compile (oppo.read code), false}
-          })();
-          """
+          if (typeof window === 'undefined')
+            oppo = exports;
+          else
+            oppo = window.oppo;
+            
+          #{file_contents}
+        })();
+        """
         
-          console.log "Writing runtime file, including oppo code..."
-          fs.writeFile file, file_contents, 'utf8', options.success
+        console.log "Writing runtime file..."
+        fs.writeFile file, file_contents, 'utf8', options.success
   else
     options.success?()
     

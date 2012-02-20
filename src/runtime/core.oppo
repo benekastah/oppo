@@ -1,0 +1,5 @@
+(defmodule oppo/core ()
+  
+  (def global (if (defined? window) window global))
+  (defmacro defn (nm argslist ...body)
+    `(def ~nm (lambda ~argslist ...body))))

@@ -1,6 +1,6 @@
 DEFMACRO 'eval', (sexp) ->
   c_sexp = compile sexp
-  "eval(compile(#{c_sexp}))"
+  "eval(oppo._compile(#{c_sexp}))"
 
 DEFMACRO 'quote', (sexp) ->
   sexp = quote_escape sexp
@@ -20,7 +20,8 @@ DEFMACRO 'quote', (sexp) ->
     "\"#{s_sexp.replace /"/g, '\\"'}\""
 
 DEFMACRO 'symbol', (sym) ->
-  e_sym = eval compile [(to_symbol "str"), sym]
+  str = GETMACRO 'str'
+  e_sym = eval str sym
   compile (to_symbol e_sym)
 
 DEFMACRO 'js-eval', (js) ->
@@ -44,7 +45,7 @@ DEFMACRO 'if', (test, t, f) ->
   sym = gensym "cond"
   cond = compile [(to_symbol 'var'), (to_symbol sym), test]
   """
-  /* if */ ((#{cond}) !== false && #{sym} !== null && #{sym} !== '' ?
+  /* if */ ((#{cond}) !== false && #{sym} != null && #{sym} === #{sym} ?
     #{compile t} :
     #{compile f})
   /* end if */
@@ -67,14 +68,16 @@ DEFMACRO 'gensym', ->
   sym = gensym arguments...
   ret = compile [(to_symbol 'quote'), (to_symbol sym)]
 
-DEFMACRO 'var', (name, value) ->
+_var = (name, value, scope) ->
   c_name = compile name
   c_value = compile value
-  Scope.def c_name, "variable"
+  Scope.def c_name, "variable", scope
   "#{c_name} = #{c_value}"
+
+DEFMACRO 'var', (name, value) ->
+  _var name, value
   
 DEFMACRO 'def', (name, value) ->
-  _var = GETMACRO 'var'
   first_group = Scope.top()
   c_name = compile name
   if c_name is (to_js_symbol c_name)

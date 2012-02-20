@@ -216,6 +216,11 @@ do ->
       break if found
     raiseSetError name if not found
     scope[name] = type
+    
+  Scope.blind_set = (name, type, scope = Scope.current()) ->
+    if scope is "global"
+      scope = global_scope
+    scope[name] = type
   
   Scope.type = (name) ->
     scope = Scope.current()
@@ -237,8 +242,8 @@ do ->
     len = scopes.length
     ret = Scope.end_current(get_vars)
     initialize_scopes()
-    if  len isnt 1
-      raise "VarGroupsError", "Expecting 1 final scope, got #{scopes.length} instead"
+    if len isnt 1
+      raise "VarGroupsError", "Expecting 1 final scope, got #{len} instead"
     ret
   
 ###

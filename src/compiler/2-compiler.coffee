@@ -4,14 +4,40 @@ oppo = exports ? (global.oppo = {})
 compiler = oppo.compiler ?= {}
 modules = {}
 
-DEFMACRO = (name, fn) ->
+oppo.DEFMACRO = DEFMACRO = (name, fn) ->
   c_name = compile to_symbol name
-  Scope.def c_name, "macro", "global"
+  Scope.blind_set c_name, "macro", "global"
   compiler[c_name] = fn
   
-GETMACRO = (name) ->
+oppo.GETMACRO = GETMACRO = (name) ->
   c_name = compile to_symbol name
   compiler[c_name]
+
+DEFITEMS = {}
+oppo.DEF = DEF = (name, value, required) ->
+  s_name = to_symbol name
+  c_name = compile s_name
+  
+  ret = DEFITEMS[c_name] = ->
+    ret = []
+    if required?
+      for item in required
+        result = use_deffed item
+        if result?
+          ret.push result
+    ret.push compile [(to_symbol "def"), s_name, [(to_symbol 'js-eval'), value]]
+    ret.join ',\n'
+    
+  ret.complete = false
+  ret
+  
+use_deffed = (name) ->
+  c_name = compile to_symbol name
+  if (item = DEFITEMS[c_name]?) and item.complete is false
+    fn = DEFITEMS[ret]
+    fn.complete = true
+    fn()
+  
 
 ###
 READ, EVAL, COMPILE
@@ -23,23 +49,17 @@ read = oppo.read = (string) ->
 
 compile = null
 do ->
+  prefix = null
   _compile = (sexp = null, top_level = false) ->
     if top_level
-      corename = "oppo/core"
-      from_core = modules[corename]?.names
-      from_core = _.keys (oppo.module.require corename) or {} if not from_core?
-    
-      if from_core.length
-        prefix = for varname in from_core
-          [(to_symbol "var"), (to_symbol varname), [(to_symbol '.'), (to_symbol corename), (to_quoted to_symbol varname)]]
-        prefix.unshift [(to_symbol 'require'), (to_symbol corename)]
-        
-        sexp = [sexp[0], prefix..., sexp[1..]...]
+      prefix = []
     
     if sexp in [null, true, false] or _.isNumber sexp
       ret = "#{sexp}"
     else if is_symbol sexp
       ret = to_js_symbol sexp[1]
+      deffed = use_deffed sexp[1]
+      if deffed? then prefix.push deffed
     else if _.isString sexp
       ret = "\"#{sexp.replace /\n/g, '\\n'}\""
     else if _.isFunction sexp
@@ -58,13 +78,17 @@ do ->
     if top_level
       vars = Scope.end_final()
       vars = if vars.length then "var #{vars.join ', '};\n" else ''
+      _prefix = if prefix?.length then "#{prefix.join ',\n'};\n" else ''
       ret = """
-      #{vars}#{ret};
+      #{vars}#{_prefix}#{ret};
       """
+      prefix = null
+      for own name, item of DEFITEMS
+        item.completed = false
     
     ret
   
-  compile = (sexp) ->
+  oppo._compile = compile = (sexp) ->
     _compile sexp, false
     
   oppo.compile = (sexp) ->

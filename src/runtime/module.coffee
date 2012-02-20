@@ -14,9 +14,7 @@ module_get = (name) ->
   value = modules
   for item in path
     value = value?[item]
-    if not value?
-      console.warn "Trying to get undefined module: #{name}"
-      {}
+    break if not value?
   value
   
 module_set = (name, value) ->
@@ -86,5 +84,7 @@ oppo.module = (name, imports=[], fn) ->
   
 oppo.module.require = (name, force) ->
   mod = module_get name
+  if mod not instanceof Module
+    module_error "Trying to get undefined module: #{name}"
   mod?.require force
     

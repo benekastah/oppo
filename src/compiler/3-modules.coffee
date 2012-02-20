@@ -3,7 +3,8 @@ do ->
   defmacro = []
   
   adjust_environment = (module_name, names, scope) ->
-    modules[module_name[1]] = {names, scope}
+    s_module_name = get_raw_text module_name
+    modules[s_module_name] = {names, scope}
     
     _var = GETMACRO 'var'
     def.push GETMACRO 'def'
@@ -11,10 +12,17 @@ do ->
       names.push name
       _var name, value, scope
       
-    defmacro.push GETMACRO 'defmacro'
+    defmacro.push (last_macro = GETMACRO 'defmacro')
     compiler.defmacro = (name, rest...) ->
-      names.push name
-      defmacro arguments...
+      r_name = get_raw_text name
+      n_name = (to_symbol "#{s_module_name}.#{r_name}")
+      def_stmt = [(to_symbol 'def'), name, [(to_symbol 'js-eval'), (last_macro n_name, rest...)]]
+      compile [
+        (to_symbol 'do'), def_stmt, 
+        [
+          (to_symbol 'js-eval'), "#{r_name}.macro_name = '#{compile n_name}'"
+        ]
+      ]
   
   restore_environment = ->
     compiler.def = def.pop()

@@ -4,13 +4,13 @@ do ->
   
   DEFMACRO 'defmacro', (name, argnames=[], template...) ->
     c_name = compile name
-    c_value = """
+    macro_fn = """
     (function () {
       return eval(oppo.compiler.#{c_name}.apply(this, arguments));
     })
     """
-    Scope.def c_name, "macro"
     
+    Scope.def c_name, "macro"
     compiler[c_name] = ->
       q_args = _.map arguments, to_quoted
       sexp = [[(to_symbol 'lambda'), argnames].concat(template)].concat(q_args)
@@ -22,6 +22,15 @@ do ->
         mc_expand_1 = false
         evald
         
+    sym = to_symbol
+    defmacro = compile [
+      (sym 'if')
+      [(sym 'js-eval'), "!oppo.compiler.#{c_name}"]
+      [(sym "eval"), [(sym 'quote'), [(sym 'defmacro'), name, argnames, template...]]]
+    ]
+    c_value = """
+    (#{defmacro}, #{macro_fn})
+    """
     "#{c_name} = #{c_value}"
     
   DEFMACRO 'macroexpand', (sexp) ->
