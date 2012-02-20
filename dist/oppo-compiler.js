@@ -414,7 +414,7 @@
       if (required != null) {
         for (_i = 0, _len = required.length; _i < _len; _i++) {
           item = required[_i];
-          result = use_deffed(item);
+          result = use_deffed(compile(to_symbol(item)));
           if (result != null) ret.push(result);
         }
       }
@@ -426,9 +426,8 @@
   };
 
   use_deffed = function(name) {
-    var c_name, fn, item;
-    c_name = compile(to_symbol(name));
-    if ((item = DEFITEMS[c_name] != null) && item.complete === false) {
+    var fn, item;
+    if ((item = DEFITEMS[name] != null) && item.complete === false) {
       fn = DEFITEMS[ret];
       fn.complete = true;
       return fn();
@@ -449,15 +448,16 @@
     var prefix, _compile;
     prefix = null;
     _compile = function(sexp, top_level) {
-      var args, deffed, fn, item, macro, name, ret, vars, _prefix;
+      var args, deffed, fn, item, macro, name, raw_text, ret, vars, _prefix;
       if (sexp == null) sexp = null;
       if (top_level == null) top_level = false;
       if (top_level) prefix = [];
       if ((sexp === null || sexp === true || sexp === false) || _.isNumber(sexp)) {
         ret = "" + sexp;
       } else if (is_symbol(sexp)) {
-        ret = to_js_symbol(sexp[1]);
-        deffed = use_deffed(sexp[1]);
+        raw_text = sexp[1];
+        ret = to_js_symbol(raw_text);
+        deffed = use_deffed(ret);
         if (deffed != null) prefix.push(deffed);
       } else if (_.isString(sexp)) {
         ret = "\"" + (sexp.replace(/\n/g, '\\n')) + "\"";

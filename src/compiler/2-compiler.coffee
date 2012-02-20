@@ -22,7 +22,7 @@ oppo.DEF = DEF = (name, value, required) ->
     ret = []
     if required?
       for item in required
-        result = use_deffed item
+        result = use_deffed (compile to_symbol item)
         if result?
           ret.push result
     ret.push compile [(to_symbol "def"), s_name, [(to_symbol 'js-eval'), value]]
@@ -32,8 +32,7 @@ oppo.DEF = DEF = (name, value, required) ->
   ret
   
 use_deffed = (name) ->
-  c_name = compile to_symbol name
-  if (item = DEFITEMS[c_name]?) and item.complete is false
+  if (item = DEFITEMS[name]?) and item.complete is false
     fn = DEFITEMS[ret]
     fn.complete = true
     fn()
@@ -57,8 +56,9 @@ do ->
     if sexp in [null, true, false] or _.isNumber sexp
       ret = "#{sexp}"
     else if is_symbol sexp
-      ret = to_js_symbol sexp[1]
-      deffed = use_deffed sexp[1]
+      raw_text = sexp[1]
+      ret = to_js_symbol raw_text
+      deffed = use_deffed ret
       if deffed? then prefix.push deffed
     else if _.isString sexp
       ret = "\"#{sexp.replace /\n/g, '\\n'}\""
