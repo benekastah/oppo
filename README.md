@@ -102,7 +102,7 @@ We can call underscore functions:
           'b 2}
          #(* %1 3)) ;; [3, 6]
          
-The runtime tends to change some of the names of existing functions (the underscore object itself is not modified). If you aren't sure about a name, there is a simple formula you can use to figure it out:
+The runtime tends to change some of the names of existing functions (the underscore object itself is *not* modified). If you aren't sure about a name, there is a simple formula you can use to figure it out:
 
   * Camel cased names end up separated by dashes: `indexOf` -> `index-of`
   * Method names prefixed with `is` have a question mark at the end instead: `isString` -> `string?`
