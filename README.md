@@ -1,7 +1,6 @@
 # Oppo
 
 ### Oppo is a sweet little lisp for javascript.
-If javascript is lisp in c's clothing, then oppo is lisp in lisp's clothing, in javascript.
 
 ## Objectives
 
