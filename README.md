@@ -8,7 +8,7 @@ Oppo is a sweet little lisp for javascript. If javascript is lisp in c's clothin
   * Oppo should be a very programmer-friendly language. It should allow the programmer to modify his or her environment. Functions and macros are preferred over rigid operators and keywords. Oppo should smooth over the not-so-sane design choices made in javascript. Any system macro or function should be redefinable.
   * Oppo should have a simple module system that works in the browser and in applicable server-side environments. (Status: currently only node.js is supported. Modules need a little polishing, but work generally. Macros currently do not work well in modules.)
   * Oppo should have strong support for compiler macros. Reader macros should also be possible. (Status: currently, reader macros are not possible with oppo. All compiler macros are global at this time. Eventually, all macros should fit nicely into modules.)
-  * Oppo should have a strong functional runtime. In accordance with oppo's desire to not reinvent the wheel, [Underscore.js](http://documentcloud.github.com/underscore) was chosen as to make the bulk of the runtime. Therefore, compiled code from oppo has Underscore.js as an implicit dependency.
+  * Oppo should have a strong functional runtime. In accordance with oppo's desire not to reinvent the wheel, [Underscore.js](http://documentcloud.github.com/underscore) was chosen as the foundation of the runtime. Therefore, compiled code from oppo has Underscore.js as an implicit dependency.
   
 ## Syntax rundown
 
@@ -57,6 +57,17 @@ We can also make arrays:
 
     (def ls [1 2 3 4 5]) ;; ls = [1, 2, 3, 4, 5]
     
+Accessing members of arrays is simple. **Note**: most functions in oppo treat arrays as if they are 1-based instead of 0-based:
+
+    (def arr [1 2 3 4 5])
+    (nth arr 3) ;; 3
+    (nth arr -2) ;; 4
+    (nth arr 0) ;; undefined
+    (index-of arr 1) ;; 1
+    
+    ;; Access arrays in a 0-based way, if you must
+    (. arr 0) ;; 1
+    
 We can do math:
 
     (+ 1 2 3) ;; 6
@@ -98,3 +109,35 @@ The runtime tends to change some of the names of existing functions (the undersc
   * Method names prefixed with `to` have `->` as a prefix instead: `toArray` -> `->array`
   * Underscores and dashes are interchangeable: `some_identifier` === `some-identifier`. The exception is when the identifier is a single dash: `-` -> `_minus_`.
   
+## A few more complete examples
+
+The obligatory factorial function (**note**: no tail recursion yet):
+
+    (defn fact (n)
+      (if (> n 2)
+        (* n (fact (- n 1)))
+        n))
+        
+Or, we could try it another way:
+
+    (defn fact (n)
+      (reduce (range n 1 -1) #(* %1 %2)))
+      
+Here is a simple error handling function:
+
+    (defn handle-error (message)
+      (let (msg (or message "An unknown error has occurred"))
+        (alert msg)))
+        
+If you have a thirst for fibonacci numbers:
+
+    (defn fib (x ls)
+      (let (-ls (or ls [1 1])
+            n (last -ls)
+            n-1 (nth -ls -2)
+            fibs (concat -ls (+ n n-1)))
+        (if (< (size fibs) x)
+          (fib x fibs)
+          fibs)))
+
+    (fib 15) ;; get the first 15 fibonacci numbers
