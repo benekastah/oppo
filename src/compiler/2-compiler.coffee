@@ -21,10 +21,14 @@ oppo.DEF = DEF = (name, value, required) ->
   ret = DEFITEMS[c_name] = ->
     ret = []
     if required?
+      required = _.map required, _.compose compile, to_symbol
       for item in required
-        result = use_deffed (compile to_symbol item)
+        result = use_deffed item
         if result?
           ret.push result
+      
+      value = value.replace /\{(\d+)\}/g, (s, num) -> required[+num]
+      
     ret.push compile [(to_symbol "def"), s_name, [(to_symbol 'js-eval'), value]]
     ret.join ',\n'
     
@@ -32,11 +36,14 @@ oppo.DEF = DEF = (name, value, required) ->
   ret
   
 use_deffed = (name) ->
-  if (item = DEFITEMS[name]?) and item.complete is false
-    fn = DEFITEMS[ret]
+  fn = DEFITEMS[name]
+  if fn? and fn.complete is false
     fn.complete = true
     fn()
   
+reset_deffed = ->
+  for own name, item of DEFITEMS
+    item.complete = false
 
 ###
 READ, EVAL, COMPILE
@@ -58,8 +65,9 @@ do ->
     else if is_symbol sexp
       raw_text = sexp[1]
       ret = to_js_symbol raw_text
-      deffed = use_deffed ret
-      if deffed? then prefix.push deffed
+      if prefix?
+        deffed = use_deffed ret
+        prefix.push deffed if deffed?
     else if _.isString sexp
       ret = "\"#{sexp.replace /\n/g, '\\n'}\""
     else if _.isFunction sexp
@@ -83,8 +91,7 @@ do ->
       #{vars}#{_prefix}#{ret};
       """
       prefix = null
-      for own name, item of DEFITEMS
-        item.completed = false
+      reset_deffed()
     
     ret
   

@@ -1,5 +1,5 @@
 (function() {
-  var DEF, DEFITEMS, DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, make_error, make_math_fn, math_fn, modules, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, restructure_list, to_js_symbol, to_list, to_quoted, to_symbol, trim, use_deffed, _is, _ref, _ref2, _var,
+  var DEF, DEFITEMS, DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_from_prototype, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, make_comparison_fn, make_error, make_math_fn, math_fn, modules, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, replace, reset_deffed, restructure_list, slice, sort, to_js_symbol, to_list, to_lower, to_quoted, to_symbol, to_upper, trim, use_deffed, _is, _ref, _ref2, _var,
     __slice = Array.prototype.slice,
     __hasProp = Object.prototype.hasOwnProperty;
 
@@ -40,22 +40,22 @@
     "^": "carat",
     "&": "amperstand",
     "*": "star",
-    "(": "oparen",
-    ")": "cparen",
+    "(": "lparen",
+    ")": "rparen",
     "-": "minus",
     "+": "plus",
     "=": "equals",
-    "{": "ocurly",
-    "}": "ccurly",
-    "[": "osquare",
-    "]": "csquare",
+    "{": "lcurly",
+    "}": "rcurly",
+    "[": "lsquare",
+    "]": "rsquare",
     "|": "pipe",
     "\\": "bslash",
     "\"": "dblquote",
     "'": "snglquote",
     ":": "colon",
     ";": "semicolon",
-    "<": "oangle",
+    "<": "langle",
     ">": "rangle",
     ",": "comma",
     ".": "dot",
@@ -412,11 +412,15 @@
       var item, result, _i, _len;
       ret = [];
       if (required != null) {
+        required = _.map(required, _.compose(compile, to_symbol));
         for (_i = 0, _len = required.length; _i < _len; _i++) {
           item = required[_i];
-          result = use_deffed(compile(to_symbol(item)));
+          result = use_deffed(item);
           if (result != null) ret.push(result);
         }
+        value = value.replace(/\{(\d+)\}/g, function(s, num) {
+          return required[+num];
+        });
       }
       ret.push(compile([to_symbol("def"), s_name, [to_symbol('js-eval'), value]]));
       return ret.join(',\n');
@@ -426,12 +430,23 @@
   };
 
   use_deffed = function(name) {
-    var fn, item;
-    if ((item = DEFITEMS[name] != null) && item.complete === false) {
-      fn = DEFITEMS[ret];
+    var fn;
+    fn = DEFITEMS[name];
+    if ((fn != null) && fn.complete === false) {
       fn.complete = true;
       return fn();
     }
+  };
+
+  reset_deffed = function() {
+    var item, name, _results;
+    _results = [];
+    for (name in DEFITEMS) {
+      if (!__hasProp.call(DEFITEMS, name)) continue;
+      item = DEFITEMS[name];
+      _results.push(item.complete = false);
+    }
+    return _results;
   };
 
   /*
@@ -448,7 +463,7 @@
     var prefix, _compile;
     prefix = null;
     _compile = function(sexp, top_level) {
-      var args, deffed, fn, item, macro, name, raw_text, ret, vars, _prefix;
+      var args, deffed, fn, macro, raw_text, ret, vars, _prefix;
       if (sexp == null) sexp = null;
       if (top_level == null) top_level = false;
       if (top_level) prefix = [];
@@ -457,8 +472,10 @@
       } else if (is_symbol(sexp)) {
         raw_text = sexp[1];
         ret = to_js_symbol(raw_text);
-        deffed = use_deffed(ret);
-        if (deffed != null) prefix.push(deffed);
+        if (prefix != null) {
+          deffed = use_deffed(ret);
+          if (deffed != null) prefix.push(deffed);
+        }
       } else if (_.isString(sexp)) {
         ret = "\"" + (sexp.replace(/\n/g, '\\n')) + "\"";
       } else if (_.isFunction(sexp)) {
@@ -481,11 +498,7 @@
         _prefix = (prefix != null ? prefix.length : void 0) ? "" + (prefix.join(',\n')) + ";\n" : '';
         ret = "" + vars + _prefix + ret + ";";
         prefix = null;
-        for (name in DEFITEMS) {
-          if (!__hasProp.call(DEFITEMS, name)) continue;
-          item = DEFITEMS[name];
-          item.completed = false;
-        }
+        reset_deffed();
       }
       return ret;
     };
@@ -1037,23 +1050,11 @@
   (function() {
     var fname, name, oppo_names, underscore_fns, value, _results;
     underscore_fns = {
-      each: null,
-      map: null,
-      reduce: ["reduce", "foldl"],
-      reduceRight: ["reduce-right", "foldr"],
-      find: null,
-      filter: null,
-      reject: null,
-      all: null,
-      any: null,
       include: null,
       invoke: null,
       pluck: null,
-      sortBy: ["sort-by"],
-      groupBy: ["group-by"],
-      sortedIndex: ["sorted-index"],
       shuffle: null,
-      toArray: ["->array"],
+      toArray: ["->arr", "->array"],
       size: null,
       first: ["first", "head"],
       initial: ["initial", "init"],
@@ -1065,10 +1066,7 @@
       union: null,
       intersection: null,
       difference: null,
-      uniq: null,
       zip: null,
-      indexOf: ["index-of"],
-      lastIndexOf: ["last-index-of"],
       range: null,
       bind: null,
       bindAll: ["bind-all"],
@@ -1084,16 +1082,14 @@
       keys: null,
       values: null,
       functions: null,
-      extend: null,
-      defaults: null,
       clone: null,
       tap: null,
-      isEqual: ["equal?", "="],
       isEmpty: ["empty?"],
       isElement: ["element?"],
       isArray: ["array?", "list?"],
       isArguments: ["arguments?"],
       isFunction: ["function?", "fn?"],
+      isString: ["string?", "str?"],
       isNumber: ["number?", "num?"],
       isBoolean: ["boolean?", "bool?"],
       isDate: ["date?"],
@@ -1130,9 +1126,16 @@
 
   DEF('global', "typeof global !== 'undefined' ? global : window");
 
+  get_from_prototype = function(obj, method) {
+    var name;
+    name = "__" + method + "__";
+    DEF(name, "{0}." + obj + ".prototype." + method, ["global"]);
+    return name;
+  };
+
   make_math_fn = function(symbol, js_symbol) {
     if (js_symbol == null) js_symbol = symbol;
-    return DEF(symbol, "function () {\n  var i, num, len, current;\n  for (i = 0, len = arguments.length; i < len; i++) {\n    current = arguments[i];\n    if (num == null) num = current;\n    else num " + js_symbol + "= current;\n  }\n  return num;\n}");
+    return DEF(symbol, "function () {\n  var i, num, len, current;\n  num = arguments[0];\n  for (i = 1, len = arguments.length; i < len; i++) {\n    current = arguments[i];\n    num " + js_symbol + "= current;\n  }\n  return num;\n}");
   };
 
   make_math_fn('+');
@@ -1145,16 +1148,132 @@
 
   make_math_fn('%');
 
-  DEF('**', 'Math.pow');
+  DEF('**', '{0}.Math.pow', ["global"]);
 
-  DEF('max', 'Math.max');
+  DEF('max', '{0}.Math.max', ["global"]);
 
-  DEF('min', 'Math.min');
+  DEF('min', '{0}.Math.min', ["global"]);
+
+  make_comparison_fn = function(symbol, compare_fn) {
+    var js_symbol;
+    if (_.isString(compare_fn)) {
+      js_symbol = compare_fn;
+      compare_fn = null;
+    } else {
+      js_symbol = symbol;
+    }
+    if (compare_fn == null) {
+      compare_fn = function(a, b) {
+        return "" + a + " " + js_symbol + " " + b;
+      };
+    }
+    return DEF(symbol, "function () {\n  var i, item, last, len, result;\n  last = arguments[0];\n  for (i = 1, len = arguments.length; i < len; i++) {\n    item = arguments[i];\n    result = " + (compare_fn("last", "item")) + ";\n    if (!result) break;\n  }\n  return result;\n}");
+  };
+
+  make_comparison_fn("<");
+
+  make_comparison_fn(">");
+
+  make_comparison_fn("<=");
+
+  make_comparison_fn(">=");
+
+  make_comparison_fn("==");
+
+  make_comparison_fn("===");
+
+  make_comparison_fn("not==", "!=");
+
+  make_comparison_fn("not===", "!==");
+
+  make_comparison_fn("=", function(a, b) {
+    return "_.isEqual(" + a + ", " + b + ")";
+  });
+
+  DEF("equal?", "{0}", ["="]);
+
+  DEF("not=", "function () { return !{0}(); }", ["="]);
 
   DEF('->bool', compile([to_symbol('lambda'), [to_symbol('x')], [to_symbol('if'), to_symbol('x'), [to_symbol('js-eval'), 'true'], [to_symbol('js-eval'), 'false']]]));
 
-  DEF('and', "function () {\n  var i, len, item;\n  i = 0;\n  len = arguments.length;\n  for (; i < len; i++) {\n    item = arguments[i];\n    if (!" + (compile(to_symbol('->bool'))) + "(item))\n      break;\n  }\n  return item;\n}", "->bool");
+  DEF('->str', "function (x) {\n  return x.toString ? x.toString : '' + x;\n}");
 
-  DEF('or', "function () {\n  var i, len, item;\n  i = 0;\n  len = arguments.length;\n  for (; i < len; i++) {\n    item = arguments[i];\n    if (" + (compile(to_symbol('->bool'))) + "(item))\n      break;\n  }\n  return item;\n}", "->bool");
+  DEF('->string', "{0}", ["->str"]);
+
+  DEF('->num', "function (x) { return +x; }");
+
+  DEF('->number', "{0}", ["->num"]);
+
+  DEF('->js-map', "function (x) { return Object(x); }");
+
+  DEF('and', "function () {\n  var i, len, item;\n  i = 0;\n  len = arguments.length;\n  for (; i < len; i++) {\n    item = arguments[i];\n    if (!{0}(item))\n      break;\n  }\n  return item;\n}", ["->bool"]);
+
+  DEF('or', "function () {\n  var i, len, item;\n  i = 0;\n  len = arguments.length;\n  for (; i < len; i++) {\n    item = arguments[i];\n    if ({0}(item))\n      break;\n  }\n  return item;\n}", ["->bool"]);
+
+  slice = get_from_prototype("Array", "slice");
+
+  sort = get_from_prototype("Array", "sort");
+
+  (function() {
+    var build;
+    DEF("__iterator_builder_1__", "function (method_name) {\n  var method = _[method_name];\n  return function (a, fn, context) {\n    var args = {0}(arguments);\n    if (fn) {\n      args[1] = {1}(a) ? function (v, k, o) {\n        return fn(v, k + 1, o);\n      } : fn;\n    }\n    return method.apply(_, args);\n  };\n}", ["->array", "array?"]);
+    build = function(name, js_name) {
+      if (js_name == null) js_name = name;
+      return DEF(name, "{0}('" + js_name + "')", ["__iterator_builder_1__"]);
+    };
+    build("each");
+    build("map");
+    build("find");
+    build("filter");
+    build("reject");
+    build("all");
+    build("any");
+    return build("group-by", "groupBy");
+  })();
+
+  (function() {
+    var build;
+    DEF("__iterator_builder_2__", "function (method_name) {\n  var method = _[method_name];\n  return function (a, fn, memo, context) {\n    var args = {0}(arguments);\n    if (fn) {\n      args[1] = {1}(a) ? function (main, v, k, o) {\n        return fn(main, v, k + 1, o)\n      } : fn;\n    }\n    return method.apply(_, args);\n  };\n}", ["->array", "array?"]);
+    build = function(name, js_name) {
+      if (js_name == null) js_name = name;
+      return DEF(name, "{0}('" + js_name + "')", ["__iterator_builder_2__"]);
+    };
+    build("reduce");
+    DEF("foldl", "{0}", ["reduce"]);
+    build("reduce-right", "reduceRight");
+    return DEF("foldr", "{0}", ["reduce-right"]);
+  })();
+
+  DEF("sorted-index", "function (a) {\n  return _.sortedIndex.apply(_, arguments) + 1;\n}");
+
+  DEF("uniq", "function (a, sorted, fn) {\n  var args = {0}(arguments);\n  if (fn) {\n    args[2] = fn && function (v, k, o) {\n      return fn(v, k + 1, o);\n    };\n  }\n  return _.uniq.apply(_, args);\n}", ["->array"]);
+
+  DEF("unique", "{0}", ["uniq"]);
+
+  DEF("concat", "function (base) {\n  var args;\n  args = {0}.call(arguments, 1);\n  return base.concat.apply(base, args);\n}", [slice]);
+
+  DEF("nth", "function (a, i) {\n  i = +i;\n  if (i === 0)\n    console.warn(\"Trying to get 0th item with nth; nth treats lists as 1-based\");\n    \n  if (i < 0)\n    i = (a || []).length + i;\n  else\n    i -= 1;\n    \n  return {0}(a) ? a[i] : {1}(a) ? a.charAt(i) : (function () { throw \"Can't get nth item: collection must be a list or a string\"; })();\n}", ["array?", "string?"]);
+
+  DEF("index-of", "function (a, x, sorted) {\n  return ({0}(a) ? a.indexOf(x) : _.indexOf(a, x, sorted)) + 1;\n}", ["string?"]);
+
+  DEF("last-index-of", "function (a, x) {\n  return ({0}(a) ? a.lastIndexOf(x) : _.lastIndexOf(a, x)) + 1;\n}", ["string?"]);
+
+  DEF("sort", "function (a, fn, context) {\n  var iterator, isArray;\n  if ({0}(a)) {\n    if (!fn) return a.slice().sort();\n    iterator = function (v, k, o) {\n      return fn(v, k + 1, o);\n    };\n  }\n  else iterator = fn;\n  return _.sortBy(a, iterator, context);\n}", ["->array"]);
+
+  DEF("merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return _.extend.apply(_, args);\n}", ["->array"]);
+
+  DEF("careful-merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return _.defaults.apply(_, args);\n}", ["->array"]);
+
+  to_lower = get_from_prototype("String", "toLowerCase");
+
+  to_upper = get_from_prototype("String", "toUpperCase");
+
+  replace = get_from_prototype("String", "replace");
+
+  DEF("->lower", "function (s) { return {0}.call(s); }", [to_lower]);
+
+  DEF("->upper", "function (s) { return {0}.call(s); }", [to_upper]);
+
+  DEF("replace", "function (s, re, val) { return {0}.call(s, re, val); }", [replace]);
 
 }).call(this);
