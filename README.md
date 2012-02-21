@@ -123,7 +123,7 @@ Or, we could try it another way:
     (defn fact (n)
       (reduce (range n 1 -1) #(* %1 %2)))
       
-Here is a simple error handling function:
+Here is a simple error handling function (for a browser):
 
     (defn handle-error (message)
       (let (msg (or message "An unknown error has occurred"))
