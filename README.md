@@ -23,7 +23,7 @@ Oppo is a lisp, and follows lisp's general semantics:
     ;; stored, modified, and evaluated later.
     '(some-fn 1 2 3)
     
-Almost anything can be an identifier. Note, identifiers in oppo are case-sensitive:
+Almost anything can be an identifier. Note, identifiers in oppo are case-insensitive:
 
     some-fn ;; becomes some_fn
     cool?   ;; becomes cool_qmark_
