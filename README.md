@@ -2,12 +2,14 @@
 
 ### Oppo is a sweet little lisp for javascript.
 
+**Important**: Oppo is in alpha stage. It is for the adventurous, the intrepid explorers, the true hackers. It is certainly moving towards stability, but there is much yet to be done before it can be determined to be stable. One of the main things that needs doing is to get a meaningful test suite going, and some complete documentation on the macros and methods that are available to the programmer.
+
 ## Objectives
 
   * Oppo should not reinvent the wheel. Sane design choices from other languages were preferred over other ideas. The languages that have influenced oppo the most were javascript, clojure and coffeescript (in no particular order). Effort was made to keep javascript ideas intact in oppo where it made sense to do so.
   * Oppo should be a very programmer-friendly language. It should allow the programmer to modify his or her environment. Functions and macros are preferred over rigid operators and keywords. Oppo should smooth over the not-so-sane design choices made in javascript. Any system macro or function should be redefinable.
   * Oppo should have a simple module system that works in the browser and in applicable server-side environments. (Status: currently only node.js is supported. Modules need a little polishing, but work generally. Macros currently do not work well in modules.)
-  * Oppo should have strong support for compiler macros. Reader macros should also be possible. (Status: currently, reader macros are not possible with oppo. All compiler macros are global at this time. Eventually, all macros should fit nicely into modules.)
+  * Oppo should have strong support for compiler macros. Reader macros should also be possible. (Status: currently, reader macros are not possible with oppo. All compiler macros are global at this time [though due to the incompleteness of the implementation, I believe they will not work across files currently]. Eventually, all macros should fit nicely into modules.)
   * Oppo should have a strong functional runtime. In accordance with oppo's desire not to reinvent the wheel, [Underscore.js](http://documentcloud.github.com/underscore) was chosen as the foundation of the runtime. Therefore, compiled code from oppo has Underscore.js as an implicit dependency.
   
 ## Syntax rundown
