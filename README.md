@@ -26,9 +26,9 @@ Oppo is a lisp, and follows lisp's general semantics:
 Almost anything can be an identifier. Note, identifiers in oppo are case-sensitive:
 
     some-fn ;; becomes some_fn
-    cool? ;; becomes cool_qmark_
-    * ;; becomes _star_
-    YO%man ;; becomes yo_percent_man
+    cool?   ;; becomes cool_qmark_
+    *       ;; becomes _star_
+    YO%man  ;; becomes yo_percent_man
     
 Oppo has keywords and strings. Keywords are similar to the idea behind clojure's keywords and ruby's symbols. Since the basic idea is to have a unique identifier, and since javascript doesn't have a keyword concept, I just chose to make keywords translate into string literals:
 
@@ -37,14 +37,14 @@ Oppo has keywords and strings. Keywords are similar to the idea behind clojure's
 Oppo also has symbols. Using these ideas, we can access properties on an object:
 
     ;; In a browser, `global` is an alias for `window`
-    (. global 'alert) ;; global.alert
-    (. global 'ALERT) ;; global.alert
+    (. global 'alert)          ;; global.alert
+    (. global 'ALERT)          ;; global.alert
     (. global 'getElementById) ;; global.getelementbyid  <- doesn't work!!
     (. global :getElementById) ;; global["getElementById"]  <- ahh, that's better!
     
-    (. foo 'bar :batz) ;; foo.bar["batz"]
-    (def thing :batz) ;; thing = "batz"
-    (. foo 'bar thing) ;; foo.bar["batz"]
+    (. foo 'bar :batz)         ;; foo.bar["batz"]
+    (def thing :batz)          ;; thing = "batz"
+    (. foo 'bar thing)         ;; foo.bar["batz"]
     
 We can make javascript objects:
 
@@ -60,20 +60,20 @@ We can also make arrays:
 Accessing members of arrays is simple. **Note**: most functions in oppo treat arrays as if they are 1-based instead of 0-based:
 
     (def arr [1 2 3 4 5])
-    (nth arr 3) ;; 3
-    (nth arr -2) ;; 4
-    (nth arr 0) ;; undefined
+    (nth arr 3)      ;; 3
+    (nth arr -2)     ;; 4
+    (nth arr 0)      ;; undefined
     (index-of arr 1) ;; 1
     
     ;; Access arrays in a 0-based way, if you must
-    (. arr 0) ;; 1
+    (. arr 0)        ;; 1
     
 We can do math:
 
     (+ 1 2 3) ;; 6
-    (/ 5 2) ;; 2.5
-    (% 10 2) ;; 0
-    (** 3 3) ;; 3^3 = 9
+    (/ 5 2)   ;; 2.5
+    (% 10 2)  ;; 0
+    (** 3 3)  ;; 3^3 = 9
     
 We can define functions:
 
@@ -94,7 +94,7 @@ We can define macros:
     (defmacro add-5 (x)
       `(+ ~x 5))
       
-    (add-5 6) ;; 6 + 5
+    (add-5 6)     ;; 6 + 5
     
 We can call underscore functions:
 
