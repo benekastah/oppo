@@ -46,7 +46,7 @@ Oppo also has symbols. Using these ideas, we can access properties on an object:
     
     (. foo 'bar :batz)         ;; foo.bar["batz"]
     (def thing :batz)          ;; thing = "batz"
-    (. foo 'bar thing)         ;; foo.bar["batz"]
+    (. foo 'bar thing)         ;; foo.bar[thing]
     
 We can make javascript objects:
 
