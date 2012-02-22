@@ -525,7 +525,7 @@ function (a, b, c, d, e, f, g) {
 }
 """, ["global"]
 
-DEF "date-now", """
+DEF "now", """
 (function () {
   var D;
   D = {0}.Date;
