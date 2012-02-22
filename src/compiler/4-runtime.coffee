@@ -100,6 +100,37 @@ get_from_prototype = (obj, method) ->
   DEF name, "{0}.#{obj}.prototype.#{method}", ["global"]
   name
 
+use_from_prototype = (obj, method, oppo_name = method) ->
+  temp = get_from_prototype obj, method
+  DEF oppo_name, """
+  function (base) {
+    var args;
+    args = {0}.call(arguments, 1);
+    return {1}.apply(base, args);
+  }
+  """, ["__slice__", temp]
+
+get_many_from_prototype = (obj, methods) ->
+  for method in methods
+    get_from_prototype obj, method
+    
+use_many_from_prototype = (obj, methods) ->
+  for args in methods
+    if not _.isArray args
+      args = [args]
+    args.unshift obj
+    use_from_prototype args...
+    
+use_properties = (obj, props) ->
+  for prop in props
+    if not _.isArray prop
+      prop = [prop]
+      
+    [js_name, oppo_name] = prop
+    oppo_name ?= js_name
+    
+    DEF oppo_name, "{0}.#{obj}.#{js_name}", ["global"]
+
 
 ## Math functions
 make_math_fn = (symbol, js_symbol = symbol) ->
@@ -124,6 +155,26 @@ DEF '**', '{0}.Math.pow', ["global"]
 DEF 'max', '{0}.Math.max', ["global"]
 DEF 'min', '{0}.Math.min', ["global"]
 
+use_properties "Math", [
+  "E", "LN2", "LN10", "LOG2E", "LOG10E", "PI", ["SQRT1_2", "sqrt1/2"], "SQRT2"
+  "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log", "max"
+  "min", ["pow", "**"], "pow", "random", "round", "sin", "sqrt", "tan"
+]
+
+DEF "finite?", "{0}.isFinite", ["global"]
+
+DEF "infinity", "{0}.Infinity", ["global"]
+DEF "-infinity", "-{0}", ["infinity"]
+DEF "nan", "{0}.NaN", ["global"]
+
+DEF "parse-int", "{0}.parseInt", ["global"]
+DEF "parse-float", "{0}.parseFloat", ["global"]
+
+DEF "to-base", """
+function (n, base) {
+  return (+n).toString(base);
+}
+"""
 
 ## Comparison functions
 make_comparison_fn = (symbol, compare_fn) ->
@@ -167,6 +218,10 @@ DEF '->bool', compile [
   [(to_symbol 'x')]
   [(to_symbol 'if'), (to_symbol 'x'), [(to_symbol 'js-eval'), 'true'], [(to_symbol 'js-eval'), 'false']]
 ]
+
+DEF '->boolean', "{0}", ["->bool"]
+
+DEF 'not', "function (x) { return !{0}(x); }", ["->bool"]
 
 DEF '->str', """
 function (x) {
@@ -216,6 +271,7 @@ function () {
 ## Array/String functions
 slice = get_from_prototype "Array", "slice"
 sort = get_from_prototype "Array", "sort"
+join = get_from_prototype "Array", "join"
 
 do ->
   DEF "__iterator_builder_1__", """
@@ -270,11 +326,25 @@ do ->
   build "reduce-right", "reduceRight"
   DEF "foldr", "{0}", ["reduce-right"]
   
+DEF "slice", """
+function (a) {
+  var args;
+  args = {0}.call(arguments, 1);
+  return a.slice.apply(a, args);
+}
+""", [slice]
+  
 DEF "sorted-index", """
 function (a) {
   return _.sortedIndex.apply(_, arguments) + 1;
 }
 """
+
+DEF "join", """
+function (a, sep) {
+  return {0}.call(a, sep != null ? sep : '');
+}
+""", [join]
 
 DEF "uniq", """
 function (a, sorted, fn) {
@@ -339,6 +409,54 @@ function (a, fn, context) {
 }
 """, ["->array"]
 
+DEF "reverse", """
+function (a) {
+  var str, ret;
+  str = {0}(a);
+  ret = str ? a.split('') : a.slice();
+  ret.reverse();
+  return str ? ret.join('') : ret;
+}
+""", ["string?"]
+
+
+## String only functions
+to_lower = get_from_prototype "String", "toLowerCase"
+to_upper = get_from_prototype "String", "toUpperCase"
+split = get_from_prototype "String", "split"
+trim = get_from_prototype "String", "trim"
+rtrim = get_from_prototype "String", "trimRight"
+ltrim = get_from_prototype "String", "trimLeft"
+
+DEF "rtrim", """
+function (s) {
+  return {0} ? {0}.call(s) : s.replace(/\s+$/, '');
+}
+""", [rtrim]
+DEF "trim-right", "{0}", ["rtrim"]
+
+DEF "ltrim", """
+function (s) {
+  return {0} ? {0}.call(s) : s.replace(/^\s+/, '');
+}
+""", [ltrim]
+DEF "trim-left", "{0}", ["ltrim"]
+
+DEF "trim", """
+function (s) {
+  return {0} ? {0}.call(s) : {1}({2}(s));
+}
+""", [trim, "ltrim", "rtrim"]
+
+DEF "->lower", "function (s) { return {0}.call(s); }", [to_lower]
+DEF "->upper", "function (s) { return {0}.call(s); }", [to_upper]
+
+use_many_from_prototype "String", [
+  "split", "replace", ["search", "str-search"], "substr", "substring",
+  ["charCodeAt", "char-code-at"], "match", ["toLocaleLowerCase", "->locale-lower"]
+  ["toLocaleUpperCase", "->locale-upper"], ["localeCompare", "locale-compare"]
+]
+
 
 ## Object functions
 DEF "merge", """
@@ -357,14 +475,79 @@ function () {
 }
 """, ["->array"]
 
+DEF "__create__", "Object.create"
 
-to_lower = get_from_prototype "String", "toLowerCase"
-to_upper = get_from_prototype "String", "toUpperCase"
-replace = get_from_prototype "String", "replace"
+DEF "extend", """
+(function () {
+  return {0} ? function (proto) { return {0}(proto != null ? proto : null); } :
+  function (proto) {
+    function noop() {}
+    noop.prototype = proto != null ? proto : null;
+    return new noop;
+  };
+})()
+""", ["__create__"]
 
-DEF "->lower", "function (s) { return {0}.call(s); }", [to_lower]
-DEF "->upper", "function (s) { return {0}.call(s); }", [to_upper]
+DEF "merge-extend", """
+function (o, proto) {
+  var ret;
+  ret = {0}(proto);
+  return _.extend(ret, o);
+}
+""", ["extend"]
 
-DEF "replace", """
-function (s, re, val) { return {0}.call(s, re, val); }
-""", [replace]
+
+## Misc
+use_many_from_prototype "RegExp", [
+  ["exec", "re-exec"], ["test", "re-test"]
+]
+
+use_many_from_prototype "Number", [
+  ["toExponential", "->exponential"], ["toFixed", "->fixed"], ["toLocaleString", "->locale-string"]
+  ["toPrecision", "->precision"]
+]
+
+DEF "date", """
+function (a, b, c, d, e, f, g) {
+  var d, D;
+  D = {0}.Date;
+  switch (arguments.length) {
+    case 0: d = new D(); break;
+    case 1: d = new D(a); break;
+    case 2: d = new D(a, b); break;
+    case 3: d = new D(a, b, c); break;
+    case 4: d = new D(a, b, c, d); break;
+    case 5: d = new D(a, b, c, d, e); break;
+    case 6: d = new D(a, b, c, d, e, f); break;
+    case 7: d = new D(a, b, c, d, e, f, g); break;
+  }
+  return d;
+}
+""", ["global"]
+
+DEF "date-now", """
+(function () {
+  var D;
+  D = {0}.Date;
+  return D.now ? D.now : function () { return +(new Date); }
+})()
+""", ["global"]
+
+use_many_from_prototype "Date", [
+  ["getDate", "get-date"], ["getDay", "get-day"], ["getFullYear", "get-year"], ["getHours", "get-hours"]
+  ["getMilliseconds", "get-milliseconds"], ["getMinutes", "get-minutes"], ["getMonth", "get-month"]
+  ["getSeconds", "get-seconds"], ["getTime", "get-time"], ["getTimezoneOffset", "get-timezone-offset"]
+  ["getUTCDate", "get-utc-date"], ["getUTCDay", "get-utc-day"], ["getUTCFullYear", "get-utc-full-year"]
+  ["getUTCHours", "get-utc-hours"], ["getUTCMilliseconds", "get-utc-milliseconds"], ["getUTCMinutes", "get-utc-minutes"]
+  ["getUTCMonth", "get-utc-month"], ["getUTCSeconds", "get-utc-seconds"], ["setDate", "set-date!"]
+  ["setFullYear", "set-year!"], ["setHours", "set-hours!"], ["setMilliseconds", "set-milliseconds!"]
+  ["setMinutes", "set-minutes!"], ["setMonth", "set-month!"], ["setSeconds", "set-seconds!"], ["setTime", "set-time!"]
+  ["setUTCDate", "set-utc-date!"], ["setUTCFullYear", "set-utc-year!"], ["setUTCHours", "set-utc-hours!"]
+  ["setUTCMilliseconds", "set-utc-milliseconds!"], ["setUTCMinutes", "set-utc-minutes!"], ["setUTCMonth", "set-utc-month!"]
+  ["setUTCSeconds", "set-utc-seconds!"], ["toDateString", "->date-string"], ["toISOString", "->iso-string"]
+  ["toJSON", "->json"], ["toLocaleDateString", "->locale-date-string"], ["toLocaleTimeString", "->locale-time-string"]
+  ["toTimeString", "->time-string"], ["toUTCString", "->utc-string"]
+]
+
+DEF "json-stringify", "{0}.JSON.stringify", ["global"]
+DEF "json-parse", "{0}.JSON.parse", ["global"]

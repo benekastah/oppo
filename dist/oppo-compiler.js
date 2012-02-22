@@ -1,5 +1,5 @@
 (function() {
-  var DEF, DEFITEMS, DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_from_prototype, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, make_comparison_fn, make_error, make_math_fn, math_fn, modules, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, replace, reset_deffed, restructure_list, slice, sort, to_js_symbol, to_list, to_lower, to_quoted, to_symbol, to_upper, trim, use_deffed, _is, _ref, _ref2, _var,
+  var DEF, DEFITEMS, DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_from_prototype, get_many_from_prototype, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, join, ltrim, make_comparison_fn, make_error, make_math_fn, math_fn, modules, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, reset_deffed, restructure_list, rtrim, slice, sort, split, to_js_symbol, to_list, to_lower, to_quoted, to_symbol, to_upper, trim, use_deffed, use_from_prototype, use_many_from_prototype, use_properties, __var, _is, _ref, _ref2,
     __slice = Array.prototype.slice,
     __hasProp = Object.prototype.hasOwnProperty;
 
@@ -768,27 +768,27 @@
     return ret = compile([to_symbol('quote'), to_symbol(sym)]);
   });
 
-  _var = function(name, value, scope) {
+  __var = function(name, value, scope, type) {
     var c_name, c_value;
+    if (type == null) type = "variable";
     c_name = compile(name);
+    if (c_name !== (to_js_symbol(c_name))) {
+      raise("DefError", "Can't define complex symbol: " + c_name);
+    }
     c_value = compile(value);
-    Scope.def(c_name, "variable", scope);
+    Scope.def(c_name, type, scope);
     return "" + c_name + " = " + c_value;
   };
 
   DEFMACRO('var', function(name, value) {
-    return _var(name, value);
+    return __var(name, value);
   });
 
   DEFMACRO('def', function(name, value) {
     var c_name, first_group, ret;
     first_group = Scope.top();
     c_name = compile(name);
-    if (c_name === (to_js_symbol(c_name))) {
-      return ret = _var(name, value, first_group);
-    } else {
-      return raise("DefError", "Can't define complex symbol: " + c_name);
-    }
+    return ret = __var(name, value, first_group);
   });
 
   DEFMACRO('set!', function(name, value) {
@@ -896,13 +896,13 @@
     mc_expand = false;
     mc_expand_1 = false;
     DEFMACRO('defmacro', function() {
-      var argnames, c_name, c_value, defmacro, macro_fn, name, sym, template;
+      var argnames, base, c_name, name, template;
       name = arguments[0], argnames = arguments[1], template = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
       if (argnames == null) argnames = [];
       c_name = compile(name);
-      macro_fn = "(function () {\n  return eval(oppo.compiler." + c_name + ".apply(this, arguments));\n})";
-      Scope.def(c_name, "macro");
-      compiler[c_name] = function() {
+      base = compiler;
+      Scope.def(c_name, "macro", "global");
+      base[c_name] = function() {
         var evald, js, q_args, sexp;
         q_args = _.map(arguments, to_quoted);
         sexp = [[to_symbol('lambda'), argnames].concat(template)].concat(q_args);
@@ -915,10 +915,7 @@
           return evald;
         }
       };
-      sym = to_symbol;
-      defmacro = compile([sym('if'), [sym('js-eval'), "!oppo.compiler." + c_name], [sym("eval"), [sym('quote'), [sym('defmacro'), name, argnames].concat(__slice.call(template))]]]);
-      c_value = "(" + defmacro + ", " + macro_fn + ")";
-      return "" + c_name + " = " + c_value;
+      return "null";
     });
     DEFMACRO('macroexpand', function(sexp) {
       var old_mc_expand, ret;
@@ -954,7 +951,7 @@
     def = [];
     defmacro = [];
     adjust_environment = function(module_name, names, scope) {
-      var last_macro, s_module_name;
+      var s_module_name, _var;
       s_module_name = get_raw_text(module_name);
       modules[s_module_name] = {
         names: names,
@@ -962,23 +959,13 @@
       };
       _var = GETMACRO('var');
       def.push(GETMACRO('def'));
-      compiler.def = function(name, value) {
+      return compiler.def = function(name, value) {
         names.push(name);
         return _var(name, value, scope);
       };
-      defmacro.push((last_macro = GETMACRO('defmacro')));
-      return compiler.defmacro = function() {
-        var def_stmt, n_name, name, r_name, rest;
-        name = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-        r_name = get_raw_text(name);
-        n_name = to_symbol("" + s_module_name + "." + r_name);
-        def_stmt = [to_symbol('def'), name, [to_symbol('js-eval'), last_macro.apply(null, [n_name].concat(__slice.call(rest)))]];
-        return compile([to_symbol('do'), def_stmt, [to_symbol('js-eval'), "" + r_name + ".macro_name = '" + (compile(n_name)) + "'"]]);
-      };
     };
     restore_environment = function() {
-      compiler.def = def.pop();
-      return compiler.defmacro = defmacro.pop();
+      return compiler.def = def.pop();
     };
     DEFMACRO('defmodule', function() {
       var args, body, c_body, c_deps, deps, export_names, js_map_args, name, r_deps, r_name, ret, return_val, scope, symbols, values, var_stmt, vars;
@@ -1003,7 +990,7 @@
       return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + (args.join(', ')) + ") {\n  " + var_stmt + (c_body.join(',\n')) + ";\n  return " + return_val + "\n})";
     });
     return DEFMACRO('require', function() {
-      var c_names, name, names, r_name, ret;
+      var c_names, name, names, r_name, ret, _var;
       names = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       _var = GETMACRO('var');
       c_names = (function() {
@@ -1012,7 +999,7 @@
         for (_i = 0, _len = names.length; _i < _len; _i++) {
           name = names[_i];
           r_name = get_raw_text(name);
-          _results.push(ret = _var(name, [to_symbol('js-eval'), "oppo.module.require(" + (compile(r_name)) + ")"]));
+          _results.push(ret = __var(name, [to_symbol('js-eval'), "oppo.module.require(" + (compile(r_name)) + ")"], null, "module"));
         }
         return _results;
       })();
@@ -1133,6 +1120,48 @@
     return name;
   };
 
+  use_from_prototype = function(obj, method, oppo_name) {
+    var temp;
+    if (oppo_name == null) oppo_name = method;
+    temp = get_from_prototype(obj, method);
+    return DEF(oppo_name, "function (base) {\n  var args;\n  args = {0}.call(arguments, 1);\n  return {1}.apply(base, args);\n}", ["__slice__", temp]);
+  };
+
+  get_many_from_prototype = function(obj, methods) {
+    var method, _i, _len, _results;
+    _results = [];
+    for (_i = 0, _len = methods.length; _i < _len; _i++) {
+      method = methods[_i];
+      _results.push(get_from_prototype(obj, method));
+    }
+    return _results;
+  };
+
+  use_many_from_prototype = function(obj, methods) {
+    var args, _i, _len, _results;
+    _results = [];
+    for (_i = 0, _len = methods.length; _i < _len; _i++) {
+      args = methods[_i];
+      if (!_.isArray(args)) args = [args];
+      args.unshift(obj);
+      _results.push(use_from_prototype.apply(null, args));
+    }
+    return _results;
+  };
+
+  use_properties = function(obj, props) {
+    var js_name, oppo_name, prop, _i, _len, _results;
+    _results = [];
+    for (_i = 0, _len = props.length; _i < _len; _i++) {
+      prop = props[_i];
+      if (!_.isArray(prop)) prop = [prop];
+      js_name = prop[0], oppo_name = prop[1];
+      if (oppo_name == null) oppo_name = js_name;
+      _results.push(DEF(oppo_name, "{0}." + obj + "." + js_name, ["global"]));
+    }
+    return _results;
+  };
+
   make_math_fn = function(symbol, js_symbol) {
     if (js_symbol == null) js_symbol = symbol;
     return DEF(symbol, "function () {\n  var i, num, len, current;\n  num = arguments[0];\n  for (i = 1, len = arguments.length; i < len; i++) {\n    current = arguments[i];\n    num " + js_symbol + "= current;\n  }\n  return num;\n}");
@@ -1153,6 +1182,22 @@
   DEF('max', '{0}.Math.max', ["global"]);
 
   DEF('min', '{0}.Math.min', ["global"]);
+
+  use_properties("Math", ["E", "LN2", "LN10", "LOG2E", "LOG10E", "PI", ["SQRT1_2", "sqrt1/2"], "SQRT2", "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log", "max", "min", ["pow", "**"], "pow", "random", "round", "sin", "sqrt", "tan"]);
+
+  DEF("finite?", "{0}.isFinite", ["global"]);
+
+  DEF("infinity", "{0}.Infinity", ["global"]);
+
+  DEF("-infinity", "-{0}", ["infinity"]);
+
+  DEF("nan", "{0}.NaN", ["global"]);
+
+  DEF("parse-int", "{0}.parseInt", ["global"]);
+
+  DEF("parse-float", "{0}.parseFloat", ["global"]);
+
+  DEF("to-base", "function (n, base) {\n  return (+n).toString(base);\n}");
 
   make_comparison_fn = function(symbol, compare_fn) {
     var js_symbol;
@@ -1196,6 +1241,10 @@
 
   DEF('->bool', compile([to_symbol('lambda'), [to_symbol('x')], [to_symbol('if'), to_symbol('x'), [to_symbol('js-eval'), 'true'], [to_symbol('js-eval'), 'false']]]));
 
+  DEF('->boolean', "{0}", ["->bool"]);
+
+  DEF('not', "function (x) { return !{0}(x); }", ["->bool"]);
+
   DEF('->str', "function (x) {\n  return x.toString ? x.toString : '' + x;\n}");
 
   DEF('->string', "{0}", ["->str"]);
@@ -1213,6 +1262,8 @@
   slice = get_from_prototype("Array", "slice");
 
   sort = get_from_prototype("Array", "sort");
+
+  join = get_from_prototype("Array", "join");
 
   (function() {
     var build;
@@ -1244,7 +1295,11 @@
     return DEF("foldr", "{0}", ["reduce-right"]);
   })();
 
+  DEF("slice", "function (a) {\n  var args;\n  args = {0}.call(arguments, 1);\n  return a.slice.apply(a, args);\n}", [slice]);
+
   DEF("sorted-index", "function (a) {\n  return _.sortedIndex.apply(_, arguments) + 1;\n}");
+
+  DEF("join", "function (a, sep) {\n  return {0}.call(a, sep != null ? sep : '');\n}", [join]);
 
   DEF("uniq", "function (a, sorted, fn) {\n  var args = {0}(arguments);\n  if (fn) {\n    args[2] = fn && function (v, k, o) {\n      return fn(v, k + 1, o);\n    };\n  }\n  return _.uniq.apply(_, args);\n}", ["->array"]);
 
@@ -1260,20 +1315,58 @@
 
   DEF("sort", "function (a, fn, context) {\n  var iterator, isArray;\n  if ({0}(a)) {\n    if (!fn) return a.slice().sort();\n    iterator = function (v, k, o) {\n      return fn(v, k + 1, o);\n    };\n  }\n  else iterator = fn;\n  return _.sortBy(a, iterator, context);\n}", ["->array"]);
 
-  DEF("merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return _.extend.apply(_, args);\n}", ["->array"]);
-
-  DEF("careful-merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return _.defaults.apply(_, args);\n}", ["->array"]);
+  DEF("reverse", "function (a) {\n  var str, ret;\n  str = {0}(a);\n  ret = str ? a.split('') : a.slice();\n  ret.reverse();\n  return str ? ret.join('') : ret;\n}", ["string?"]);
 
   to_lower = get_from_prototype("String", "toLowerCase");
 
   to_upper = get_from_prototype("String", "toUpperCase");
 
-  replace = get_from_prototype("String", "replace");
+  split = get_from_prototype("String", "split");
+
+  trim = get_from_prototype("String", "trim");
+
+  rtrim = get_from_prototype("String", "trimRight");
+
+  ltrim = get_from_prototype("String", "trimLeft");
+
+  DEF("rtrim", "function (s) {\n  return {0} ? {0}.call(s) : s.replace(/\s+$/, '');\n}", [rtrim]);
+
+  DEF("trim-right", "{0}", ["rtrim"]);
+
+  DEF("ltrim", "function (s) {\n  return {0} ? {0}.call(s) : s.replace(/^\s+/, '');\n}", [ltrim]);
+
+  DEF("trim-left", "{0}", ["ltrim"]);
+
+  DEF("trim", "function (s) {\n  return {0} ? {0}.call(s) : {1}({2}(s));\n}", [trim, "ltrim", "rtrim"]);
 
   DEF("->lower", "function (s) { return {0}.call(s); }", [to_lower]);
 
   DEF("->upper", "function (s) { return {0}.call(s); }", [to_upper]);
 
-  DEF("replace", "function (s, re, val) { return {0}.call(s, re, val); }", [replace]);
+  use_many_from_prototype("String", ["split", "replace", ["search", "str-search"], "substr", "substring", ["charCodeAt", "char-code-at"], "match", ["toLocaleLowerCase", "->locale-lower"], ["toLocaleUpperCase", "->locale-upper"], ["localeCompare", "locale-compare"]]);
+
+  DEF("merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return _.extend.apply(_, args);\n}", ["->array"]);
+
+  DEF("careful-merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return _.defaults.apply(_, args);\n}", ["->array"]);
+
+  DEF("__create__", "Object.create");
+
+  DEF("extend", "(function () {\n  return {0} ? function (proto) { return {0}(proto != null ? proto : null); } :\n  function (proto) {\n    function noop() {}\n    noop.prototype = proto != null ? proto : null;\n    return new noop;\n  };\n})()", ["__create__"]);
+
+  DEF("merge-extend", "function (o, proto) {\n  var ret;\n  ret = {0}(proto);\n  return _.extend(ret, o);\n}", ["extend"]);
+
+  use_many_from_prototype("RegExp", [["exec", "re-exec"], ["test", "re-test"]]);
+
+  use_many_from_prototype("Number", [["toExponential", "->exponential"], ["toFixed", "->fixed"], ["toLocaleString", "->locale-string"], ["toPrecision", "->precision"]]);
+
+  DEF("date", "function (a, b, c, d, e, f, g) {\n  var d, D;\n  D = {0}.Date;\n  switch (arguments.length) {\n    case 0: d = new D(); break;\n    case 1: d = new D(a); break;\n    case 2: d = new D(a, b); break;\n    case 3: d = new D(a, b, c); break;\n    case 4: d = new D(a, b, c, d); break;\n    case 5: d = new D(a, b, c, d, e); break;\n    case 6: d = new D(a, b, c, d, e, f); break;\n    case 7: d = new D(a, b, c, d, e, f, g); break;\n  }\n  return d;\n}", ["global"]);
+
+  DEF("date-now", "(function () {\n  var D;\n  D = {0}.Date;\n  return D.now ? D.now : function () { return +(new Date); }\n})()", ["global"]);
+
+  use_many_from_prototype("Date", [["getDate", "get-date"], ["getDay", "get-day"], ["getFullYear", "get-year"], ["getHours", "get-hours"], ["getMilliseconds", "get-milliseconds"], ["getMinutes", "get-minutes"], ["getMonth", "get-month"], ["getSeconds", "get-seconds"], ["getTime", "get-time"], ["getTimezoneOffset", "get-timezone-offset"], ["getUTCDate", "get-utc-date"], ["getUTCDay", "get-utc-day"], ["getUTCFullYear", "get-utc-full-year"], ["getUTCHours", "get-utc-hours"], ["getUTCMilliseconds", "get-utc-milliseconds"], ["getUTCMinutes", "get-utc-minutes"], ["getUTCMonth", "get-utc-month"], ["getUTCSeconds", "get-utc-seconds"], ["setDate", "set-date!"], ["setFullYear", "set-year!"], ["setHours", "set-hours!"], ["setMilliseconds", "set-milliseconds!"], ["setMinutes", "set-minutes!"], ["setMonth", "set-month!"], ["setSeconds", "set-seconds!"], ["setTime", "set-time!"], ["setUTCDate", "set-utc-date!"], ["setUTCFullYear", "set-utc-year!"], ["setUTCHours", "set-utc-hours!"], ["setUTCMilliseconds", "set-utc-milliseconds!"], ["setUTCMinutes", "set-utc-minutes!"], ["setUTCMonth", "set-utc-month!"], ["setUTCSeconds", "set-utc-seconds!"], ["toDateString", "->date-string"], ["toISOString", "->iso-string"], ["toJSON", "->json"], ["toLocaleDateString", "->locale-date-string"], ["toLocaleTimeString", "->locale-time-string"], ["toTimeString", "->time-string"], ["toUTCString", "->utc-string"]]);
+
+  DEF("json-stringify", "{0}.JSON.stringify", ["global"]);
+
+  DEF("json-parse", "{0}.JSON.parse", ["global"]);
 
 }).call(this);

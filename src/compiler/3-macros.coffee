@@ -4,14 +4,17 @@ do ->
   
   DEFMACRO 'defmacro', (name, argnames=[], template...) ->
     c_name = compile name
-    macro_fn = """
-    (function () {
-      return eval(oppo.compiler.#{c_name}.apply(this, arguments));
-    })
-    """
+    base = compiler
     
-    Scope.def c_name, "macro"
-    compiler[c_name] = ->
+    # if _is (_.first name), "."
+    #   module_name = compile name[1]
+    #   if (Scope.type module_name) isnt "module"
+    #     throw new TypeError "Can't nest a macro within a non-module: #{module_name}"
+    #   
+    #   c_name = compile c_name
+    
+    Scope.def c_name, "macro", "global"
+    base[c_name] = ->
       q_args = _.map arguments, to_quoted
       sexp = [[(to_symbol 'lambda'), argnames].concat(template)].concat(q_args)
       js = compile sexp
@@ -22,16 +25,8 @@ do ->
         mc_expand_1 = false
         evald
         
-    sym = to_symbol
-    defmacro = compile [
-      (sym 'if')
-      [(sym 'js-eval'), "!oppo.compiler.#{c_name}"]
-      [(sym "eval"), [(sym 'quote'), [(sym 'defmacro'), name, argnames, template...]]]
-    ]
-    c_value = """
-    (#{defmacro}, #{macro_fn})
-    """
-    "#{c_name} = #{c_value}"
+    #"#{c_name} = {type: 'macro', name: '#{get_raw_text name}'}"
+    "null"
     
   DEFMACRO 'macroexpand', (sexp) ->
     old_mc_expand = mc_expand
