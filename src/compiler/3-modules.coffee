@@ -12,21 +12,14 @@ do ->
       names.push name
       _var name, value, scope
       
-    defmacro.push (last_macro = GETMACRO 'defmacro')
-    compiler.defmacro = (name, rest...) ->
-      r_name = get_raw_text name
-      n_name = (to_symbol "#{s_module_name}.#{r_name}")
-      def_stmt = [(to_symbol 'def'), name, [(to_symbol 'js-eval'), (last_macro n_name, rest...)]]
-      compile [
-        (to_symbol 'do'), def_stmt, 
-        [
-          (to_symbol 'js-eval'), "#{r_name}.macro_name = '#{compile n_name}'"
-        ]
-      ]
+    # defmacro.push (last_macro = GETMACRO 'defmacro')
+    # compiler.defmacro = (name, argnames, template...) ->
+    #   n_name = [(to_symbol '.'), module_name, [(to_symbol 'quote'), name]]
+    #   last_macro n_name, argnames, template
   
   restore_environment = ->
     compiler.def = def.pop()
-    compiler.defmacro = defmacro.pop()
+    # compiler.defmacro = defmacro.pop()
   
   DEFMACRO 'defmodule', (name, deps=[], body...) ->
     scope = Scope.make_new()
@@ -62,5 +55,5 @@ do ->
     _var = GETMACRO 'var'
     c_names = for name in names
       r_name = get_raw_text name
-      ret = _var name, [(to_symbol 'js-eval'), "oppo.module.require(#{compile r_name})"]
+      ret = __var name, [(to_symbol 'js-eval'), "oppo.module.require(#{compile r_name})"], null, "module"
     c_names.join ',\n'

@@ -68,22 +68,22 @@ DEFMACRO 'gensym', ->
   sym = gensym arguments...
   ret = compile [(to_symbol 'quote'), (to_symbol sym)]
 
-_var = (name, value, scope) ->
+__var = (name, value, scope, type = "variable") ->
   c_name = compile name
+  if c_name isnt (to_js_symbol c_name)
+    raise "DefError", "Can't define complex symbol: #{c_name}"
+  
   c_value = compile value
-  Scope.def c_name, "variable", scope
+  Scope.def c_name, type, scope
   "#{c_name} = #{c_value}"
 
 DEFMACRO 'var', (name, value) ->
-  _var name, value
-  
+  __var name, value
+
 DEFMACRO 'def', (name, value) ->
   first_group = Scope.top()
   c_name = compile name
-  if c_name is (to_js_symbol c_name)
-    ret = _var name, value, first_group
-  else
-    raise "DefError", "Can't define complex symbol: #{c_name}"
+  ret = __var name, value, first_group
 
 DEFMACRO 'set!', (name, value) ->
   c_name = compile name

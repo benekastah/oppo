@@ -1,0 +1,17 @@
+(def noop (fn () {'append noop}))
+
+(defmacro write (x)
+  `(do
+    ((. global 'console 'log) ~x)
+    ((. ((or (. global '$) noop) "#test") 'append) ~x)))
+
+(defmacro assert (nm x)
+  `(if (not ~x)
+    (write (str ~nm ": FAILED!"))
+    (write (str ~nm ": passed"))))
+    
+(assert "Fail"
+        (= 1 2))
+
+(assert "Keywords"
+        (= (keyword "asdf") :asdf "asdf"))

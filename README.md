@@ -8,8 +8,8 @@
 
   * Oppo should not reinvent the wheel. Sane design choices from other languages were preferred over other ideas. The languages that have influenced oppo the most were javascript, clojure and coffeescript (in no particular order). Effort was made to keep javascript ideas intact in oppo where it made sense to do so.
   * Oppo should be a very programmer-friendly language. It should allow the programmer to modify his or her environment. Functions and macros are preferred over rigid operators and keywords. Oppo should smooth over the not-so-sane design choices made in javascript. Any system macro or function should be redefinable.
-  * Oppo should have a simple module system that works in the browser and in applicable server-side environments. (Status: currently only node.js is supported. Modules need a little polishing, but work generally. Macros currently do not work well in modules.)
-  * Oppo should have strong support for compiler macros. Reader macros should also be possible. (Status: currently, reader macros are not possible with oppo. All compiler macros are global at this time [though due to the incompleteness of the implementation, I believe they will not work across files currently]. Eventually, all macros should fit nicely into modules.)
+  * Oppo should have a simple module system that works in the browser and in applicable server-side environments. (Status: currently the only server-side environment supported is node.js. Modules need a little polishing, but work generally. Currently, macros are global values and don't benefit from modules yet.)
+  * Oppo should have strong support for compiler macros. Reader macros should also be possible. (Status: currently, reader macros are not possible with oppo. All compiler macros are global at this time. Eventually, all macros should fit nicely into modules.)
   * Oppo should have a strong functional runtime. In accordance with oppo's desire not to reinvent the wheel, [Underscore.js](http://documentcloud.github.com/underscore) was chosen as the foundation of the runtime. Therefore, compiled code from oppo has Underscore.js as an implicit dependency.
   
 ## Syntax rundown
@@ -24,8 +24,8 @@ Oppo is a lisp, and follows lisp's general semantics:
     ;; This is a quoted expression. It won't be evaluated. Instead it can be
     ;; stored, modified, and evaluated later.
     '(some-fn 1 2 3)
-    
-Almost anything can be an identifier. Note, identifiers in oppo are case-insensitive:
+   
+Almost anything can be an identifier. _**Note**, identifiers in oppo are **not** case-sensitive_:
 
     some-fn ;; becomes some_fn
     cool?   ;; becomes cool_qmark_
@@ -46,7 +46,7 @@ Oppo also has symbols. Using these ideas, we can access properties on an object:
     
     (. foo 'bar :batz)         ;; foo.bar["batz"]
     (def thing :batz)          ;; thing = "batz"
-    (. foo 'bar thing)         ;; foo.bar["batz"]
+    (. foo 'bar thing)         ;; foo.bar[thing]
     
 We can make javascript objects:
 

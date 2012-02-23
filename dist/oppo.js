@@ -505,8 +505,8 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   }
 }
 ;(function() {
-  var DEF, DEFITEMS, DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_from_prototype, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, make_comparison_fn, make_error, make_math_fn, math_fn, modules, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, replace, reset_deffed, restructure_list, slice, 
-  sort, to_js_symbol, to_list, to_lower, to_quoted, to_symbol, to_upper, trim, use_deffed, _is, _ref, _ref2, _var, __slice = Array.prototype.slice, __hasProp = Object.prototype.hasOwnProperty;
+  var DEF, DEFITEMS, DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_from_prototype, get_many_from_prototype, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, join, ltrim, make_comparison_fn, make_error, make_math_fn, math_fn, modules, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, reset_deffed, 
+  restructure_list, rtrim, slice, sort, split, to_js_symbol, to_list, to_lower, to_quoted, to_symbol, to_upper, trim, use_deffed, use_from_prototype, use_many_from_prototype, use_properties, use_root_properties, __var, _is, _ref, _ref2, __slice = Array.prototype.slice, __hasProp = Object.prototype.hasOwnProperty;
   if(typeof global === "undefined" || global === null) {
     global = window
   }
@@ -1229,25 +1229,27 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     sym = gensym.apply(null, arguments);
     return ret = compile([to_symbol("quote"), to_symbol(sym)])
   });
-  _var = function(name, value, scope) {
+  __var = function(name, value, scope, type) {
     var c_name, c_value;
+    if(type == null) {
+      type = "variable"
+    }
     c_name = compile(name);
+    if(c_name !== to_js_symbol(c_name)) {
+      raise("DefError", "Can't define complex symbol: " + c_name)
+    }
     c_value = compile(value);
-    Scope.def(c_name, "variable", scope);
+    Scope.def(c_name, type, scope);
     return"" + c_name + " = " + c_value
   };
   DEFMACRO("var", function(name, value) {
-    return _var(name, value)
+    return __var(name, value)
   });
   DEFMACRO("def", function(name, value) {
     var c_name, first_group, ret;
     first_group = Scope.top();
     c_name = compile(name);
-    if(c_name === to_js_symbol(c_name)) {
-      return ret = _var(name, value, first_group)
-    }else {
-      return raise("DefError", "Can't define complex symbol: " + c_name)
-    }
+    return ret = __var(name, value, first_group)
   });
   DEFMACRO("set!", function(name, value) {
     var c_name, c_value, ret;
@@ -1318,15 +1320,15 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     mc_expand = false;
     mc_expand_1 = false;
     DEFMACRO("defmacro", function() {
-      var argnames, c_name, c_value, defmacro, macro_fn, name, sym, template;
+      var argnames, base, c_name, name, template;
       name = arguments[0], argnames = arguments[1], template = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
       if(argnames == null) {
         argnames = []
       }
       c_name = compile(name);
-      macro_fn = "(function () {\n  return eval(oppo.compiler." + c_name + ".apply(this, arguments));\n})";
-      Scope.def(c_name, "macro");
-      compiler[c_name] = function() {
+      base = compiler;
+      Scope.def(c_name, "macro", "global");
+      base[c_name] = function() {
         var evald, js, q_args, sexp;
         q_args = _.map(arguments, to_quoted);
         sexp = [[to_symbol("lambda"), argnames].concat(template)].concat(q_args);
@@ -1339,10 +1341,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
           return evald
         }
       };
-      sym = to_symbol;
-      defmacro = compile([sym("if"), [sym("js-eval"), "!oppo.compiler." + c_name], [sym("eval"), [sym("quote"), [sym("defmacro"), name, argnames].concat(__slice.call(template))]]]);
-      c_value = "(" + defmacro + ", " + macro_fn + ")";
-      return"" + c_name + " = " + c_value
+      return"null"
     });
     DEFMACRO("macroexpand", function(sexp) {
       var old_mc_expand, ret;
@@ -1377,28 +1376,18 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     def = [];
     defmacro = [];
     adjust_environment = function(module_name, names, scope) {
-      var last_macro, s_module_name;
+      var s_module_name, _var;
       s_module_name = get_raw_text(module_name);
       modules[s_module_name] = {names:names, scope:scope};
       _var = GETMACRO("var");
       def.push(GETMACRO("def"));
-      compiler.def = function(name, value) {
+      return compiler.def = function(name, value) {
         names.push(name);
         return _var(name, value, scope)
-      };
-      defmacro.push(last_macro = GETMACRO("defmacro"));
-      return compiler.defmacro = function() {
-        var def_stmt, n_name, name, r_name, rest;
-        name = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-        r_name = get_raw_text(name);
-        n_name = to_symbol("" + s_module_name + "." + r_name);
-        def_stmt = [to_symbol("def"), name, [to_symbol("js-eval"), last_macro.apply(null, [n_name].concat(__slice.call(rest)))]];
-        return compile([to_symbol("do"), def_stmt, [to_symbol("js-eval"), "" + r_name + ".macro_name = '" + compile(n_name) + "'"]])
       }
     };
     restore_environment = function() {
-      compiler.def = def.pop();
-      return compiler.defmacro = defmacro.pop()
+      return compiler.def = def.pop()
     };
     DEFMACRO("defmodule", function() {
       var args, body, c_body, c_deps, deps, export_names, js_map_args, name, r_deps, r_name, ret, return_val, scope, symbols, values, var_stmt, vars;
@@ -1425,7 +1414,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + args.join(", ") + ") {\n  " + var_stmt + c_body.join(",\n") + ";\n  return " + return_val + "\n})"
     });
     return DEFMACRO("require", function() {
-      var c_names, name, names, r_name, ret;
+      var c_names, name, names, r_name, ret, _var;
       names = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       _var = GETMACRO("var");
       c_names = function() {
@@ -1434,7 +1423,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
         for(_i = 0, _len = names.length;_i < _len;_i++) {
           name = names[_i];
           r_name = get_raw_text(name);
-          _results.push(ret = _var(name, [to_symbol("js-eval"), "oppo.module.require(" + compile(r_name) + ")"]))
+          _results.push(ret = __var(name, [to_symbol("js-eval"), "oppo.module.require(" + compile(r_name) + ")"], null, "module"))
         }
         return _results
       }();
@@ -1474,6 +1463,8 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       }
     }
   });
+  DEF("root", "typeof global !== 'undefined' ? global : window");
+  DEF("_", "{0}._ || (require && require('underscore'))", ["root"]);
   (function() {
     var fname, name, oppo_names, underscore_fns, value, _results;
     underscore_fns = {include:null, invoke:null, pluck:null, shuffle:null, toArray:["->arr", "->array"], size:null, first:["first", "head"], initial:["initial", "init"], last:null, rest:["rest", "tail"], compact:null, flatten:null, without:null, union:null, intersection:null, difference:null, zip:null, range:null, bind:null, bindAll:["bind-all"], memoize:null, delay:null, defer:null, throttle:null, debounce:null, once:null, after:null, wrap:null, compose:null, keys:null, values:null, functions:null, 
@@ -1487,25 +1478,74 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
       if(oppo_names == null) {
         oppo_names = [fname]
       }
-      value = "_." + fname;
+      value = "{0}." + fname;
       _results.push(function() {
         var _i, _len, _results2;
         _results2 = [];
         for(_i = 0, _len = oppo_names.length;_i < _len;_i++) {
           name = oppo_names[_i];
-          _results2.push(DEF(name, value))
+          _results2.push(DEF(name, value, ["_"]))
         }
         return _results2
       }())
     }
     return _results
   })();
-  DEF("global", "typeof global !== 'undefined' ? global : window");
   get_from_prototype = function(obj, method) {
     var name;
     name = "__" + method + "__";
-    DEF(name, "{0}." + obj + ".prototype." + method, ["global"]);
+    DEF(name, "{0}." + obj + ".prototype." + method, ["root"]);
     return name
+  };
+  use_from_prototype = function(obj, method, oppo_name) {
+    var temp;
+    if(oppo_name == null) {
+      oppo_name = method
+    }
+    temp = get_from_prototype(obj, method);
+    return DEF(oppo_name, "function (base) {\n  var args;\n  args = {0}.call(arguments, 1);\n  return {1}.apply(base, args);\n}", ["__slice__", temp])
+  };
+  get_many_from_prototype = function(obj, methods) {
+    var method, _i, _len, _results;
+    _results = [];
+    for(_i = 0, _len = methods.length;_i < _len;_i++) {
+      method = methods[_i];
+      _results.push(get_from_prototype(obj, method))
+    }
+    return _results
+  };
+  use_many_from_prototype = function(obj, methods) {
+    var args, _i, _len, _results;
+    _results = [];
+    for(_i = 0, _len = methods.length;_i < _len;_i++) {
+      args = methods[_i];
+      if(!_.isArray(args)) {
+        args = [args]
+      }
+      args.unshift(obj);
+      _results.push(use_from_prototype.apply(null, args))
+    }
+    return _results
+  };
+  use_properties = function(obj, props) {
+    var js_name, oppo_name, prop, _i, _len, _obj, _results;
+    _results = [];
+    for(_i = 0, _len = props.length;_i < _len;_i++) {
+      prop = props[_i];
+      if(!_.isArray(prop)) {
+        prop = [prop]
+      }
+      js_name = prop[0], oppo_name = prop[1];
+      if(oppo_name == null) {
+        oppo_name = js_name
+      }
+      _obj = obj != null ? "." + obj : "";
+      _results.push(DEF(oppo_name, "{0}" + _obj + "." + js_name, ["root"]))
+    }
+    return _results
+  };
+  use_root_properties = function(props) {
+    return use_properties(null, props)
   };
   make_math_fn = function(symbol, js_symbol) {
     if(js_symbol == null) {
@@ -1518,10 +1558,14 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   make_math_fn("-");
   make_math_fn("/");
   make_math_fn("%");
-  DEF("**", "{0}.Math.pow", ["global"]);
-  DEF("max", "{0}.Math.max", ["global"]);
-  DEF("min", "{0}.Math.min", ["global"]);
-  make_comparison_fn = function(symbol, compare_fn) {
+  use_properties("Math", ["E", "LN2", "LN10", "LOG2E", "LOG10E", "PI", ["SQRT1_2", "sqrt1/2"], "SQRT2", "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log", "max", "min", ["pow", "**"], "pow", "round", "sin", "sqrt", "tan"]);
+  DEF("random", "function (_1, _2) {\n  var r, min, max;\n  r = Math.random;\n  switch (arguments.length) {\n    case 0: return r();\n    case 1:\n      max = _1;\n      return {0}(r() * max);\n    case 2:\n      min = _1;\n      max = _2;\n      return {0}(r() * (max - min)) + min;\n  }\n}", ["floor"]);
+  DEF("rand", "{0}", ["random"]);
+  use_root_properties([["isFinite", "finite?"], "Infinity", "NaN", ["parseFloat", "->float"]]);
+  DEF("->int", "function (s, r) { return parseInt(s, r == null ? 10 : r); }");
+  DEF("-infinity", "-{0}", ["infinity"]);
+  DEF("->base", "function (n, base) {\n  return (+n).toString(base);\n}");
+  make_comparison_fn = function(symbol, compare_fn, deps) {
     var js_symbol;
     if(_.isString(compare_fn)) {
       js_symbol = compare_fn;
@@ -1534,7 +1578,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
         return"" + a + " " + js_symbol + " " + b
       }
     }
-    return DEF(symbol, "function () {\n  var i, item, last, len, result;\n  last = arguments[0];\n  for (i = 1, len = arguments.length; i < len; i++) {\n    item = arguments[i];\n    result = " + compare_fn("last", "item") + ";\n    if (!result) break;\n  }\n  return result;\n}")
+    return DEF(symbol, "function () {\n  var i, item, last, len, result;\n  last = arguments[0];\n  for (i = 1, len = arguments.length; i < len; i++) {\n    item = arguments[i];\n    result = " + compare_fn("last", "item") + ";\n    if (!result) break;\n  }\n  return result;\n}", deps)
   };
   make_comparison_fn("<");
   make_comparison_fn(">");
@@ -1545,11 +1589,13 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   make_comparison_fn("not==", "!=");
   make_comparison_fn("not===", "!==");
   make_comparison_fn("=", function(a, b) {
-    return"_.isEqual(" + a + ", " + b + ")"
-  });
+    return"{0}.isEqual(" + a + ", " + b + ")"
+  }, ["_"]);
   DEF("equal?", "{0}", ["="]);
   DEF("not=", "function () { return !{0}(); }", ["="]);
   DEF("->bool", compile([to_symbol("lambda"), [to_symbol("x")], [to_symbol("if"), to_symbol("x"), [to_symbol("js-eval"), "true"], [to_symbol("js-eval"), "false"]]]));
+  DEF("->boolean", "{0}", ["->bool"]);
+  DEF("not", "function (x) { return !{0}(x); }", ["->bool"]);
   DEF("->str", "function (x) {\n  return x.toString ? x.toString : '' + x;\n}");
   DEF("->string", "{0}", ["->str"]);
   DEF("->num", "function (x) { return +x; }");
@@ -1559,9 +1605,10 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   DEF("or", "function () {\n  var i, len, item;\n  i = 0;\n  len = arguments.length;\n  for (; i < len; i++) {\n    item = arguments[i];\n    if ({0}(item))\n      break;\n  }\n  return item;\n}", ["->bool"]);
   slice = get_from_prototype("Array", "slice");
   sort = get_from_prototype("Array", "sort");
+  join = get_from_prototype("Array", "join");
   (function() {
     var build;
-    DEF("__iterator_builder_1__", "function (method_name) {\n  var method = _[method_name];\n  return function (a, fn, context) {\n    var args = {0}(arguments);\n    if (fn) {\n      args[1] = {1}(a) ? function (v, k, o) {\n        return fn(v, k + 1, o);\n      } : fn;\n    }\n    return method.apply(_, args);\n  };\n}", ["->array", "array?"]);
+    DEF("__iterator_builder_1__", "function (method_name) {\n  var method = {0}[method_name];\n  return function (a, fn, context) {\n    var args = {1}(arguments);\n    if (fn) {\n      args[1] = {2}(a) ? function (v, k, o) {\n        return fn(v, k + 1, o);\n      } : fn;\n    }\n    return method.apply({0}, args);\n  };\n}", ["_", "->array", "array?"]);
     build = function(name, js_name) {
       if(js_name == null) {
         js_name = name
@@ -1579,7 +1626,7 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
   })();
   (function() {
     var build;
-    DEF("__iterator_builder_2__", "function (method_name) {\n  var method = _[method_name];\n  return function (a, fn, memo, context) {\n    var args = {0}(arguments);\n    if (fn) {\n      args[1] = {1}(a) ? function (main, v, k, o) {\n        return fn(main, v, k + 1, o)\n      } : fn;\n    }\n    return method.apply(_, args);\n  };\n}", ["->array", "array?"]);
+    DEF("__iterator_builder_2__", "function (method_name) {\n  var method = {2}[method_name];\n  return function (a, fn, memo, context) {\n    var args = {0}(arguments);\n    if (fn) {\n      args[1] = {1}(a) ? function (main, v, k, o) {\n        return fn(main, v, k + 1, o)\n      } : fn;\n    }\n    return method.apply({2}, args);\n  };\n}", ["->array", "array?", "_"]);
     build = function(name, js_name) {
       if(js_name == null) {
         js_name = name
@@ -1591,21 +1638,44 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     build("reduce-right", "reduceRight");
     return DEF("foldr", "{0}", ["reduce-right"])
   })();
-  DEF("sorted-index", "function (a) {\n  return _.sortedIndex.apply(_, arguments) + 1;\n}");
-  DEF("uniq", "function (a, sorted, fn) {\n  var args = {0}(arguments);\n  if (fn) {\n    args[2] = fn && function (v, k, o) {\n      return fn(v, k + 1, o);\n    };\n  }\n  return _.uniq.apply(_, args);\n}", ["->array"]);
+  DEF("slice", "function (a) {\n  var args;\n  args = {0}.call(arguments, 1);\n  return a.slice.apply(a, args);\n}", [slice]);
+  DEF("sorted-index", "function (a) {\n  return {0}.sortedIndex.apply({0}, arguments) + 1;\n}", ["_"]);
+  DEF("join", "function (a, sep) {\n  return {0}.call(a, sep != null ? sep : '');\n}", [join]);
+  DEF("uniq", "function (a, sorted, fn) {\n  var args = {0}(arguments);\n  if (fn) {\n    args[2] = fn && function (v, k, o) {\n      return fn(v, k + 1, o);\n    };\n  }\n  return {1}.uniq.apply({1}, args);\n}", ["->array", "_"]);
   DEF("unique", "{0}", ["uniq"]);
   DEF("concat", "function (base) {\n  var args;\n  args = {0}.call(arguments, 1);\n  return base.concat.apply(base, args);\n}", [slice]);
   DEF("nth", 'function (a, i) {\n  i = +i;\n  if (i === 0)\n    console.warn("Trying to get 0th item with nth; nth treats lists as 1-based");\n    \n  if (i < 0)\n    i = (a || []).length + i;\n  else\n    i -= 1;\n    \n  return {0}(a) ? a[i] : {1}(a) ? a.charAt(i) : (function () { throw "Can\'t get nth item: collection must be a list or a string"; })();\n}', ["array?", "string?"]);
-  DEF("index-of", "function (a, x, sorted) {\n  return ({0}(a) ? a.indexOf(x) : _.indexOf(a, x, sorted)) + 1;\n}", ["string?"]);
-  DEF("last-index-of", "function (a, x) {\n  return ({0}(a) ? a.lastIndexOf(x) : _.lastIndexOf(a, x)) + 1;\n}", ["string?"]);
-  DEF("sort", "function (a, fn, context) {\n  var iterator, isArray;\n  if ({0}(a)) {\n    if (!fn) return a.slice().sort();\n    iterator = function (v, k, o) {\n      return fn(v, k + 1, o);\n    };\n  }\n  else iterator = fn;\n  return _.sortBy(a, iterator, context);\n}", ["->array"]);
-  DEF("merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return _.extend.apply(_, args);\n}", ["->array"]);
-  DEF("careful-merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return _.defaults.apply(_, args);\n}", ["->array"]);
+  DEF("index-of", "function (a, x, sorted) {\n  return ({0}(a) ? a.indexOf(x) : {1}.indexOf(a, x, sorted)) + 1;\n}", ["string?", "_"]);
+  DEF("last-index-of", "function (a, x) {\n  return ({0}(a) ? a.lastIndexOf(x) : {1}.lastIndexOf(a, x)) + 1;\n}", ["string?", "_"]);
+  DEF("sort", "function (a, fn, context) {\n  var iterator, isArray;\n  if ({0}(a)) {\n    if (!fn) return a.slice().sort();\n    iterator = function (v, k, o) {\n      return fn(v, k + 1, o);\n    };\n  }\n  else iterator = fn;\n  return {1}.sortBy(a, iterator, context);\n}", ["->array", "_"]);
+  DEF("reverse", "function (a) {\n  var str, ret;\n  str = {0}(a);\n  ret = str ? a.split('') : a.slice();\n  ret.reverse();\n  return str ? ret.join('') : ret;\n}", ["string?"]);
   to_lower = get_from_prototype("String", "toLowerCase");
   to_upper = get_from_prototype("String", "toUpperCase");
-  replace = get_from_prototype("String", "replace");
+  split = get_from_prototype("String", "split");
+  trim = get_from_prototype("String", "trim");
+  rtrim = get_from_prototype("String", "trimRight");
+  ltrim = get_from_prototype("String", "trimLeft");
+  DEF("rtrim", "function (s) {\n  return {0} ? {0}.call(s) : s.replace(/s+$/, '');\n}", [rtrim]);
+  DEF("trim-right", "{0}", ["rtrim"]);
+  DEF("ltrim", "function (s) {\n  return {0} ? {0}.call(s) : s.replace(/^s+/, '');\n}", [ltrim]);
+  DEF("trim-left", "{0}", ["ltrim"]);
+  DEF("trim", "function (s) {\n  return {0} ? {0}.call(s) : {1}({2}(s));\n}", [trim, "ltrim", "rtrim"]);
   DEF("->lower", "function (s) { return {0}.call(s); }", [to_lower]);
   DEF("->upper", "function (s) { return {0}.call(s); }", [to_upper]);
-  DEF("replace", "function (s, re, val) { return {0}.call(s, re, val); }", [replace])
+  use_many_from_prototype("String", ["split", "replace", ["search", "str-search"], "substr", "substring", ["charCodeAt", "char-code-at"], "match", ["toLocaleLowerCase", "->locale-lower"], ["toLocaleUpperCase", "->locale-upper"], ["localeCompare", "locale-compare"]]);
+  DEF("merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return {1}.extend.apply({1}, args);\n}", ["->array", "_"]);
+  DEF("careful-merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return {1}.defaults.apply({1}, args);\n}", ["->array", "_"]);
+  DEF("__create__", "Object.create");
+  DEF("extend", "(function () {\n  return {0} ? function (proto) { return {0}(proto != null ? proto : null); } :\n  function (proto) {\n    function noop() {}\n    noop.prototype = proto != null ? proto : null;\n    return new noop;\n  };\n})()", ["__create__"]);
+  DEF("merge-extend", "function (o, proto) {\n  var ret;\n  ret = {0}(proto);\n  return {1}.extend(ret, o);\n}", ["extend", "_"]);
+  use_many_from_prototype("RegExp", [["exec", "re-exec"], ["test", "re-test"]]);
+  use_many_from_prototype("Number", [["toExponential", "->exponential"], ["toFixed", "->fixed"], ["toLocaleString", "->locale-string"], ["toPrecision", "->precision"]]);
+  DEF("date", "function (a, b, c, d, e, f, g) {\n  var d, D;\n  D = {0}.Date;\n  switch (arguments.length) {\n    case 0: d = new D(); break;\n    case 1: d = new D(a); break;\n    case 2: d = new D(a, b); break;\n    case 3: d = new D(a, b, c); break;\n    case 4: d = new D(a, b, c, d); break;\n    case 5: d = new D(a, b, c, d, e); break;\n    case 6: d = new D(a, b, c, d, e, f); break;\n    case 7: d = new D(a, b, c, d, e, f, g); break;\n  }\n  return d;\n}", ["root"]);
+  DEF("now", "(function () {\n  var D;\n  D = {0}.Date;\n  return D.now ? D.now : function () { return +(new Date); }\n})()", ["root"]);
+  use_many_from_prototype("Date", [["getDate", "get-date"], ["getDay", "get-day"], ["getFullYear", "get-year"], ["getHours", "get-hours"], ["getMilliseconds", "get-milliseconds"], ["getMinutes", "get-minutes"], ["getMonth", "get-month"], ["getSeconds", "get-seconds"], ["getTime", "get-time"], ["getTimezoneOffset", "get-timezone-offset"], ["getUTCDate", "get-utc-date"], ["getUTCDay", "get-utc-day"], ["getUTCFullYear", "get-utc-full-year"], ["getUTCHours", "get-utc-hours"], ["getUTCMilliseconds", "get-utc-milliseconds"], 
+  ["getUTCMinutes", "get-utc-minutes"], ["getUTCMonth", "get-utc-month"], ["getUTCSeconds", "get-utc-seconds"], ["setDate", "set-date!"], ["setFullYear", "set-year!"], ["setHours", "set-hours!"], ["setMilliseconds", "set-milliseconds!"], ["setMinutes", "set-minutes!"], ["setMonth", "set-month!"], ["setSeconds", "set-seconds!"], ["setTime", "set-time!"], ["setUTCDate", "set-utc-date!"], ["setUTCFullYear", "set-utc-year!"], ["setUTCHours", "set-utc-hours!"], ["setUTCMilliseconds", "set-utc-milliseconds!"], 
+  ["setUTCMinutes", "set-utc-minutes!"], ["setUTCMonth", "set-utc-month!"], ["setUTCSeconds", "set-utc-seconds!"], ["toDateString", "->date-string"], ["toISOString", "->iso-string"], ["toJSON", "->json"], ["toLocaleDateString", "->locale-date-string"], ["toLocaleTimeString", "->locale-time-string"], ["toTimeString", "->time-string"], ["toUTCString", "->utc-string"]]);
+  DEF("json-stringify", "{0}.JSON.stringify", ["root"]);
+  DEF("json-parse", "{0}.JSON.parse", ["root"])
 }).call(this);
 
