@@ -1,4 +1,7 @@
 (function() {
+  var _;
+
+  _ = require("underscore");
 
   $.domReady(function() {
     var $js, $oppo, $result, cache, compile, compile_and_compute_result, compute_result, oppo_code_cache_key, timeout;

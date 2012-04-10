@@ -1,4 +1,4 @@
-global ?= window
+root = global ? window
 _ ?= require 'underscore'
 
 create_object = do ->

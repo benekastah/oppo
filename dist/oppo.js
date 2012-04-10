@@ -1,15 +1,517 @@
+(function() {
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, WRAPPER_PREFIX, WRAPPER_REGEX, WRAPPER_SUFFIX, call_macro, char_wrapper, clone, compile, compile_list, last, macro, map, read, root, scope_stack, to_js_identifier, type_of, types, wrapper, __toString, _ref, _ref2, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
+    for(var key in parent) {
+      if(__hasProp.call(parent, key)) {
+        child[key] = parent[key]
+      }
+    }
+    function ctor() {
+      this.constructor = child
+    }
+    ctor.prototype = parent.prototype;
+    child.prototype = new ctor;
+    child.__super__ = parent.prototype;
+    return child
+  }, __slice = Array.prototype.slice;
+  JS_KEYWORDS = ["break", "case", "catch", "char", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "function", "if", "implements", "import", "in", "instanceof", "interface", "let", "new", "null", "package", "private", "protected", "public", "return", "static", "switch", "super", "this", "throw", "true", "try", "typeof", "undefined", "var", "void", "while", "with", "yield"];
+  JS_ILLEGAL_IDENTIFIER_CHARS = {"~":"tilde", "`":"backtick", "!":"exclamationmark", "@":"at", "#":"pound", "%":"percent", "^":"carat", "&":"amperstand", "*":"asterisk", "(":"leftparen", ")":"rightparen", "-":"dash", "+":"plus", "=":"equals", "{":"leftcurly", "}":"rightcurly", "[":"leftsquare", "]":"rightsquare", "|":"pipe", "\\":"backslash", '"':"doublequote", "'":"singlequote", ":":"colon", ";":"semicolon", "<":"leftangle", ">":"rightangle", ",":"comma", ".":"period", "?":"questionmark", "/":"forwardslash", 
+  " ":"space", "\t":"tab", "\n":"newline", "\r":"carriagereturn"};
+  WRAPPER_PREFIX = "_$";
+  WRAPPER_SUFFIX = "_";
+  WRAPPER_REGEX = /_\$[^_]+_/g;
+  wrapper = function(text) {
+    return"" + WRAPPER_PREFIX + text + WRAPPER_SUFFIX
+  };
+  char_wrapper = function(_char) {
+    var txt, _ref;
+    txt = (_ref = JS_ILLEGAL_IDENTIFIER_CHARS[_char]) != null ? _ref : "ASCII_" + _char.charCodeAt(0);
+    return wrapper(txt)
+  };
+  to_js_identifier = function(text) {
+    if(JS_KEYWORDS.indexOf(text) >= 0) {
+      return wrapper(text)
+    }
+    if(text.length === 0) {
+      return wrapper("null")
+    }
+    return text.replace(WRAPPER_REGEX, wrapper).replace(/^\d/, char_wrapper).replace(/[^\w\$]/g, char_wrapper)
+  };
+  if((typeof module !== "undefined" && module !== null ? module.exports : void 0) != null) {
+    module.exports = to_js_identifier
+  }else {
+    if(typeof ender !== "undefined" && ender !== null) {
+      ender.ender({to_js_identifier:to_js_identifier})
+    }else {
+      this.to_js_identifier = to_js_identifier
+    }
+  }
+  root = typeof global !== "undefined" && global !== null ? global : window;
+  root.oppo = {compiler:{types:{}, scope_stack:[{}]}};
+  if((typeof module !== "undefined" && module !== null ? module.exports : void 0) != null) {
+    module.exports = oppo
+  }
+  _ref = oppo.compiler, scope_stack = _ref.scope_stack, types = _ref.types;
+  oppo.Error = function(_super) {
+    __extends(Error, _super);
+    function Error(name, message) {
+      this.name = name;
+      this.message = message
+    }
+    Error.prototype.toString = function() {
+      return"" + this.name + ": " + this.message
+    };
+    return Error
+  }(Error);
+  oppo.ArityException = function(_super) {
+    __extends(ArityException, _super);
+    function ArityException(message) {
+      if(message != null) {
+        this.message = message
+      }
+    }
+    ArityException.prototype.name = "Arity-Exception";
+    ArityException.prototype.message = "Wrong number of arguments";
+    return ArityException
+  }(oppo.Error);
+  __toString = Object.prototype.toString;
+  type_of = function(x) {
+    return __toString.call(x).slice(8, -1).toLowerCase()
+  };
+  clone = (_ref2 = Object.create) != null ? _ref2 : function(o) {
+    function ObjectClone() {
+    }
+    ObjectClone.prototype = o;
+    return new ObjectClone
+  };
+  last = function(list) {
+    if((list != null ? list.length : void 0) != null) {
+      return list[list.length - 1]
+    }
+  };
+  map = function(list, fn) {
+    var item, _i, _len, _results;
+    _results = [];
+    for(_i = 0, _len = list.length;_i < _len;_i++) {
+      item = list[_i];
+      _results.push(fn(item))
+    }
+    return _results
+  };
+  compile_list = function(list, arg) {
+    var item, _i, _len, _results;
+    _results = [];
+    for(_i = 0, _len = list.length;_i < _len;_i++) {
+      item = list[_i];
+      _results.push(item.compile(arg))
+    }
+    return _results
+  };
+  (function() {
+    this.SyntaxNode = function() {
+      function SyntaxNode(value, yy_or_node_or_num) {
+        var _ref3;
+        this.value = value;
+        if(yy_or_node_or_num instanceof types.SyntaxNode) {
+          this.transfer_node = yy_or_node_or_num;
+          this.yy = yy_or_node_or_num.yy
+        }else {
+          if(type_of(yy_or_node_or_num) === "number") {
+            this.yy = {lexer:{yylineno:yy_or_node_or_num}}
+          }else {
+            this.yy = yy_or_node_or_num
+          }
+        }
+        this.line_number = (_ref3 = this.yy) != null ? _ref3.lexer.yylineno : void 0
+      }
+      SyntaxNode.prototype.compile = function(quoted) {
+        if(!(this.quoted || quoted)) {
+          return this.compile_unquoted()
+        }else {
+          return this.compile_quoted()
+        }
+      };
+      SyntaxNode.prototype.compile_unquoted = function() {
+        return"" + this.value
+      };
+      SyntaxNode.prototype.compile_quoted = function() {
+        return"new oppo.compiler.types." + this.constructor.name + "('" + this.value + "')"
+      };
+      SyntaxNode.prototype.location_trace = function() {
+        var file, line_number;
+        line_number = this.line_number ? "@ line " + this.line_number : "";
+        file = this.file ? " in " + this.file : "";
+        return"" + line_number + file
+      };
+      SyntaxNode.prototype.error_message = function(type, msg) {
+        var full_msg, msg_prefix;
+        if(arguments.length === 1) {
+          msg = type
+        }
+        if(msg == null) {
+          msg = "An error occurred"
+        }
+        msg.replace(/\.$/, "");
+        msg_prefix = "" + (type != null ? type : this.constructor.name) + "Error: ";
+        return full_msg = "" + msg_prefix + msg + this.location_trace() + "."
+      };
+      SyntaxNode.prototype.error = function(type, msg) {
+        throw this.error_message(type, msg);
+      };
+      SyntaxNode.prototype.valueOf = function() {
+        return this.value
+      };
+      SyntaxNode.prototype.toString = function() {
+        var prefix;
+        prefix = this.quoted ? "'" : "";
+        return"" + prefix + this.value.toString()
+      };
+      return SyntaxNode
+    }();
+    this.List = function(_super) {
+      __extends(List, _super);
+      function List() {
+        List.__super__.constructor.apply(this, arguments)
+      }
+      List.prototype.compile_unquoted = function() {
+        var scope, _ref3;
+        scope = last(scope_stack);
+        return(_ref3 = scope.call).call.apply(_ref3, this.value)
+      };
+      List.prototype.compile_quoted = function() {
+        var c_value;
+        c_value = compile_list(this.value, true);
+        return"[" + c_value.join(", ") + "]"
+      };
+      List.prototype.toString = function() {
+        var item, prefix, s_value;
+        s_value = function() {
+          var _i, _len, _ref3, _results;
+          _ref3 = this.value;
+          _results = [];
+          for(_i = 0, _len = _ref3.length;_i < _len;_i++) {
+            item = _ref3[_i];
+            _results.push(item.toString())
+          }
+          return _results
+        }.call(this);
+        prefix = this.quoted ? "'" : "";
+        return"" + prefix + "(" + s_value.join(" ") + ")"
+      };
+      return List
+    }(this.SyntaxNode);
+    this.Quoted = function(_super) {
+      __extends(Quoted, _super);
+      function Quoted(value, yy) {
+        Quoted.__super__.constructor.call(this, null, yy);
+        value.quoted = true;
+        this.value = [new types.Symbol("quote", yy), value];
+        this.quoted_value = value
+      }
+      return Quoted
+    }(this.List);
+    this.Object = function(_super) {
+      __extends(Object, _super);
+      function Object() {
+        Object.__super__.constructor.apply(this, arguments)
+      }
+      return Object
+    }(this.List);
+    this.Number = function(_super) {
+      __extends(Number, _super);
+      function Number() {
+        Number.__super__.constructor.apply(this, arguments)
+      }
+      Number.prototype.compile = function() {
+        return this.value
+      };
+      return Number
+    }(this.SyntaxNode);
+    this.Fixnum = function(_super) {
+      __extends(Fixnum, _super);
+      function Fixnum() {
+        Fixnum.__super__.constructor.apply(this, arguments)
+      }
+      return Fixnum
+    }(this.Number);
+    this.Float = function(_super) {
+      __extends(Float, _super);
+      function Float() {
+        Float.__super__.constructor.apply(this, arguments)
+      }
+      return Float
+    }(this.Number);
+    this.String = function(_super) {
+      __extends(String, _super);
+      function String() {
+        String.__super__.constructor.apply(this, arguments)
+      }
+      String.prototype.compile = function() {
+        var val;
+        val = this.value instanceof types.Symbol ? this.value.compile() : this.value;
+        return'"' + val.replace(/\n/g, "\\n") + '"'
+      };
+      return String
+    }(this.SyntaxNode);
+    this.Regex = function(_super) {
+      __extends(Regex, _super);
+      function Regex(body, flags, yy) {
+        this.body = body;
+        this.flags = flags;
+        Regex.__super__.constructor.call(this, null, yy)
+      }
+      Regex.prototype.compile_unquoted = function() {
+        return"/" + this.body + "/" + this.flags
+      };
+      return Regex
+    }(this.SyntaxNode);
+    this.Atom = function(_super) {
+      __extends(Atom, _super);
+      function Atom(yy) {
+        Atom.__super__.constructor.call(this, this.value, yy)
+      }
+      return Atom
+    }(this.SyntaxNode);
+    this.Nil = function(_super) {
+      __extends(Nil, _super);
+      function Nil() {
+        Nil.__super__.constructor.apply(this, arguments)
+      }
+      Nil.prototype.value = null;
+      return Nil
+    }(this.Atom);
+    this.Boolean = function(_super) {
+      __extends(Boolean, _super);
+      function Boolean() {
+        Boolean.__super__.constructor.apply(this, arguments)
+      }
+      return Boolean
+    }(this.Atom);
+    this.True = function(_super) {
+      __extends(True, _super);
+      function True() {
+        True.__super__.constructor.apply(this, arguments)
+      }
+      True.prototype.value = true;
+      True.prototype.toString = function() {
+        return"#t"
+      };
+      return True
+    }(this.Boolean);
+    this.False = function(_super) {
+      __extends(False, _super);
+      function False() {
+        False.__super__.constructor.apply(this, arguments)
+      }
+      False.prototype.value = false;
+      False.prototype.toString = function() {
+        return"#f"
+      };
+      return False
+    }(this.Boolean);
+    this.Symbol = function(_super) {
+      __extends(Symbol, _super);
+      function Symbol(value, yy) {
+        Symbol.__super__.constructor.apply(this, arguments);
+        if(this.value.substr(0, 3) === "...") {
+          this.splat = true;
+          this.value = this.value.substr(3)
+        }
+      }
+      Symbol.prototype.compile_unquoted = function() {
+        var val;
+        val = this.value.length > 1 ? this.value.replace(/\-/g, "_") : this.value;
+        return to_js_identifier(val)
+      };
+      Symbol.gensym = function(sym) {
+        var random, s_sym, symbol, time;
+        if(sym instanceof types.Symbol) {
+          s_sym = sym.value;
+          symbol = sym
+        }else {
+          if(type_of(sym) === "string") {
+            s_sym = sym
+          }else {
+            s_sym = "gen"
+          }
+        }
+        time = (+new Date).toString(36);
+        random = Math.floor(Math.random() * 1E5).toString(36);
+        s_sym = "" + s_sym + "-" + time + "-" + random;
+        return new types.Symbol(s_sym, symbol)
+      };
+      return Symbol
+    }(this.SyntaxNode);
+    this.Function = function(_super) {
+      __extends(Function, _super);
+      function Function(name, args, body, yy) {
+        var arg, i, _len;
+        this.name = name;
+        this.args = args;
+        this.body = body;
+        Function.__super__.constructor.call(this, null, yy);
+        if(this.args) {
+          this.min_arity = this.max_arity = this.args.length;
+          for(i = 0, _len = args.length;i < _len;i++) {
+            arg = args[i];
+            if(arg.splat) {
+              this.min_arity = i;
+              this.max_arity = Infinity;
+              break
+            }
+          }
+        }else {
+          this.min_arity = 0;
+          this.max_arity = Infinity
+        }
+      }
+      Function.prototype.compile_unquoted = function() {
+        var c_args, c_body, c_name, error_name, v_length, _ref3, _ref4;
+        c_name = (_ref3 = (_ref4 = this.name) != null ? _ref4.compile() : void 0) != null ? _ref3 : "";
+        if(this.args != null) {
+          c_args = compile_list(this.args)
+        }else {
+          c_args = []
+        }
+        c_body = compile_list(this.body);
+        v_length = types.Symbol.gensym("argslen").compile();
+        error_name = c_name ? " in '" + c_name + "': " : "";
+        return"function " + c_name + "(" + c_args.join(", ") + ") {\n  var " + v_length + " = arguments.length;\n  if (" + v_length + " < " + this.min_arity + " || " + v_length + " > " + this.max_arity + ')\n    throw new oppo.ArityException("' + error_name + "Expected between " + this.min_arity + " and " + this.max_arity + ' arguments; got " + ' + v_length + ' +  " instead ' + this.location_trace() + '.");\n    \n  return (' + c_body.join(",\n") + ");\n}"
+      };
+      return Function
+    }(this.SyntaxNode);
+    return this.Macro = function(_super) {
+      __extends(Macro, _super);
+      function Macro(name, argnames, template, yy, fn) {
+        this.name = name;
+        this.argnames = argnames;
+        this.template = template;
+        Macro.__super__.constructor.call(this, null, yy);
+        if(fn != null) {
+          this.call = fn
+        }
+      }
+      Macro.prototype.compile_unquoted = function() {
+        var c_name, scope;
+        c_name = this.name.compile();
+        if(this.call == null) {
+        }
+        scope = last(scope_stack);
+        scope[c_name] = this;
+        return"null"
+      };
+      return Macro
+    }(this.SyntaxNode)
+  }).call(types);
+  macro = function(name, fn) {
+    var m, s_name;
+    s_name = new types.Symbol(name);
+    m = new types.Macro(s_name, null, null, null, fn);
+    return m.compile()
+  };
+  call_macro = function() {
+    var args, c_name, name, scope, _ref3;
+    name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    scope = last(scope_stack);
+    c_name = to_js_identifier(name);
+    return(_ref3 = scope[c_name]).call.apply(_ref3, args)
+  };
+  macro("def", function() {
+    var args, body, c_name, c_value, fn, name, rest, scope, to_define, value;
+    to_define = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    if(!rest.length) {
+      to_define.error("Def", "You must provide a value.")
+    }
+    if(to_define instanceof types.List) {
+      name = to_define.value[0];
+      args = to_define.value.slice(1);
+      body = rest;
+      fn = new types.Function(name, args, body, to_define);
+      c_name = name.compile();
+      c_value = fn.compile()
+    }else {
+      if(to_define instanceof types.Symbol) {
+        name = to_define;
+        value = rest[0];
+        c_name = name.compile();
+        c_value = value.compile()
+      }else {
+        to_define.error("Def", "Invalid definition.")
+      }
+    }
+    scope = last(scope_stack);
+    if(scope[c_name] != null) {
+      name.error("Def", "Cannot define previously defined value.")
+    }else {
+      scope[c_name] = value
+    }
+    return"" + c_name + " = " + c_value
+  });
+  macro("call", function() {
+    var args, c_args, callable, item, scope, to_call;
+    callable = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    to_call = callable.compile();
+    if(callable instanceof types.Symbol) {
+      scope = last(scope_stack);
+      item = scope[to_call];
+      if(item instanceof types.Macro) {
+        return item.call.apply(item, args)
+      }
+    }
+    if(callable instanceof types.Function) {
+      to_call = "(" + to_call + ")"
+    }
+    c_args = compile_list(args);
+    return"" + to_call + "(" + c_args.join(", ") + ")"
+  });
+  macro("do", function() {
+    var c_items;
+    c_items = compile_list(arguments);
+    return"(" + c_items.join(", ") + ")"
+  });
+  macro("quote", function(x) {
+    x.quoted = true;
+    return x.compile()
+  });
+  macro("raise", function(namespace, error) {
+    var c_error, c_namespace;
+    if(arguments.length === 1) {
+      error = namespace;
+      c_namespace = "Error"
+    }else {
+      c_namespace = namespace.compile()
+    }
+    c_error = error.compile();
+    return"(function () {\n  throw new oppo.Error(" + c_namespace + ", " + c_error + ");\n})()"
+  });
+  macro("assert", function(sexp) {
+    var c_sexp, error, error_namespace, raise_call;
+    c_sexp = sexp.compile();
+    error_namespace = new types.String("Assertion-Error");
+    error = new types.String(sexp.toString());
+    raise_call = call_macro("raise", error_namespace, error);
+    return"(" + c_sexp + " || " + raise_call + ")"
+  });
+  read = oppo.read = oppo.compiler.read = function() {
+    return parser.parse.apply(parser, arguments)
+  };
+  compile = oppo.compile = oppo.compiler.compile = function(sexp) {
+    return sexp.compile()
+  }
+}).call(this);
 var parser = function() {
+  var types = oppo.compiler.types;
   var parser = {trace:function trace() {
-  }, yy:{}, symbols_:{"error":2, "program":3, "s_expression_list":4, "EOF":5, "s_expression":6, "special_form":7, "list":8, "symbol":9, "keyword":10, "literal":11, "atom":12, "callable_list":13, "quoted_list":14, "js_map":15, "(":16, "element_list":17, ")":18, "[":19, "]":20, "JS_MAP_START":21, "MAP_END":22, "element":23, "QUOTE":24, "SYNTAX_QUOTE":25, "UNQUOTE":26, "SPLAT":27, "FUNCTION":28, "ARGUMENTS_ACCESSOR":29, "NIL":30, "BOOLEAN_TRUE":31, "BOOLEAN_FALSE":32, "STRING":33, "regex":34, "number":35, 
-  "REGEX":36, "FLAGS":37, "DECIMAL_NUMBER":38, "OCTAL_NUMBER":39, "HEXIDECIMAL_NUMBER":40, "BINARY_NUMBER":41, "KEYWORD":42, "IDENTIFIER":43, "$accept":0, "$end":1}, terminals_:{2:"error", 5:"EOF", 16:"(", 18:")", 19:"[", 20:"]", 21:"JS_MAP_START", 22:"MAP_END", 24:"QUOTE", 25:"SYNTAX_QUOTE", 26:"UNQUOTE", 27:"SPLAT", 28:"FUNCTION", 29:"ARGUMENTS_ACCESSOR", 30:"NIL", 31:"BOOLEAN_TRUE", 32:"BOOLEAN_FALSE", 33:"STRING", 36:"REGEX", 37:"FLAGS", 38:"DECIMAL_NUMBER", 39:"OCTAL_NUMBER", 40:"HEXIDECIMAL_NUMBER", 
-  41:"BINARY_NUMBER", 42:"KEYWORD", 43:"IDENTIFIER"}, productions_:[0, [3, 2], [3, 1], [4, 2], [4, 1], [6, 1], [6, 1], [6, 1], [6, 1], [6, 1], [6, 1], [8, 1], [8, 1], [8, 1], [13, 3], [13, 2], [14, 3], [14, 2], [15, 3], [15, 2], [17, 1], [17, 2], [23, 1], [7, 2], [7, 2], [7, 2], [7, 2], [7, 3], [7, 1], [12, 1], [12, 1], [12, 1], [11, 1], [11, 1], [11, 1], [34, 2], [35, 1], [35, 1], [35, 1], [35, 1], [10, 2], [9, 1]], performAction:function anonymous(yytext, yyleng, yylineno, yy, yystate, $$, _$) {
+  }, yy:{}, symbols_:{"error":2, "program":3, "s_expression_list":4, "EOF":5, "s_expression":6, "special_form":7, "list":8, "symbol":9, "literal":10, "atom":11, "callable_list":12, "quoted_list":13, "object":14, "(":15, "element_list":16, ")":17, "[":18, "]":19, "OBJECT":20, "OBJECT_END":21, "element":22, "QUOTE":23, "QUASIQUOTE":24, "UNQUOTE":25, "UNQUOTE_SPLICING":26, "FUNCTION":27, "NIL":28, "BOOLEAN_TRUE":29, "BOOLEAN_FALSE":30, "string":31, "regex":32, "number":33, "REGEX":34, "FLAGS":35, "FIXNUM":36, 
+  "FLOAT":37, "BASENUM":38, "STRING":39, "KEYWORD":40, "IDENTIFIER":41, "$accept":0, "$end":1}, terminals_:{2:"error", 5:"EOF", 15:"(", 17:")", 18:"[", 19:"]", 20:"OBJECT", 21:"OBJECT_END", 23:"QUOTE", 24:"QUASIQUOTE", 25:"UNQUOTE", 26:"UNQUOTE_SPLICING", 27:"FUNCTION", 28:"NIL", 29:"BOOLEAN_TRUE", 30:"BOOLEAN_FALSE", 34:"REGEX", 35:"FLAGS", 36:"FIXNUM", 37:"FLOAT", 38:"BASENUM", 39:"STRING", 40:"KEYWORD", 41:"IDENTIFIER"}, productions_:[0, [3, 2], [3, 1], [4, 2], [4, 1], [6, 1], [6, 1], [6, 1], 
+  [6, 1], [6, 1], [8, 1], [8, 1], [8, 1], [12, 3], [12, 2], [13, 3], [13, 2], [14, 3], [14, 2], [16, 1], [16, 2], [22, 1], [7, 2], [7, 2], [7, 2], [7, 2], [7, 3], [11, 1], [11, 1], [11, 1], [10, 1], [10, 1], [10, 1], [32, 2], [33, 1], [33, 1], [33, 1], [31, 1], [31, 2], [9, 1]], performAction:function anonymous(yytext, yyleng, yylineno, yy, yystate, $$, _$) {
     var $0 = $$.length - 1;
     switch(yystate) {
       case 1:
-        return[["symbol", "do"]].concat($$[$0 - 1]);
+        var _do = new types.Symbol("do", yy);
+        return new types.List([_do].concat($$[$0 - 1]), yy);
         break;
       case 2:
-        return null;
+        return new types.Nil(yy);
         break;
       case 3:
         this.$ = $$[$0 - 1];
@@ -18,128 +520,114 @@ var parser = function() {
       case 4:
         this.$ = [$$[$0]];
         break;
+      case 13:
+        this.$ = new types.List($$[$0 - 1], yy);
+        break;
       case 14:
-        this.$ = $$[$0 - 1];
+        this.$ = new types.Nil(yy);
         break;
       case 15:
-        this.$ = null;
+        var list = new types.List($$[$0 - 1], yy);
+        this.$ = new types.Quoted(list, yy);
         break;
       case 16:
-        this.$ = [["symbol", "list"]].concat($$[$0 - 1]);
+        var list = new types.List([], yy);
+        this.$ = new types.Quoted(list, yy);
         break;
       case 17:
-        this.$ = [["symbol", "list"]];
+        this.$ = new types.Object($$[$0 - 1], yy);
         break;
       case 18:
-        this.$ = [["symbol", "js-map"]].concat($$[$0 - 1]);
+        this.$ = new types.Object([], yy);
         break;
       case 19:
-        this.$ = [["symbol", "js-map"]];
-        break;
-      case 20:
         this.$ = [$$[$0]];
         break;
-      case 21:
+      case 20:
         this.$ = $$[$0 - 1];
         this.$.push($$[$0]);
         break;
+      case 22:
+        this.$ = new types.Quoted($$[$0], yy);
+        break;
       case 23:
-        this.$ = [["symbol", "quote"], $$[$0]];
+        var sym = new types.Symbol("quasiquote", yy);
+        this.$ = new types.List([sym, $$[$0]], yy);
         break;
       case 24:
-        this.$ = [["symbol", "syntax-quote"], $$[$0]];
+        var sym = new types.Symbol("unquote", yy);
+        this.$ = new types.List([sym, $$[$0]], yy);
         break;
       case 25:
-        this.$ = [["symbol", "unquote"], $$[$0]];
+        var sym = new types.Symbol("unquote-splicing", yy);
+        this.$ = new types.List([sym, $$[$0]], yy);
         break;
       case 26:
-        this.$ = [["symbol", "splat"], $$[$0]];
+        this.$ = new types.Function(null, null, $$[$0 - 1]);
         break;
       case 27:
-        this.$ = [["symbol", "lambda"], [], $$[$0 - 1]];
+        this.$ = new types.Nil(yy);
         break;
       case 28:
-        this.$ = [["symbol", "js-eval"], "arguments[" + ($$[$0].substring(1) - 1) + "]"];
+        this.$ = new types.True(yy);
         break;
       case 29:
-        this.$ = null;
+        this.$ = new types.False(yy);
         break;
-      case 30:
-        this.$ = true;
+      case 33:
+        this.$ = new types.Regex($$[$0 - 1], $$[$0].substr(1), yy);
         break;
-      case 31:
-        this.$ = false;
-        break;
-      case 32:
-        this.$ = $$[$0];
+      case 34:
+        this.$ = new types.Fixnum($$[$0], yy);
         break;
       case 35:
-        this.$ = [["symbol", "regex"], $$[$0 - 1], $$[$0].substr(1)];
+        this.$ = new types.Float($$[$0], yy);
         break;
       case 36:
-        this.$ = parseFloat(yytext, 10);
+        var basenum = $$[$0].split("#");
+        var base = basenum[0];
+        var snum = basenum[1];
+        var num = parseInt(snum, +base);
+        this.$ = new types.Fixnum(num, yy);
         break;
       case 37:
-        if(/[8-9]/.test(yytext)) {
-          this.$ = NaN
-        }else {
-          this.$ = parseInt(yytext.replace(/^#0/, ""), 8)
-        }
+        this.$ = new types.String($$[$0], yy);
         break;
       case 38:
-        this.$ = parseInt(yytext.replace(/^#x/, ""), 16);
+        this.$ = new types.String($$[$0].value, yy);
         break;
       case 39:
-        if(/[2-9]/.test(yytext)) {
-          this.$ = NaN
-        }else {
-          this.$ = parseInt(yytext.replace(/^#b/, ""), 2)
-        }
-        break;
-      case 40:
-        this.$ = [["symbol", "keyword"], [["symbol", "quote"], $$[$0]]];
-        break;
-      case 41:
-        var _this = [["symbol", "js-eval"], "this"], yytext1_ = yytext.substr(1), yytext0 = yytext.charAt(0), yytextLower = yytext.toLowerCase();
-        if(yytextLower === "nil") {
-          this.$ = null
-        }else {
-          this.$ = ["symbol", yytext]
-        }
+        this.$ = new types.Symbol($$[$0], yy);
         break
     }
-  }, table:[{3:1, 4:2, 5:[1, 3], 6:4, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 19:[1, 29], 21:[1, 30], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {1:[3]}, {5:[1, 36], 6:37, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 19:[1, 29], 21:[1, 30], 24:[1, 11], 25:[1, 12], 26:[1, 13], 
-  27:[1, 14], 28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {1:[2, 2]}, {5:[2, 4], 16:[2, 4], 19:[2, 4], 21:[2, 4], 24:[2, 4], 25:[2, 4], 26:[2, 4], 27:[2, 4], 28:[2, 4], 29:[2, 4], 30:[2, 4], 31:[2, 4], 32:[2, 4], 33:[2, 4], 36:[2, 4], 38:[2, 4], 39:[2, 4], 40:[2, 4], 41:[2, 4], 42:[2, 4], 43:[2, 4]}, {5:[2, 5], 16:[2, 5], 18:[2, 5], 19:[2, 5], 20:[2, 5], 21:[2, 5], 22:[2, 
-  5], 24:[2, 5], 25:[2, 5], 26:[2, 5], 27:[2, 5], 28:[2, 5], 29:[2, 5], 30:[2, 5], 31:[2, 5], 32:[2, 5], 33:[2, 5], 36:[2, 5], 38:[2, 5], 39:[2, 5], 40:[2, 5], 41:[2, 5], 42:[2, 5], 43:[2, 5]}, {5:[2, 6], 16:[2, 6], 18:[2, 6], 19:[2, 6], 20:[2, 6], 21:[2, 6], 22:[2, 6], 24:[2, 6], 25:[2, 6], 26:[2, 6], 27:[2, 6], 28:[2, 6], 29:[2, 6], 30:[2, 6], 31:[2, 6], 32:[2, 6], 33:[2, 6], 36:[2, 6], 38:[2, 6], 39:[2, 6], 40:[2, 6], 41:[2, 6], 42:[2, 6], 43:[2, 6]}, {5:[2, 7], 16:[2, 7], 18:[2, 7], 19:[2, 7], 
-  20:[2, 7], 21:[2, 7], 22:[2, 7], 24:[2, 7], 25:[2, 7], 26:[2, 7], 27:[2, 7], 28:[2, 7], 29:[2, 7], 30:[2, 7], 31:[2, 7], 32:[2, 7], 33:[2, 7], 36:[2, 7], 38:[2, 7], 39:[2, 7], 40:[2, 7], 41:[2, 7], 42:[2, 7], 43:[2, 7]}, {5:[2, 8], 16:[2, 8], 18:[2, 8], 19:[2, 8], 20:[2, 8], 21:[2, 8], 22:[2, 8], 24:[2, 8], 25:[2, 8], 26:[2, 8], 27:[2, 8], 28:[2, 8], 29:[2, 8], 30:[2, 8], 31:[2, 8], 32:[2, 8], 33:[2, 8], 36:[2, 8], 38:[2, 8], 39:[2, 8], 40:[2, 8], 41:[2, 8], 42:[2, 8], 43:[2, 8]}, {5:[2, 9], 16:[2, 
-  9], 18:[2, 9], 19:[2, 9], 20:[2, 9], 21:[2, 9], 22:[2, 9], 24:[2, 9], 25:[2, 9], 26:[2, 9], 27:[2, 9], 28:[2, 9], 29:[2, 9], 30:[2, 9], 31:[2, 9], 32:[2, 9], 33:[2, 9], 36:[2, 9], 38:[2, 9], 39:[2, 9], 40:[2, 9], 41:[2, 9], 42:[2, 9], 43:[2, 9]}, {5:[2, 10], 16:[2, 10], 18:[2, 10], 19:[2, 10], 20:[2, 10], 21:[2, 10], 22:[2, 10], 24:[2, 10], 25:[2, 10], 26:[2, 10], 27:[2, 10], 28:[2, 10], 29:[2, 10], 30:[2, 10], 31:[2, 10], 32:[2, 10], 33:[2, 10], 36:[2, 10], 38:[2, 10], 39:[2, 10], 40:[2, 10], 
-  41:[2, 10], 42:[2, 10], 43:[2, 10]}, {6:38, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 19:[1, 29], 21:[1, 30], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {6:39, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 19:[1, 29], 21:[1, 30], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 
-  28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {6:40, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 19:[1, 29], 21:[1, 30], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {6:41, 7:5, 
-  8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 19:[1, 29], 21:[1, 30], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {6:44, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 17:42, 19:[1, 29], 21:[1, 30], 23:43, 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 15], 29:[1, 16], 30:[1, 25], 
-  31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {5:[2, 28], 16:[2, 28], 18:[2, 28], 19:[2, 28], 20:[2, 28], 21:[2, 28], 22:[2, 28], 24:[2, 28], 25:[2, 28], 26:[2, 28], 27:[2, 28], 28:[2, 28], 29:[2, 28], 30:[2, 28], 31:[2, 28], 32:[2, 28], 33:[2, 28], 36:[2, 28], 38:[2, 28], 39:[2, 28], 40:[2, 28], 41:[2, 28], 42:[2, 28], 43:[2, 28]}, {5:[2, 11], 16:[2, 11], 18:[2, 11], 19:[2, 11], 20:[2, 11], 21:[2, 11], 22:[2, 
-  11], 24:[2, 11], 25:[2, 11], 26:[2, 11], 27:[2, 11], 28:[2, 11], 29:[2, 11], 30:[2, 11], 31:[2, 11], 32:[2, 11], 33:[2, 11], 36:[2, 11], 38:[2, 11], 39:[2, 11], 40:[2, 11], 41:[2, 11], 42:[2, 11], 43:[2, 11]}, {5:[2, 12], 16:[2, 12], 18:[2, 12], 19:[2, 12], 20:[2, 12], 21:[2, 12], 22:[2, 12], 24:[2, 12], 25:[2, 12], 26:[2, 12], 27:[2, 12], 28:[2, 12], 29:[2, 12], 30:[2, 12], 31:[2, 12], 32:[2, 12], 33:[2, 12], 36:[2, 12], 38:[2, 12], 39:[2, 12], 40:[2, 12], 41:[2, 12], 42:[2, 12], 43:[2, 12]}, 
-  {5:[2, 13], 16:[2, 13], 18:[2, 13], 19:[2, 13], 20:[2, 13], 21:[2, 13], 22:[2, 13], 24:[2, 13], 25:[2, 13], 26:[2, 13], 27:[2, 13], 28:[2, 13], 29:[2, 13], 30:[2, 13], 31:[2, 13], 32:[2, 13], 33:[2, 13], 36:[2, 13], 38:[2, 13], 39:[2, 13], 40:[2, 13], 41:[2, 13], 42:[2, 13], 43:[2, 13]}, {5:[2, 41], 16:[2, 41], 18:[2, 41], 19:[2, 41], 20:[2, 41], 21:[2, 41], 22:[2, 41], 24:[2, 41], 25:[2, 41], 26:[2, 41], 27:[2, 41], 28:[2, 41], 29:[2, 41], 30:[2, 41], 31:[2, 41], 32:[2, 41], 33:[2, 41], 36:[2, 
-  41], 38:[2, 41], 39:[2, 41], 40:[2, 41], 41:[2, 41], 42:[2, 41], 43:[2, 41]}, {9:45, 43:[1, 20]}, {5:[2, 32], 16:[2, 32], 18:[2, 32], 19:[2, 32], 20:[2, 32], 21:[2, 32], 22:[2, 32], 24:[2, 32], 25:[2, 32], 26:[2, 32], 27:[2, 32], 28:[2, 32], 29:[2, 32], 30:[2, 32], 31:[2, 32], 32:[2, 32], 33:[2, 32], 36:[2, 32], 38:[2, 32], 39:[2, 32], 40:[2, 32], 41:[2, 32], 42:[2, 32], 43:[2, 32]}, {5:[2, 33], 16:[2, 33], 18:[2, 33], 19:[2, 33], 20:[2, 33], 21:[2, 33], 22:[2, 33], 24:[2, 33], 25:[2, 33], 26:[2, 
-  33], 27:[2, 33], 28:[2, 33], 29:[2, 33], 30:[2, 33], 31:[2, 33], 32:[2, 33], 33:[2, 33], 36:[2, 33], 38:[2, 33], 39:[2, 33], 40:[2, 33], 41:[2, 33], 42:[2, 33], 43:[2, 33]}, {5:[2, 34], 16:[2, 34], 18:[2, 34], 19:[2, 34], 20:[2, 34], 21:[2, 34], 22:[2, 34], 24:[2, 34], 25:[2, 34], 26:[2, 34], 27:[2, 34], 28:[2, 34], 29:[2, 34], 30:[2, 34], 31:[2, 34], 32:[2, 34], 33:[2, 34], 36:[2, 34], 38:[2, 34], 39:[2, 34], 40:[2, 34], 41:[2, 34], 42:[2, 34], 43:[2, 34]}, {5:[2, 29], 16:[2, 29], 18:[2, 29], 
-  19:[2, 29], 20:[2, 29], 21:[2, 29], 22:[2, 29], 24:[2, 29], 25:[2, 29], 26:[2, 29], 27:[2, 29], 28:[2, 29], 29:[2, 29], 30:[2, 29], 31:[2, 29], 32:[2, 29], 33:[2, 29], 36:[2, 29], 38:[2, 29], 39:[2, 29], 40:[2, 29], 41:[2, 29], 42:[2, 29], 43:[2, 29]}, {5:[2, 30], 16:[2, 30], 18:[2, 30], 19:[2, 30], 20:[2, 30], 21:[2, 30], 22:[2, 30], 24:[2, 30], 25:[2, 30], 26:[2, 30], 27:[2, 30], 28:[2, 30], 29:[2, 30], 30:[2, 30], 31:[2, 30], 32:[2, 30], 33:[2, 30], 36:[2, 30], 38:[2, 30], 39:[2, 30], 40:[2, 
-  30], 41:[2, 30], 42:[2, 30], 43:[2, 30]}, {5:[2, 31], 16:[2, 31], 18:[2, 31], 19:[2, 31], 20:[2, 31], 21:[2, 31], 22:[2, 31], 24:[2, 31], 25:[2, 31], 26:[2, 31], 27:[2, 31], 28:[2, 31], 29:[2, 31], 30:[2, 31], 31:[2, 31], 32:[2, 31], 33:[2, 31], 36:[2, 31], 38:[2, 31], 39:[2, 31], 40:[2, 31], 41:[2, 31], 42:[2, 31], 43:[2, 31]}, {6:44, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 17:46, 18:[1, 47], 19:[1, 29], 21:[1, 30], 23:43, 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 
-  28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {6:44, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 17:48, 19:[1, 29], 20:[1, 49], 21:[1, 30], 23:43, 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 
-  43:[1, 20]}, {6:44, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 17:50, 19:[1, 29], 21:[1, 30], 22:[1, 51], 23:43, 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {37:[1, 52]}, {5:[2, 36], 16:[2, 36], 18:[2, 36], 19:[2, 36], 20:[2, 36], 21:[2, 36], 22:[2, 36], 24:[2, 36], 25:[2, 36], 26:[2, 36], 27:[2, 36], 
-  28:[2, 36], 29:[2, 36], 30:[2, 36], 31:[2, 36], 32:[2, 36], 33:[2, 36], 36:[2, 36], 38:[2, 36], 39:[2, 36], 40:[2, 36], 41:[2, 36], 42:[2, 36], 43:[2, 36]}, {5:[2, 37], 16:[2, 37], 18:[2, 37], 19:[2, 37], 20:[2, 37], 21:[2, 37], 22:[2, 37], 24:[2, 37], 25:[2, 37], 26:[2, 37], 27:[2, 37], 28:[2, 37], 29:[2, 37], 30:[2, 37], 31:[2, 37], 32:[2, 37], 33:[2, 37], 36:[2, 37], 38:[2, 37], 39:[2, 37], 40:[2, 37], 41:[2, 37], 42:[2, 37], 43:[2, 37]}, {5:[2, 38], 16:[2, 38], 18:[2, 38], 19:[2, 38], 20:[2, 
-  38], 21:[2, 38], 22:[2, 38], 24:[2, 38], 25:[2, 38], 26:[2, 38], 27:[2, 38], 28:[2, 38], 29:[2, 38], 30:[2, 38], 31:[2, 38], 32:[2, 38], 33:[2, 38], 36:[2, 38], 38:[2, 38], 39:[2, 38], 40:[2, 38], 41:[2, 38], 42:[2, 38], 43:[2, 38]}, {5:[2, 39], 16:[2, 39], 18:[2, 39], 19:[2, 39], 20:[2, 39], 21:[2, 39], 22:[2, 39], 24:[2, 39], 25:[2, 39], 26:[2, 39], 27:[2, 39], 28:[2, 39], 29:[2, 39], 30:[2, 39], 31:[2, 39], 32:[2, 39], 33:[2, 39], 36:[2, 39], 38:[2, 39], 39:[2, 39], 40:[2, 39], 41:[2, 39], 42:[2, 
-  39], 43:[2, 39]}, {1:[2, 1]}, {5:[2, 3], 16:[2, 3], 19:[2, 3], 21:[2, 3], 24:[2, 3], 25:[2, 3], 26:[2, 3], 27:[2, 3], 28:[2, 3], 29:[2, 3], 30:[2, 3], 31:[2, 3], 32:[2, 3], 33:[2, 3], 36:[2, 3], 38:[2, 3], 39:[2, 3], 40:[2, 3], 41:[2, 3], 42:[2, 3], 43:[2, 3]}, {5:[2, 23], 16:[2, 23], 18:[2, 23], 19:[2, 23], 20:[2, 23], 21:[2, 23], 22:[2, 23], 24:[2, 23], 25:[2, 23], 26:[2, 23], 27:[2, 23], 28:[2, 23], 29:[2, 23], 30:[2, 23], 31:[2, 23], 32:[2, 23], 33:[2, 23], 36:[2, 23], 38:[2, 23], 39:[2, 23], 
-  40:[2, 23], 41:[2, 23], 42:[2, 23], 43:[2, 23]}, {5:[2, 24], 16:[2, 24], 18:[2, 24], 19:[2, 24], 20:[2, 24], 21:[2, 24], 22:[2, 24], 24:[2, 24], 25:[2, 24], 26:[2, 24], 27:[2, 24], 28:[2, 24], 29:[2, 24], 30:[2, 24], 31:[2, 24], 32:[2, 24], 33:[2, 24], 36:[2, 24], 38:[2, 24], 39:[2, 24], 40:[2, 24], 41:[2, 24], 42:[2, 24], 43:[2, 24]}, {5:[2, 25], 16:[2, 25], 18:[2, 25], 19:[2, 25], 20:[2, 25], 21:[2, 25], 22:[2, 25], 24:[2, 25], 25:[2, 25], 26:[2, 25], 27:[2, 25], 28:[2, 25], 29:[2, 25], 30:[2, 
-  25], 31:[2, 25], 32:[2, 25], 33:[2, 25], 36:[2, 25], 38:[2, 25], 39:[2, 25], 40:[2, 25], 41:[2, 25], 42:[2, 25], 43:[2, 25]}, {5:[2, 26], 16:[2, 26], 18:[2, 26], 19:[2, 26], 20:[2, 26], 21:[2, 26], 22:[2, 26], 24:[2, 26], 25:[2, 26], 26:[2, 26], 27:[2, 26], 28:[2, 26], 29:[2, 26], 30:[2, 26], 31:[2, 26], 32:[2, 26], 33:[2, 26], 36:[2, 26], 38:[2, 26], 39:[2, 26], 40:[2, 26], 41:[2, 26], 42:[2, 26], 43:[2, 26]}, {6:44, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 18:[1, 53], 
-  19:[1, 29], 21:[1, 30], 23:54, 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {16:[2, 20], 18:[2, 20], 19:[2, 20], 20:[2, 20], 21:[2, 20], 22:[2, 20], 24:[2, 20], 25:[2, 20], 26:[2, 20], 27:[2, 20], 28:[2, 20], 29:[2, 20], 30:[2, 20], 31:[2, 20], 32:[2, 20], 33:[2, 20], 36:[2, 20], 38:[2, 20], 39:[2, 20], 40:[2, 20], 41:[2, 20], 
-  42:[2, 20], 43:[2, 20]}, {16:[2, 22], 18:[2, 22], 19:[2, 22], 20:[2, 22], 21:[2, 22], 22:[2, 22], 24:[2, 22], 25:[2, 22], 26:[2, 22], 27:[2, 22], 28:[2, 22], 29:[2, 22], 30:[2, 22], 31:[2, 22], 32:[2, 22], 33:[2, 22], 36:[2, 22], 38:[2, 22], 39:[2, 22], 40:[2, 22], 41:[2, 22], 42:[2, 22], 43:[2, 22]}, {5:[2, 40], 16:[2, 40], 18:[2, 40], 19:[2, 40], 20:[2, 40], 21:[2, 40], 22:[2, 40], 24:[2, 40], 25:[2, 40], 26:[2, 40], 27:[2, 40], 28:[2, 40], 29:[2, 40], 30:[2, 40], 31:[2, 40], 32:[2, 40], 33:[2, 
-  40], 36:[2, 40], 38:[2, 40], 39:[2, 40], 40:[2, 40], 41:[2, 40], 42:[2, 40], 43:[2, 40]}, {6:44, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 18:[1, 55], 19:[1, 29], 21:[1, 30], 23:54, 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {5:[2, 15], 16:[2, 15], 18:[2, 15], 19:[2, 15], 20:[2, 15], 21:[2, 15], 22:[2, 
-  15], 24:[2, 15], 25:[2, 15], 26:[2, 15], 27:[2, 15], 28:[2, 15], 29:[2, 15], 30:[2, 15], 31:[2, 15], 32:[2, 15], 33:[2, 15], 36:[2, 15], 38:[2, 15], 39:[2, 15], 40:[2, 15], 41:[2, 15], 42:[2, 15], 43:[2, 15]}, {6:44, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 19:[1, 29], 20:[1, 56], 21:[1, 30], 23:54, 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 
-  34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {5:[2, 17], 16:[2, 17], 18:[2, 17], 19:[2, 17], 20:[2, 17], 21:[2, 17], 22:[2, 17], 24:[2, 17], 25:[2, 17], 26:[2, 17], 27:[2, 17], 28:[2, 17], 29:[2, 17], 30:[2, 17], 31:[2, 17], 32:[2, 17], 33:[2, 17], 36:[2, 17], 38:[2, 17], 39:[2, 17], 40:[2, 17], 41:[2, 17], 42:[2, 17], 43:[2, 17]}, {6:44, 7:5, 8:6, 9:7, 10:8, 11:9, 12:10, 13:17, 14:18, 15:19, 16:[1, 28], 19:[1, 29], 21:[1, 30], 22:[1, 57], 23:54, 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 
-  15], 29:[1, 16], 30:[1, 25], 31:[1, 26], 32:[1, 27], 33:[1, 22], 34:23, 35:24, 36:[1, 31], 38:[1, 32], 39:[1, 33], 40:[1, 34], 41:[1, 35], 42:[1, 21], 43:[1, 20]}, {5:[2, 19], 16:[2, 19], 18:[2, 19], 19:[2, 19], 20:[2, 19], 21:[2, 19], 22:[2, 19], 24:[2, 19], 25:[2, 19], 26:[2, 19], 27:[2, 19], 28:[2, 19], 29:[2, 19], 30:[2, 19], 31:[2, 19], 32:[2, 19], 33:[2, 19], 36:[2, 19], 38:[2, 19], 39:[2, 19], 40:[2, 19], 41:[2, 19], 42:[2, 19], 43:[2, 19]}, {5:[2, 35], 16:[2, 35], 18:[2, 35], 19:[2, 35], 
-  20:[2, 35], 21:[2, 35], 22:[2, 35], 24:[2, 35], 25:[2, 35], 26:[2, 35], 27:[2, 35], 28:[2, 35], 29:[2, 35], 30:[2, 35], 31:[2, 35], 32:[2, 35], 33:[2, 35], 36:[2, 35], 38:[2, 35], 39:[2, 35], 40:[2, 35], 41:[2, 35], 42:[2, 35], 43:[2, 35]}, {5:[2, 27], 16:[2, 27], 18:[2, 27], 19:[2, 27], 20:[2, 27], 21:[2, 27], 22:[2, 27], 24:[2, 27], 25:[2, 27], 26:[2, 27], 27:[2, 27], 28:[2, 27], 29:[2, 27], 30:[2, 27], 31:[2, 27], 32:[2, 27], 33:[2, 27], 36:[2, 27], 38:[2, 27], 39:[2, 27], 40:[2, 27], 41:[2, 
-  27], 42:[2, 27], 43:[2, 27]}, {16:[2, 21], 18:[2, 21], 19:[2, 21], 20:[2, 21], 21:[2, 21], 22:[2, 21], 24:[2, 21], 25:[2, 21], 26:[2, 21], 27:[2, 21], 28:[2, 21], 29:[2, 21], 30:[2, 21], 31:[2, 21], 32:[2, 21], 33:[2, 21], 36:[2, 21], 38:[2, 21], 39:[2, 21], 40:[2, 21], 41:[2, 21], 42:[2, 21], 43:[2, 21]}, {5:[2, 14], 16:[2, 14], 18:[2, 14], 19:[2, 14], 20:[2, 14], 21:[2, 14], 22:[2, 14], 24:[2, 14], 25:[2, 14], 26:[2, 14], 27:[2, 14], 28:[2, 14], 29:[2, 14], 30:[2, 14], 31:[2, 14], 32:[2, 14], 
-  33:[2, 14], 36:[2, 14], 38:[2, 14], 39:[2, 14], 40:[2, 14], 41:[2, 14], 42:[2, 14], 43:[2, 14]}, {5:[2, 16], 16:[2, 16], 18:[2, 16], 19:[2, 16], 20:[2, 16], 21:[2, 16], 22:[2, 16], 24:[2, 16], 25:[2, 16], 26:[2, 16], 27:[2, 16], 28:[2, 16], 29:[2, 16], 30:[2, 16], 31:[2, 16], 32:[2, 16], 33:[2, 16], 36:[2, 16], 38:[2, 16], 39:[2, 16], 40:[2, 16], 41:[2, 16], 42:[2, 16], 43:[2, 16]}, {5:[2, 18], 16:[2, 18], 18:[2, 18], 19:[2, 18], 20:[2, 18], 21:[2, 18], 22:[2, 18], 24:[2, 18], 25:[2, 18], 26:[2, 
-  18], 27:[2, 18], 28:[2, 18], 29:[2, 18], 30:[2, 18], 31:[2, 18], 32:[2, 18], 33:[2, 18], 36:[2, 18], 38:[2, 18], 39:[2, 18], 40:[2, 18], 41:[2, 18], 42:[2, 18], 43:[2, 18]}], defaultActions:{3:[2, 2], 36:[2, 1]}, parseError:function parseError(str, hash) {
+  }, table:[{3:1, 4:2, 5:[1, 3], 6:4, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 18:[1, 26], 20:[1, 27], 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {1:[3]}, {5:[1, 34], 6:35, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 18:[1, 26], 20:[1, 27], 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 
+  22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {1:[2, 2]}, {5:[2, 4], 15:[2, 4], 18:[2, 4], 20:[2, 4], 23:[2, 4], 24:[2, 4], 25:[2, 4], 26:[2, 4], 27:[2, 4], 28:[2, 4], 29:[2, 4], 30:[2, 4], 34:[2, 4], 36:[2, 4], 37:[2, 4], 38:[2, 4], 39:[2, 4], 40:[2, 4], 41:[2, 4]}, {5:[2, 5], 15:[2, 5], 17:[2, 5], 18:[2, 5], 19:[2, 5], 20:[2, 5], 21:[2, 5], 23:[2, 5], 24:[2, 5], 25:[2, 5], 26:[2, 5], 27:[2, 5], 28:[2, 5], 
+  29:[2, 5], 30:[2, 5], 34:[2, 5], 36:[2, 5], 37:[2, 5], 38:[2, 5], 39:[2, 5], 40:[2, 5], 41:[2, 5]}, {5:[2, 6], 15:[2, 6], 17:[2, 6], 18:[2, 6], 19:[2, 6], 20:[2, 6], 21:[2, 6], 23:[2, 6], 24:[2, 6], 25:[2, 6], 26:[2, 6], 27:[2, 6], 28:[2, 6], 29:[2, 6], 30:[2, 6], 34:[2, 6], 36:[2, 6], 37:[2, 6], 38:[2, 6], 39:[2, 6], 40:[2, 6], 41:[2, 6]}, {5:[2, 7], 15:[2, 7], 17:[2, 7], 18:[2, 7], 19:[2, 7], 20:[2, 7], 21:[2, 7], 23:[2, 7], 24:[2, 7], 25:[2, 7], 26:[2, 7], 27:[2, 7], 28:[2, 7], 29:[2, 7], 30:[2, 
+  7], 34:[2, 7], 36:[2, 7], 37:[2, 7], 38:[2, 7], 39:[2, 7], 40:[2, 7], 41:[2, 7]}, {5:[2, 8], 15:[2, 8], 17:[2, 8], 18:[2, 8], 19:[2, 8], 20:[2, 8], 21:[2, 8], 23:[2, 8], 24:[2, 8], 25:[2, 8], 26:[2, 8], 27:[2, 8], 28:[2, 8], 29:[2, 8], 30:[2, 8], 34:[2, 8], 36:[2, 8], 37:[2, 8], 38:[2, 8], 39:[2, 8], 40:[2, 8], 41:[2, 8]}, {5:[2, 9], 15:[2, 9], 17:[2, 9], 18:[2, 9], 19:[2, 9], 20:[2, 9], 21:[2, 9], 23:[2, 9], 24:[2, 9], 25:[2, 9], 26:[2, 9], 27:[2, 9], 28:[2, 9], 29:[2, 9], 30:[2, 9], 34:[2, 9], 
+  36:[2, 9], 37:[2, 9], 38:[2, 9], 39:[2, 9], 40:[2, 9], 41:[2, 9]}, {6:36, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 18:[1, 26], 20:[1, 27], 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {6:37, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 18:[1, 26], 20:[1, 27], 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 
+  27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {6:38, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 18:[1, 26], 20:[1, 27], 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {6:39, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 
+  15:[1, 25], 18:[1, 26], 20:[1, 27], 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {6:42, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 16:40, 18:[1, 26], 20:[1, 27], 22:41, 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 
+  33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {5:[2, 10], 15:[2, 10], 17:[2, 10], 18:[2, 10], 19:[2, 10], 20:[2, 10], 21:[2, 10], 23:[2, 10], 24:[2, 10], 25:[2, 10], 26:[2, 10], 27:[2, 10], 28:[2, 10], 29:[2, 10], 30:[2, 10], 34:[2, 10], 36:[2, 10], 37:[2, 10], 38:[2, 10], 39:[2, 10], 40:[2, 10], 41:[2, 10]}, {5:[2, 11], 15:[2, 11], 17:[2, 11], 18:[2, 11], 19:[2, 11], 20:[2, 11], 21:[2, 11], 23:[2, 11], 24:[2, 11], 25:[2, 11], 26:[2, 11], 27:[2, 11], 28:[2, 11], 29:[2, 11], 30:[2, 11], 34:[2, 11], 
+  36:[2, 11], 37:[2, 11], 38:[2, 11], 39:[2, 11], 40:[2, 11], 41:[2, 11]}, {5:[2, 12], 15:[2, 12], 17:[2, 12], 18:[2, 12], 19:[2, 12], 20:[2, 12], 21:[2, 12], 23:[2, 12], 24:[2, 12], 25:[2, 12], 26:[2, 12], 27:[2, 12], 28:[2, 12], 29:[2, 12], 30:[2, 12], 34:[2, 12], 36:[2, 12], 37:[2, 12], 38:[2, 12], 39:[2, 12], 40:[2, 12], 41:[2, 12]}, {5:[2, 39], 15:[2, 39], 17:[2, 39], 18:[2, 39], 19:[2, 39], 20:[2, 39], 21:[2, 39], 23:[2, 39], 24:[2, 39], 25:[2, 39], 26:[2, 39], 27:[2, 39], 28:[2, 39], 29:[2, 
+  39], 30:[2, 39], 34:[2, 39], 36:[2, 39], 37:[2, 39], 38:[2, 39], 39:[2, 39], 40:[2, 39], 41:[2, 39]}, {5:[2, 30], 15:[2, 30], 17:[2, 30], 18:[2, 30], 19:[2, 30], 20:[2, 30], 21:[2, 30], 23:[2, 30], 24:[2, 30], 25:[2, 30], 26:[2, 30], 27:[2, 30], 28:[2, 30], 29:[2, 30], 30:[2, 30], 34:[2, 30], 36:[2, 30], 37:[2, 30], 38:[2, 30], 39:[2, 30], 40:[2, 30], 41:[2, 30]}, {5:[2, 31], 15:[2, 31], 17:[2, 31], 18:[2, 31], 19:[2, 31], 20:[2, 31], 21:[2, 31], 23:[2, 31], 24:[2, 31], 25:[2, 31], 26:[2, 31], 
+  27:[2, 31], 28:[2, 31], 29:[2, 31], 30:[2, 31], 34:[2, 31], 36:[2, 31], 37:[2, 31], 38:[2, 31], 39:[2, 31], 40:[2, 31], 41:[2, 31]}, {5:[2, 32], 15:[2, 32], 17:[2, 32], 18:[2, 32], 19:[2, 32], 20:[2, 32], 21:[2, 32], 23:[2, 32], 24:[2, 32], 25:[2, 32], 26:[2, 32], 27:[2, 32], 28:[2, 32], 29:[2, 32], 30:[2, 32], 34:[2, 32], 36:[2, 32], 37:[2, 32], 38:[2, 32], 39:[2, 32], 40:[2, 32], 41:[2, 32]}, {5:[2, 27], 15:[2, 27], 17:[2, 27], 18:[2, 27], 19:[2, 27], 20:[2, 27], 21:[2, 27], 23:[2, 27], 24:[2, 
+  27], 25:[2, 27], 26:[2, 27], 27:[2, 27], 28:[2, 27], 29:[2, 27], 30:[2, 27], 34:[2, 27], 36:[2, 27], 37:[2, 27], 38:[2, 27], 39:[2, 27], 40:[2, 27], 41:[2, 27]}, {5:[2, 28], 15:[2, 28], 17:[2, 28], 18:[2, 28], 19:[2, 28], 20:[2, 28], 21:[2, 28], 23:[2, 28], 24:[2, 28], 25:[2, 28], 26:[2, 28], 27:[2, 28], 28:[2, 28], 29:[2, 28], 30:[2, 28], 34:[2, 28], 36:[2, 28], 37:[2, 28], 38:[2, 28], 39:[2, 28], 40:[2, 28], 41:[2, 28]}, {5:[2, 29], 15:[2, 29], 17:[2, 29], 18:[2, 29], 19:[2, 29], 20:[2, 29], 
+  21:[2, 29], 23:[2, 29], 24:[2, 29], 25:[2, 29], 26:[2, 29], 27:[2, 29], 28:[2, 29], 29:[2, 29], 30:[2, 29], 34:[2, 29], 36:[2, 29], 37:[2, 29], 38:[2, 29], 39:[2, 29], 40:[2, 29], 41:[2, 29]}, {6:42, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 16:43, 17:[1, 44], 18:[1, 26], 20:[1, 27], 22:41, 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 
+  41:[1, 18]}, {6:42, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 16:45, 18:[1, 26], 19:[1, 46], 20:[1, 27], 22:41, 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {6:42, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 16:47, 18:[1, 26], 20:[1, 27], 21:[1, 48], 22:41, 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 
+  14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {5:[2, 37], 15:[2, 37], 17:[2, 37], 18:[2, 37], 19:[2, 37], 20:[2, 37], 21:[2, 37], 23:[2, 37], 24:[2, 37], 25:[2, 37], 26:[2, 37], 27:[2, 37], 28:[2, 37], 29:[2, 37], 30:[2, 37], 34:[2, 37], 36:[2, 37], 37:[2, 37], 38:[2, 37], 39:[2, 37], 40:[2, 37], 41:[2, 37]}, {9:49, 41:[1, 18]}, {35:[1, 50]}, {5:[2, 34], 15:[2, 34], 17:[2, 34], 18:[2, 34], 19:[2, 
+  34], 20:[2, 34], 21:[2, 34], 23:[2, 34], 24:[2, 34], 25:[2, 34], 26:[2, 34], 27:[2, 34], 28:[2, 34], 29:[2, 34], 30:[2, 34], 34:[2, 34], 36:[2, 34], 37:[2, 34], 38:[2, 34], 39:[2, 34], 40:[2, 34], 41:[2, 34]}, {5:[2, 35], 15:[2, 35], 17:[2, 35], 18:[2, 35], 19:[2, 35], 20:[2, 35], 21:[2, 35], 23:[2, 35], 24:[2, 35], 25:[2, 35], 26:[2, 35], 27:[2, 35], 28:[2, 35], 29:[2, 35], 30:[2, 35], 34:[2, 35], 36:[2, 35], 37:[2, 35], 38:[2, 35], 39:[2, 35], 40:[2, 35], 41:[2, 35]}, {5:[2, 36], 15:[2, 36], 
+  17:[2, 36], 18:[2, 36], 19:[2, 36], 20:[2, 36], 21:[2, 36], 23:[2, 36], 24:[2, 36], 25:[2, 36], 26:[2, 36], 27:[2, 36], 28:[2, 36], 29:[2, 36], 30:[2, 36], 34:[2, 36], 36:[2, 36], 37:[2, 36], 38:[2, 36], 39:[2, 36], 40:[2, 36], 41:[2, 36]}, {1:[2, 1]}, {5:[2, 3], 15:[2, 3], 18:[2, 3], 20:[2, 3], 23:[2, 3], 24:[2, 3], 25:[2, 3], 26:[2, 3], 27:[2, 3], 28:[2, 3], 29:[2, 3], 30:[2, 3], 34:[2, 3], 36:[2, 3], 37:[2, 3], 38:[2, 3], 39:[2, 3], 40:[2, 3], 41:[2, 3]}, {5:[2, 22], 15:[2, 22], 17:[2, 22], 
+  18:[2, 22], 19:[2, 22], 20:[2, 22], 21:[2, 22], 23:[2, 22], 24:[2, 22], 25:[2, 22], 26:[2, 22], 27:[2, 22], 28:[2, 22], 29:[2, 22], 30:[2, 22], 34:[2, 22], 36:[2, 22], 37:[2, 22], 38:[2, 22], 39:[2, 22], 40:[2, 22], 41:[2, 22]}, {5:[2, 23], 15:[2, 23], 17:[2, 23], 18:[2, 23], 19:[2, 23], 20:[2, 23], 21:[2, 23], 23:[2, 23], 24:[2, 23], 25:[2, 23], 26:[2, 23], 27:[2, 23], 28:[2, 23], 29:[2, 23], 30:[2, 23], 34:[2, 23], 36:[2, 23], 37:[2, 23], 38:[2, 23], 39:[2, 23], 40:[2, 23], 41:[2, 23]}, {5:[2, 
+  24], 15:[2, 24], 17:[2, 24], 18:[2, 24], 19:[2, 24], 20:[2, 24], 21:[2, 24], 23:[2, 24], 24:[2, 24], 25:[2, 24], 26:[2, 24], 27:[2, 24], 28:[2, 24], 29:[2, 24], 30:[2, 24], 34:[2, 24], 36:[2, 24], 37:[2, 24], 38:[2, 24], 39:[2, 24], 40:[2, 24], 41:[2, 24]}, {5:[2, 25], 15:[2, 25], 17:[2, 25], 18:[2, 25], 19:[2, 25], 20:[2, 25], 21:[2, 25], 23:[2, 25], 24:[2, 25], 25:[2, 25], 26:[2, 25], 27:[2, 25], 28:[2, 25], 29:[2, 25], 30:[2, 25], 34:[2, 25], 36:[2, 25], 37:[2, 25], 38:[2, 25], 39:[2, 25], 40:[2, 
+  25], 41:[2, 25]}, {6:42, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 17:[1, 51], 18:[1, 26], 20:[1, 27], 22:52, 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {15:[2, 19], 17:[2, 19], 18:[2, 19], 19:[2, 19], 20:[2, 19], 21:[2, 19], 23:[2, 19], 24:[2, 19], 25:[2, 19], 26:[2, 19], 27:[2, 19], 28:[2, 19], 29:[2, 19], 30:[2, 19], 
+  34:[2, 19], 36:[2, 19], 37:[2, 19], 38:[2, 19], 39:[2, 19], 40:[2, 19], 41:[2, 19]}, {15:[2, 21], 17:[2, 21], 18:[2, 21], 19:[2, 21], 20:[2, 21], 21:[2, 21], 23:[2, 21], 24:[2, 21], 25:[2, 21], 26:[2, 21], 27:[2, 21], 28:[2, 21], 29:[2, 21], 30:[2, 21], 34:[2, 21], 36:[2, 21], 37:[2, 21], 38:[2, 21], 39:[2, 21], 40:[2, 21], 41:[2, 21]}, {6:42, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 17:[1, 53], 18:[1, 26], 20:[1, 27], 22:52, 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 
+  14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {5:[2, 14], 15:[2, 14], 17:[2, 14], 18:[2, 14], 19:[2, 14], 20:[2, 14], 21:[2, 14], 23:[2, 14], 24:[2, 14], 25:[2, 14], 26:[2, 14], 27:[2, 14], 28:[2, 14], 29:[2, 14], 30:[2, 14], 34:[2, 14], 36:[2, 14], 37:[2, 14], 38:[2, 14], 39:[2, 14], 40:[2, 14], 41:[2, 14]}, {6:42, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 18:[1, 26], 19:[1, 54], 
+  20:[1, 27], 22:52, 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {5:[2, 16], 15:[2, 16], 17:[2, 16], 18:[2, 16], 19:[2, 16], 20:[2, 16], 21:[2, 16], 23:[2, 16], 24:[2, 16], 25:[2, 16], 26:[2, 16], 27:[2, 16], 28:[2, 16], 29:[2, 16], 30:[2, 16], 34:[2, 16], 36:[2, 16], 37:[2, 16], 38:[2, 16], 39:[2, 16], 40:[2, 16], 41:[2, 16]}, {6:42, 7:5, 8:6, 
+  9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 18:[1, 26], 20:[1, 27], 21:[1, 55], 22:52, 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {5:[2, 18], 15:[2, 18], 17:[2, 18], 18:[2, 18], 19:[2, 18], 20:[2, 18], 21:[2, 18], 23:[2, 18], 24:[2, 18], 25:[2, 18], 26:[2, 18], 27:[2, 18], 28:[2, 18], 29:[2, 18], 30:[2, 18], 34:[2, 18], 36:[2, 18], 
+  37:[2, 18], 38:[2, 18], 39:[2, 18], 40:[2, 18], 41:[2, 18]}, {5:[2, 38], 15:[2, 38], 17:[2, 38], 18:[2, 38], 19:[2, 38], 20:[2, 38], 21:[2, 38], 23:[2, 38], 24:[2, 38], 25:[2, 38], 26:[2, 38], 27:[2, 38], 28:[2, 38], 29:[2, 38], 30:[2, 38], 34:[2, 38], 36:[2, 38], 37:[2, 38], 38:[2, 38], 39:[2, 38], 40:[2, 38], 41:[2, 38]}, {5:[2, 33], 15:[2, 33], 17:[2, 33], 18:[2, 33], 19:[2, 33], 20:[2, 33], 21:[2, 33], 23:[2, 33], 24:[2, 33], 25:[2, 33], 26:[2, 33], 27:[2, 33], 28:[2, 33], 29:[2, 33], 30:[2, 
+  33], 34:[2, 33], 36:[2, 33], 37:[2, 33], 38:[2, 33], 39:[2, 33], 40:[2, 33], 41:[2, 33]}, {5:[2, 26], 15:[2, 26], 17:[2, 26], 18:[2, 26], 19:[2, 26], 20:[2, 26], 21:[2, 26], 23:[2, 26], 24:[2, 26], 25:[2, 26], 26:[2, 26], 27:[2, 26], 28:[2, 26], 29:[2, 26], 30:[2, 26], 34:[2, 26], 36:[2, 26], 37:[2, 26], 38:[2, 26], 39:[2, 26], 40:[2, 26], 41:[2, 26]}, {15:[2, 20], 17:[2, 20], 18:[2, 20], 19:[2, 20], 20:[2, 20], 21:[2, 20], 23:[2, 20], 24:[2, 20], 25:[2, 20], 26:[2, 20], 27:[2, 20], 28:[2, 20], 
+  29:[2, 20], 30:[2, 20], 34:[2, 20], 36:[2, 20], 37:[2, 20], 38:[2, 20], 39:[2, 20], 40:[2, 20], 41:[2, 20]}, {5:[2, 13], 15:[2, 13], 17:[2, 13], 18:[2, 13], 19:[2, 13], 20:[2, 13], 21:[2, 13], 23:[2, 13], 24:[2, 13], 25:[2, 13], 26:[2, 13], 27:[2, 13], 28:[2, 13], 29:[2, 13], 30:[2, 13], 34:[2, 13], 36:[2, 13], 37:[2, 13], 38:[2, 13], 39:[2, 13], 40:[2, 13], 41:[2, 13]}, {5:[2, 15], 15:[2, 15], 17:[2, 15], 18:[2, 15], 19:[2, 15], 20:[2, 15], 21:[2, 15], 23:[2, 15], 24:[2, 15], 25:[2, 15], 26:[2, 
+  15], 27:[2, 15], 28:[2, 15], 29:[2, 15], 30:[2, 15], 34:[2, 15], 36:[2, 15], 37:[2, 15], 38:[2, 15], 39:[2, 15], 40:[2, 15], 41:[2, 15]}, {5:[2, 17], 15:[2, 17], 17:[2, 17], 18:[2, 17], 19:[2, 17], 20:[2, 17], 21:[2, 17], 23:[2, 17], 24:[2, 17], 25:[2, 17], 26:[2, 17], 27:[2, 17], 28:[2, 17], 29:[2, 17], 30:[2, 17], 34:[2, 17], 36:[2, 17], 37:[2, 17], 38:[2, 17], 39:[2, 17], 40:[2, 17], 41:[2, 17]}], defaultActions:{3:[2, 2], 34:[2, 1]}, parseError:function parseError(str, hash) {
     throw new Error(str);
   }, parse:function parse(input) {
     var self = this, stack = [0], vstack = [null], lstack = [], table = this.table, yytext = "", yylineno = 0, yyleng = 0, recovering = 0, TERROR = 2, EOF = 1;
@@ -387,7 +875,7 @@ var parser = function() {
         case 3:
           this.popState();
           yy_.yytext = this.string_buffer;
-          return 33;
+          return 39;
           break;
         case 4:
           this.string_buffer = yy_.yytext;
@@ -397,34 +885,34 @@ var parser = function() {
           break;
         case 6:
           this.popState();
-          return 37;
+          return 35;
           break;
         case 7:
-          return 36;
+          return 34;
           break;
         case 8:
-          return 38;
+          return 37;
           break;
         case 9:
-          return 39;
+          return 38;
           break;
         case 10:
-          return 40;
+          return 36;
           break;
         case 11:
-          return 41;
+          return 28;
           break;
         case 12:
-          return 30;
+          return 29;
           break;
         case 13:
-          return 31;
+          return 30;
           break;
         case 14:
-          return 32;
+          return 15;
           break;
         case 15:
-          return 16;
+          return 17;
           break;
         case 16:
           return 18;
@@ -436,48 +924,39 @@ var parser = function() {
           return 20;
           break;
         case 19:
-          return"HASH_MAP_START";
-          break;
-        case 20:
           return 21;
           break;
-        case 21:
-          return 22;
-          break;
-        case 22:
-          return 26;
-          break;
-        case 23:
-          return 24;
-          break;
-        case 24:
+        case 20:
           return 25;
           break;
-        case 25:
+        case 21:
+          return 23;
+          break;
+        case 22:
+          return 24;
+          break;
+        case 23:
+          return 26;
+          break;
+        case 24:
           return 27;
           break;
+        case 25:
+          return 40;
+          break;
         case 26:
-          return 28;
+          return 41;
           break;
         case 27:
-          return 29;
-          break;
-        case 28:
-          return 42;
-          break;
-        case 29:
-          return 43;
-          break;
-        case 30:
           return 5;
           break;
-        case 31:
+        case 28:
           return"INVALID";
           break
       }
     };
-    lexer.rules = [/^;.*/, /^\s+/, /^"/, /^"/, /^(\\"|[^"])*/, /^#\//, /^\/[a-zA-Z]*/, /^(\\\/|[^\/])*/, /^[+-]?[0-9]+(\.[0-9]+)?\b/, /^[+-]?#0[0-9]+\b/, /^[+-]?#x[0-9a-fA-F]+\b/, /^[+-]?#b[0-9]+\b/, /^#(n|N)/, /^#(t|T)/, /^#(f|F)/, /^\(/, /^\)/, /^\[/, /^\]/, /^#\{/, /^\{/, /^\}/, /^~/, /^'/, /^`/, /^\.\.\./, /^#\(/, /^%\d+/, /^:/, /^[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>,]+/, /^$/, /^./];
-    lexer.conditions = {"string":{"rules":[3, 4], "inclusive":false}, "regex":{"rules":[6, 7], "inclusive":false}, "INITIAL":{"rules":[0, 1, 2, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31], "inclusive":true}};
+    lexer.rules = [/^;.*/, /^\s+/, /^"/, /^"/, /^(\\"|[^"])*/, /^#\//, /^\/[a-zA-Z]*/, /^(\\\/|[^\/])*/, /^[\+\-]?\d*\.\d+/, /^\d{1,2}#[\+\-]?\w+/, /^[\+\-]?\d+/, /^#(n|N)/, /^#(t|T)/, /^#(f|F)/, /^\(/, /^\)/, /^\[/, /^\]/, /^\{/, /^\}/, /^~/, /^'/, /^`/, /^\.\.\./, /^#\(/, /^:/, /^[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>,]+/, /^$/, /^./];
+    lexer.conditions = {"string":{"rules":[3, 4], "inclusive":false}, "regex":{"rules":[6, 7], "inclusive":false}, "INITIAL":{"rules":[0, 1, 2, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28], "inclusive":true}};
     return lexer
   }();
   parser.lexer = lexer;
@@ -504,1178 +983,4 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     exports.main(typeof process !== "undefined" ? process.argv.slice(1) : require("system").args)
   }
 }
-;(function() {
-  var DEF, DEFITEMS, DEFMACRO, GETMACRO, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, Scope, binary_fn, compare_fn, compile, compiler, create_object, destructure_list, gensym, get_from_prototype, get_many_from_prototype, get_raw_text, is_keyword, is_quoted, is_splat, is_string, is_symbol, is_unquote, join, ltrim, make_comparison_fn, make_error, make_math_fn, math_fn, modules, objectSet, oppo, quote_escape, raise, raiseDefError, raiseParseError, raiseSetError, read, read_compile, recursive_map, reset_deffed, 
-  restructure_list, rtrim, slice, sort, split, to_js_symbol, to_list, to_lower, to_quoted, to_symbol, to_upper, trim, use_deffed, use_from_prototype, use_many_from_prototype, use_properties, use_root_properties, __var, _is, _ref, _ref2, __slice = Array.prototype.slice, __hasProp = Object.prototype.hasOwnProperty;
-  if(typeof global === "undefined" || global === null) {
-    global = window
-  }
-  if(typeof _ === "undefined" || _ === null) {
-    _ = require("underscore")
-  }
-  create_object = function() {
-    if(Object.create) {
-      return function(o) {
-        return Object.create(o)
-      }
-    }else {
-      return function(o) {
-        var Object;
-        Object = function() {
-          function Object() {
-          }
-          return Object
-        }();
-        Object.prototype = o;
-        return new Object
-      }
-    }
-  }();
-  JS_KEYWORDS = ["break", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "finally", "for", "function", "if", "implements", "import", "in", "instanceof", "interface", "label", "let", "new", "package", "private", "protected", "public", "return", "static", "switch", "super", "this", "throw", "try", "catch", "typeof", "undefined", "var", "void", "while", "with", "yield"];
-  JS_ILLEGAL_IDENTIFIER_CHARS = {"~":"tilde", "`":"backtick", "!":"exclmark", "@":"at", "#":"pound", "%":"percent", "^":"carat", "&":"amperstand", "*":"star", "(":"lparen", ")":"rparen", "-":"minus", "+":"plus", "=":"equals", "{":"lcurly", "}":"rcurly", "[":"lsquare", "]":"rsquare", "|":"pipe", "\\":"bslash", '"':"dblquote", "'":"snglquote", ":":"colon", ";":"semicolon", "<":"langle", ">":"rangle", ",":"comma", ".":"dot", "?":"qmark", "/":"fslash", " ":"space", "\t":"tab", "\n":"newline", "\r":"return", 
-  "\u000b":"vertical", "\x00":"null"};
-  _is = function(what, x) {
-    var _ref;
-    return(x != null ? (_ref = x[0]) != null ? _ref[1] : void 0 : void 0) === what
-  };
-  is_splat = function(s) {
-    return _is("splat", s)
-  };
-  is_unquote = function(u) {
-    return _is("unquote", u)
-  };
-  is_quoted = function(q) {
-    return _is("quote", q)
-  };
-  is_keyword = function(k) {
-    return _is("keyword", k)
-  };
-  is_string = function(s) {
-    return _.isString(s) && /^"/.test(s) && /"$/.test(s)
-  };
-  is_symbol = function(s) {
-    return(s != null ? s[0] : void 0) === "symbol"
-  };
-  to_symbol = function(s) {
-    return["symbol", s]
-  };
-  to_quoted = function(x) {
-    return[to_symbol("quote"), x]
-  };
-  to_list = function(ls) {
-    return[to_symbol("list")].concat(__slice.call(ls))
-  };
-  quote_escape = function(x) {
-    var ret;
-    ret = x;
-    if(_.isString(x)) {
-      ret = x.replace(/\\/g, "\\\\")
-    }
-    return ret
-  };
-  get_raw_text = function(s) {
-    if(is_quoted(s)) {
-      s = oppo.eval(s)
-    }
-    if(_.isString(s)) {
-      return s
-    }else {
-      return s[1]
-    }
-  };
-  objectSet = function(o, s, v) {
-    var get, path, ret, _final, _ref;
-    if(arguments.length < 3) {
-      _ref = [o, s, null], s = _ref[0], v = _ref[1], o = _ref[2]
-    }
-    if(o == null) {
-      o = global
-    }
-    path = (s != null ? s : "").split(".");
-    _final = path.pop();
-    get = function(o, k) {
-      var _ref2;
-      return(_ref2 = o[k]) != null ? _ref2 : o[k] = {}
-    };
-    ret = _.reduce(path, get, o);
-    return ret[_final] = v
-  };
-  recursive_map = function(ls, fn, pass_back, parent, parent_index) {
-    if(pass_back == null) {
-      pass_back = function(item) {
-        return!_.isArray(item)
-      }
-    }
-    return _.map(ls, function(item, i, ls) {
-      if(pass_back(item)) {
-        return fn(item, i, ls, parent, parent_index)
-      }else {
-        return recursive_map(item, fn, pass_back, ls, i)
-      }
-    })
-  };
-  to_js_symbol = function(ident) {
-    var keyword, replaced, _char, _i, _len;
-    for(_i = 0, _len = JS_KEYWORDS.length;_i < _len;_i++) {
-      keyword = JS_KEYWORDS[_i];
-      ident = ident === keyword ? "_" + ident + "_" : ident
-    }
-    if(ident === "-") {
-      ident = "_" + JS_ILLEGAL_IDENTIFIER_CHARS["-"] + "_"
-    }
-    ident = ident.replace(/\-/g, "_");
-    for(_char in JS_ILLEGAL_IDENTIFIER_CHARS) {
-      if(!__hasProp.call(JS_ILLEGAL_IDENTIFIER_CHARS, _char)) {
-        continue
-      }
-      replaced = JS_ILLEGAL_IDENTIFIER_CHARS[_char];
-      while(ident.indexOf(_char) >= 0) {
-        ident = ident.replace(_char, "_" + replaced + "_")
-      }
-    }
-    return ident.toLowerCase()
-  };
-  gensym = function(sym) {
-    var c_sym, num, time;
-    if(sym == null) {
-      sym = "gen"
-    }
-    c_sym = compile([to_symbol("symbol"), sym]);
-    time = (+new Date).toString(32);
-    num = Math.floor(Math.random() * 1E10).toString(32);
-    return"" + c_sym + "_" + time + "_" + num
-  };
-  trim = (_ref = String.prototype.trim) != null ? _ref : function() {
-    return this.replace(/^\s+/, "").replace(/\s+$/, "")
-  };
-  make_error = function(name, message) {
-    var BaseError, err, _ref2;
-    if(arguments.length === 1) {
-      _ref2 = [name, null], message = _ref2[0], name = _ref2[1]
-    }
-    BaseError = _.isFunction(name) ? name : Error;
-    err = new BaseError;
-    if(name != null) {
-      err.name = name
-    }
-    if(message != null) {
-      err.message = message
-    }
-    return err
-  };
-  raise = function() {
-    throw make_error.apply(null, arguments);
-  };
-  raiseParseError = function(expr) {
-    return raise("ParseError", "Can't parse expression: " + expr)
-  };
-  raiseDefError = function(name) {
-    return raise("DefError", "Can't define previously defined value: " + name)
-  };
-  raiseSetError = function(name) {
-    return raise("SetError", "Can't set value that has not been defined: " + name)
-  };
-  Scope = {};
-  (function() {
-    var global_scope, initialize_scopes, scopes;
-    global_scope = {};
-    scopes = null;
-    initialize_scopes = function() {
-      return scopes = [create_object(global_scope)]
-    };
-    initialize_scopes();
-    Scope.top = function() {
-      return _.first(scopes)
-    };
-    Scope.current = function() {
-      return _.last(scopes)
-    };
-    Scope.def = function(name, type, scope) {
-      if(scope == null) {
-        scope = Scope.current()
-      }
-      if(scope === "global") {
-        scope = global_scope
-      }
-      if(scope.hasOwnProperty(name)) {
-        raiseDefError(name)
-      }
-      return scope[name] = type
-    };
-    Scope.set = function(name, type) {
-      var found, index, scope;
-      index = scopes.length;
-      while(index) {
-        scope = scopes[--index];
-        found = scope.hasOwnProperty(name);
-        if(found) {
-          break
-        }
-      }
-      if(!found) {
-        raiseSetError(name)
-      }
-      return scope[name] = type
-    };
-    Scope.blind_set = function(name, type, scope) {
-      if(scope == null) {
-        scope = Scope.current()
-      }
-      if(scope === "global") {
-        scope = global_scope
-      }
-      return scope[name] = type
-    };
-    Scope.type = function(name) {
-      var scope;
-      scope = Scope.current();
-      return"" + scope[name]
-    };
-    Scope.make_new = function() {
-      var ret, scope;
-      scope = Scope.current();
-      scopes.push(ret = create_object(scope));
-      return ret
-    };
-    Scope.end_current = function(get_vars) {
-      var ret;
-      if(get_vars == null) {
-        get_vars = true
-      }
-      ret = scopes.pop();
-      if(get_vars) {
-        return _.keys(ret)
-      }else {
-        return ret
-      }
-    };
-    return Scope.end_final = function(get_vars) {
-      var len, ret;
-      if(get_vars == null) {
-        get_vars = true
-      }
-      len = scopes.length;
-      ret = Scope.end_current(get_vars);
-      initialize_scopes();
-      if(len !== 1) {
-        raise("VarGroupsError", "Expecting 1 final scope, got " + len + " instead")
-      }
-      return ret
-    }
-  })();
-  destructure_list = function(pattern, sourceName) {
-    var c_item, compiled, has_splat, i, item, oldSourceIndex, patternLen, result, sourceIndex, _len;
-    result = [];
-    has_splat = false;
-    patternLen = pattern.length;
-    sourceIndex = {value:0, toString:function() {
-      var num, numStr;
-      if(this.value >= 0) {
-        return"" + this.value
-      }else {
-        num = this.value * -1 - 1;
-        numStr = num ? " - " + num : "";
-        return"" + sourceName + ".length" + numStr
-      }
-    }};
-    for(i = 0, _len = pattern.length;i < _len;i++) {
-      item = pattern[i];
-      if(is_splat(item)) {
-        has_splat = true;
-        c_item = compile(item[1]);
-        oldSourceIndex = "" + sourceIndex;
-        sourceIndex.value = (patternLen - i) * -1;
-        result.push([c_item, "Array.prototype.slice.call(" + sourceName + ", " + oldSourceIndex + ", " + sourceIndex + ")"])
-      }else {
-        compiled = [compile(item), "" + sourceName + "[" + sourceIndex + "]"];
-        sourceIndex.value++;
-        if(!is_symbol(item) && item instanceof Array) {
-          result = result.concat(destructure_list(item, sourceName))
-        }else {
-          result.push(compiled)
-        }
-      }
-    }
-    if(has_splat) {
-      return result
-    }else {
-      return[]
-    }
-  };
-  restructure_list = function(pattern, sourceName) {
-    var c_item, concatArgs, do_slice, i, ident, item, new_ident, restructured, result, slice_start, _len;
-    ident = gensym(sourceName);
-    concatArgs = [];
-    result = [to_symbol(ident)];
-    slice_start = null;
-    do_slice = function() {
-      if(slice_start != null) {
-        concatArgs.push("" + sourceName + ".slice(" + slice_start + ", " + i + ")");
-        return slice_start = null
-      }
-    };
-    for(i = 0, _len = pattern.length;i < _len;i++) {
-      item = pattern[i];
-      if(is_splat(item)) {
-        do_slice();
-        c_item = compile(item[1]);
-        concatArgs.push(c_item)
-      }else {
-        if(is_unquote(item)) {
-          do_slice();
-          c_item = compile(item[1]);
-          concatArgs.push("[" + c_item + "]")
-        }else {
-          if(_.isArray(item) && !is_symbol(item)) {
-            do_slice();
-            new_ident = "" + sourceName + "[" + i + "]";
-            restructured = restructure_list(item, new_ident);
-            concatArgs.push("[" + restructured[1] + "]")
-          }else {
-            if(!(slice_start != null)) {
-              slice_start = i
-            }
-          }
-        }
-      }
-    }
-    do_slice();
-    result.push("[].concat(" + concatArgs.join(", ") + ")");
-    return result
-  };
-  if(typeof parser === "undefined" || parser === null) {
-    parser = require("./parser")
-  }
-  oppo = typeof exports !== "undefined" && exports !== null ? exports : global.oppo = {};
-  compiler = (_ref2 = oppo.compiler) != null ? _ref2 : oppo.compiler = {};
-  modules = {};
-  oppo.DEFMACRO = DEFMACRO = function(name, fn) {
-    var c_name;
-    c_name = compile(to_symbol(name));
-    Scope.blind_set(c_name, "macro", "global");
-    return compiler[c_name] = fn
-  };
-  oppo.GETMACRO = GETMACRO = function(name) {
-    var c_name;
-    c_name = compile(to_symbol(name));
-    return compiler[c_name]
-  };
-  DEFITEMS = {};
-  oppo.DEF = DEF = function(name, value, required) {
-    var c_name, ret, s_name;
-    s_name = to_symbol(name);
-    c_name = compile(s_name);
-    ret = DEFITEMS[c_name] = function() {
-      var item, result, _i, _len;
-      ret = [];
-      if(required != null) {
-        required = _.map(required, _.compose(compile, to_symbol));
-        for(_i = 0, _len = required.length;_i < _len;_i++) {
-          item = required[_i];
-          result = use_deffed(item);
-          if(result != null) {
-            ret.push(result)
-          }
-        }
-        value = value.replace(/\{(\d+)\}/g, function(s, num) {
-          return required[+num]
-        })
-      }
-      ret.push(compile([to_symbol("def"), s_name, [to_symbol("js-eval"), value]]));
-      return ret.join(",\n")
-    };
-    ret.complete = false;
-    return ret
-  };
-  use_deffed = function(name) {
-    var fn;
-    fn = DEFITEMS[name];
-    if(fn != null && fn.complete === false) {
-      fn.complete = true;
-      return fn()
-    }
-  };
-  reset_deffed = function() {
-    var item, name, _results;
-    _results = [];
-    for(name in DEFITEMS) {
-      if(!__hasProp.call(DEFITEMS, name)) {
-        continue
-      }
-      item = DEFITEMS[name];
-      _results.push(item.complete = false)
-    }
-    return _results
-  };
-  read = oppo.read = function(string) {
-    return parser.parse(string)
-  };
-  compile = null;
-  (function() {
-    var prefix, _compile;
-    prefix = null;
-    _compile = function(sexp, top_level) {
-      var args, deffed, fn, macro, raw_text, ret, vars, _prefix;
-      if(sexp == null) {
-        sexp = null
-      }
-      if(top_level == null) {
-        top_level = false
-      }
-      if(top_level) {
-        prefix = []
-      }
-      if(sexp === null || sexp === true || sexp === false || _.isNumber(sexp)) {
-        ret = "" + sexp
-      }else {
-        if(is_symbol(sexp)) {
-          raw_text = sexp[1];
-          ret = to_js_symbol(raw_text);
-          if(prefix != null) {
-            deffed = use_deffed(ret);
-            if(deffed != null) {
-              prefix.push(deffed)
-            }
-          }
-        }else {
-          if(_.isString(sexp)) {
-            ret = '"' + sexp.replace(/\n/g, "\\n") + '"'
-          }else {
-            if(_.isFunction(sexp)) {
-              ret = "" + sexp
-            }else {
-              if(_.isArray(sexp)) {
-                fn = compile(_.first(sexp));
-                args = sexp.slice(1);
-                if(Scope.type(fn) === "macro") {
-                  macro = compiler[fn];
-                  ret = macro.apply(null, args)
-                }else {
-                  ret = compiler.call.apply(compiler, [[to_symbol("js-eval"), fn]].concat(__slice.call(args)))
-                }
-              }else {
-                raiseParseError(sexp)
-              }
-            }
-          }
-        }
-      }
-      if(top_level) {
-        vars = Scope.end_final();
-        vars = vars.length ? "var " + vars.join(", ") + ";\n" : "";
-        _prefix = (prefix != null ? prefix.length : void 0) ? "" + prefix.join(",\n") + ";\n" : "";
-        ret = "" + vars + _prefix + ret + ";";
-        prefix = null;
-        reset_deffed()
-      }
-      return ret
-    };
-    oppo._compile = compile = function(sexp) {
-      return _compile(sexp, false)
-    };
-    return oppo.compile = function(sexp) {
-      return _compile(sexp, true)
-    }
-  })();
-  oppo.eval = _.compose(_.bind(global.eval, global), compile);
-  read_compile = _.compose(compile, oppo.read);
-  DEFMACRO("js-map", function() {
-    var add_ons, c_value, e_key, i, item, item_added, last, ret, sexp, sym, _len;
-    sexp = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    sym = gensym("obj");
-    add_ons = [];
-    item_added = false;
-    ret = "{ ";
-    for(i = 0, _len = sexp.length;i < _len;i++) {
-      item = sexp[i];
-      if(i % 2 === 0) {
-        if(is_quoted(item) && is_symbol(e_key = oppo.eval(item))) {
-          ret += "" + compile(e_key) + " : "
-        }else {
-          if(_.isString(item) || is_keyword(item)) {
-            ret += "" + compile(item) + " : "
-          }else {
-            if(_.isNumber(item) && !_.isNaN(item)) {
-              ret += '"' + compile(item) + '" : '
-            }else {
-              item_added = true;
-              add_ons.push("" + sym + "[" + compile(item) + "] = ")
-            }
-          }
-        }
-      }else {
-        c_value = compile(item);
-        if(!item_added) {
-          ret += "" + c_value + ",\n"
-        }else {
-          item_added = false;
-          last = add_ons.pop();
-          last += c_value;
-          add_ons.push(last)
-        }
-      }
-    }
-    ret = ret.replace(/(\s|,\s)$/, " }");
-    if(!add_ons.length) {
-      return ret
-    }else {
-      add_ons = _.map(add_ons, function(x) {
-        return[to_symbol("js-eval"), x]
-      });
-      add_ons.unshift(to_symbol("do"));
-      add_ons.push(["symbol", sym]);
-      return ret = "(function (" + sym + ") {\n  return " + compile(add_ons) + ";\n})(" + ret + ")"
-    }
-  });
-  DEFMACRO("list", function() {
-    var c_sexp, sexp;
-    sexp = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    c_sexp = _.map(sexp, compile);
-    return"[" + c_sexp.join(", ") + "]"
-  });
-  DEFMACRO(".", function() {
-    var base, c_base, e_name, name, names, ret, _i, _len;
-    base = arguments[0], names = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    c_base = compile(base);
-    ret = c_base;
-    for(_i = 0, _len = names.length;_i < _len;_i++) {
-      name = names[_i];
-      e_name = null;
-      if(is_quoted(name)) {
-        e_name = oppo.eval(name)
-      }
-      if(e_name != null && is_symbol(e_name)) {
-        ret += "." + compile(e_name)
-      }else {
-        ret += "[" + compile(name) + "]"
-      }
-    }
-    return ret
-  });
-  (function() {
-    var get_args;
-    get_args = function(args) {
-      var body, destructure, vars, _i, _len, _var;
-      if(args == null) {
-        args = []
-      }
-      if(args === "null") {
-        args = []
-      }
-      destructure = _.any(args, is_splat);
-      if(destructure) {
-        vars = destructure_list(args, "arguments");
-        args = [];
-        body = [];
-        for(_i = 0, _len = vars.length;_i < _len;_i++) {
-          _var = vars[_i];
-          body.push(read("(var " + _var[0] + ' (js-eval "' + _var[1] + '"))'))
-        }
-      }else {
-        args = args.map(function(arg) {
-          return compile(arg)
-        });
-        body = []
-      }
-      return[args || [], body || []]
-    };
-    DEFMACRO("lambda", function() {
-      var args, argsbody, body, ret, scope, var_stmt, vars, _ref3;
-      args = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      scope = Scope.make_new();
-      _ref3 = get_args(args), args = _ref3[0], argsbody = _ref3[1];
-      body = argsbody.concat(body);
-      body = _.map(body, compile);
-      vars = Scope.end_current();
-      var_stmt = vars.length ? "var " + vars.join(", ") + ";\n" : "";
-      return ret = "(function (" + args.join(", ") + ") {\n  " + var_stmt + "return " + body.join(", ") + ";\n})"
-    });
-    return DEFMACRO("fn", compiler.lambda)
-  })();
-  DEFMACRO("call", function() {
-    var args, c_args, c_fn, fn;
-    fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    c_fn = compile(fn);
-    c_args = _.map(args, compile);
-    return"" + c_fn + "(" + c_args.join(", ") + ")"
-  });
-  DEFMACRO("apply", function() {
-    var args, c_args, c_fn, fn, fn_base, spl_fn;
-    fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    c_fn = compile(fn);
-    spl_fn = c_fn.split(".");
-    spl_fn.pop();
-    fn_base = spl_fn.join(".");
-    c_args = _.map(args, compile);
-    return"" + c_fn + ".apply(" + (fn_base || null) + ", [].concat(" + c_args.join(", ") + "))"
-  });
-  DEFMACRO("let", function() {
-    var body, i, len, let_fn, names_vals, ret, vars;
-    names_vals = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    vars = [];
-    i = 0;
-    len = names_vals.length;
-    while(i < len) {
-      vars.push([to_symbol("var"), names_vals[i++], names_vals[i++]])
-    }
-    body = vars.concat(body);
-    let_fn = [to_symbol("lambda"), []].concat(__slice.call(body));
-    return ret = "" + compile(let_fn) + '.apply(this, typeof arguments !== "undefined" ? arguments : [])'
-  });
-  DEFMACRO("new", function() {
-    var args, c_args, c_cls, cls;
-    cls = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    c_cls = compile(cls);
-    c_args = _.map(args, compile);
-    return"new " + c_cls + "(" + c_args.join(", ") + ")"
-  });
-  DEFMACRO("defn", function() {
-    var args, body, name;
-    name = arguments[0], args = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
-    return compile([to_symbol("def"), name, [to_symbol("lambda"), args].concat(__slice.call(body))])
-  });
-  DEFMACRO("curry", function() {
-    var args, base, fn, ret;
-    fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    if(_.isArray(fn) && get_raw_text(fn[0]) === ".") {
-      base = fn.slice(0);
-      base.pop();
-      if(base.length === 2) {
-        base = base[1]
-      }
-    }else {
-      base = null
-    }
-    return ret = compile([to_symbol("bind"), fn, base].concat(__slice.call(args)))
-  });
-  DEFMACRO("eval", function(sexp) {
-    var c_sexp;
-    c_sexp = compile(sexp);
-    return"eval(oppo._compile(" + c_sexp + "))"
-  });
-  DEFMACRO("quote", function(sexp) {
-    var q_sexp, ret, s_sexp;
-    sexp = quote_escape(sexp);
-    ret = !(sexp != null) ? null : void 0;
-    if(_.isBoolean(sexp)) {
-      return sexp
-    }else {
-      if(is_symbol(sexp)) {
-        return compile(to_list(sexp))
-      }else {
-        if(_.isArray(sexp)) {
-          q_sexp = _.map(sexp, to_quoted);
-          return compile(to_list(q_sexp))
-        }else {
-          if(_.isNumber(sexp)) {
-            return sexp
-          }else {
-            s_sexp = "" + sexp;
-            return'"' + s_sexp.replace(/"/g, '\\"') + '"'
-          }
-        }
-      }
-    }
-  });
-  DEFMACRO("symbol", function(sym) {
-    var e_sym, str;
-    str = GETMACRO("str");
-    e_sym = eval(str(sym));
-    return compile(to_symbol(e_sym))
-  });
-  DEFMACRO("js-eval", function(js) {
-    var c_js, e_js, ret;
-    c_js = compile(js);
-    if(is_string(c_js)) {
-      e_js = c_js.substr(1, c_js.length - 2);
-      e_js = e_js.replace(/\\?"/g, '\\"');
-      return ret = eval('"' + e_js + '"')
-    }else {
-      return ret = "eval(" + c_js + ")"
-    }
-  });
-  DEFMACRO("do", function() {
-    var body, compiled_body, ret;
-    body = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    compiled_body = _.map(arguments, compile);
-    ret = compiled_body.join(",\n");
-    return"(" + ret + ")"
-  });
-  DEFMACRO("if", function(test, t, f) {
-    var c_f, c_t, c_test, cond, sym, _ref3;
-    if(arguments.length === 2) {
-      Array.prototype.push.call(arguments, f)
-    }
-    _ref3 = _.map(arguments, compile), c_test = _ref3[0], c_t = _ref3[1], c_f = _ref3[2];
-    sym = gensym("cond");
-    cond = compile([to_symbol("var"), to_symbol(sym), test]);
-    return"/* if */ ((" + cond + ") !== false && " + sym + " != null && " + sym + " === " + sym + " ?\n  " + compile(t) + " :\n  " + compile(f) + ")\n/* end if */"
-  });
-  DEFMACRO("regex", function(body, modifiers) {
-    return"/" + body + "/" + (modifiers != null ? modifiers : "")
-  });
-  DEFMACRO("undefined?", function(x) {
-    var c_x;
-    c_x = compile(x);
-    return"(typeof " + c_x + " === 'undefined')"
-  });
-  DEFMACRO("defined?", function(x) {
-    var c_x;
-    c_x = compile(x);
-    return"(typeof " + c_x + " !== 'undefined')"
-  });
-  DEFMACRO("gensym", function() {
-    var ret, sym;
-    sym = gensym.apply(null, arguments);
-    return ret = compile([to_symbol("quote"), to_symbol(sym)])
-  });
-  __var = function(name, value, scope, type) {
-    var c_name, c_value;
-    if(type == null) {
-      type = "variable"
-    }
-    c_name = compile(name);
-    if(c_name !== to_js_symbol(c_name)) {
-      raise("DefError", "Can't define complex symbol: " + c_name)
-    }
-    c_value = compile(value);
-    Scope.def(c_name, type, scope);
-    return"" + c_name + " = " + c_value
-  };
-  DEFMACRO("var", function(name, value) {
-    return __var(name, value)
-  });
-  DEFMACRO("def", function(name, value) {
-    var c_name, first_group, ret;
-    first_group = Scope.top();
-    c_name = compile(name);
-    return ret = __var(name, value, first_group)
-  });
-  DEFMACRO("set!", function(name, value) {
-    var c_name, c_value, ret;
-    c_name = compile(name);
-    c_value = compile(value);
-    if(c_name === to_js_symbol(c_name)) {
-      Scope.set(c_name, "variable");
-      return ret = "" + c_name + " = " + c_value
-    }else {
-      return raise("SetError", "Can't set complex symbol: " + c_name)
-    }
-  });
-  math_fn = function(fn, symbol) {
-    return DEFMACRO(fn, function() {
-      var c_nums, nums;
-      nums = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-      c_nums = _.map(nums, compile);
-      return c_nums.join(" " + (symbol || fn) + " ")
-    })
-  };
-  math_fn("+");
-  math_fn("-");
-  math_fn("*");
-  math_fn("/");
-  math_fn("%");
-  binary_fn = function(fn, symbol) {
-    return DEFMACRO(fn, function() {
-      var c_nums, nums, ret;
-      nums = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-      c_nums = _.map(nums, compile);
-      ret = c_nums.join(" " + (symbol || fn) + " ");
-      return"(" + ret + ")"
-    })
-  };
-  binary_fn("||");
-  binary_fn("&&");
-  compare_fn = function(fn, symbol) {
-    return DEFMACRO(fn, function() {
-      var c_items, item, items, last, ret, _i, _len, _ref3;
-      items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-      c_items = _.map(items, compile);
-      ret = [];
-      last = c_items[0];
-      _ref3 = c_items.slice(1);
-      for(_i = 0, _len = _ref3.length;_i < _len;_i++) {
-        item = _ref3[_i];
-        ret.push("" + last + " " + (symbol || fn) + " " + item);
-        last = item
-      }
-      return"(" + ret.join(" && ") + ")"
-    })
-  };
-  compare_fn("<");
-  compare_fn(">");
-  compare_fn("<=");
-  compare_fn(">=");
-  compare_fn("==");
-  compare_fn("not==", "!=");
-  compare_fn("===");
-  compare_fn("not===", "!==");
-  DEFMACRO("throw", function(err) {
-    var c_err;
-    c_err = compile(err);
-    return"(function () { throw " + c_err + " })()"
-  });
-  (function() {
-    var mc_expand, mc_expand_1;
-    mc_expand = false;
-    mc_expand_1 = false;
-    DEFMACRO("defmacro", function() {
-      var argnames, base, c_name, name, template;
-      name = arguments[0], argnames = arguments[1], template = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
-      if(argnames == null) {
-        argnames = []
-      }
-      c_name = compile(name);
-      base = compiler;
-      Scope.def(c_name, "macro", "global");
-      base[c_name] = function() {
-        var evald, js, q_args, sexp;
-        q_args = _.map(arguments, to_quoted);
-        sexp = [[to_symbol("lambda"), argnames].concat(template)].concat(q_args);
-        js = compile(sexp);
-        evald = eval(js);
-        if(!mc_expand && !mc_expand_1) {
-          return compile(evald)
-        }else {
-          mc_expand_1 = false;
-          return evald
-        }
-      };
-      return"null"
-    });
-    DEFMACRO("macroexpand", function(sexp) {
-      var old_mc_expand, ret;
-      old_mc_expand = mc_expand;
-      mc_expand = true;
-      ret = compile(sexp);
-      ret = compile(to_quoted(ret));
-      mc_expand = old_mc_expand;
-      return ret
-    });
-    DEFMACRO("macroexpand-1", function(sexp) {
-      var ret;
-      mc_expand_1 = true;
-      ret = compile(sexp);
-      ret = compile(to_quoted(ret));
-      mc_expand_1 = false;
-      return ret
-    });
-    return DEFMACRO("syntax-quote", function(list) {
-      var code, ident, q_list, restructured_list, ret, sym;
-      sym = to_symbol;
-      ident = gensym("list");
-      restructured_list = restructure_list(list, ident);
-      restructured_list[1] = [sym("js-eval"), restructured_list[1]];
-      q_list = to_quoted(list);
-      code = [[sym("lambda"), [sym(ident)], [sym("var")].concat(__slice.call(restructured_list))], q_list];
-      return ret = compile(code)
-    })
-  })();
-  (function() {
-    var adjust_environment, def, defmacro, restore_environment;
-    def = [];
-    defmacro = [];
-    adjust_environment = function(module_name, names, scope) {
-      var s_module_name, _var;
-      s_module_name = get_raw_text(module_name);
-      modules[s_module_name] = {names:names, scope:scope};
-      _var = GETMACRO("var");
-      def.push(GETMACRO("def"));
-      return compiler.def = function(name, value) {
-        names.push(name);
-        return _var(name, value, scope)
-      }
-    };
-    restore_environment = function() {
-      return compiler.def = def.pop()
-    };
-    DEFMACRO("defmodule", function() {
-      var args, body, c_body, c_deps, deps, export_names, js_map_args, name, r_deps, r_name, ret, return_val, scope, symbols, values, var_stmt, vars;
-      name = arguments[0], deps = arguments[1], body = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
-      if(deps == null) {
-        deps = []
-      }
-      scope = Scope.make_new();
-      r_name = compile(get_raw_text(name));
-      r_deps = _.map(deps, _.compose(compile, get_raw_text));
-      c_deps = compile([to_symbol("quote"), r_deps]);
-      args = _.map(deps, compile);
-      export_names = [];
-      adjust_environment(name, export_names, scope);
-      body = body.length ? body : [null];
-      c_body = _.map(body, compile);
-      values = export_names;
-      symbols = _.map(values, to_quoted);
-      js_map_args = Array.prototype.concat.apply([], _.zip(symbols, values));
-      return_val = compile([to_symbol("js-map")].concat(__slice.call(js_map_args)));
-      vars = Scope.end_current();
-      restore_environment();
-      var_stmt = vars.length ? "var " + vars.join(", ") + ";\n" : "";
-      return ret = "oppo.module(" + r_name + ", " + c_deps + ", function (" + args.join(", ") + ") {\n  " + var_stmt + c_body.join(",\n") + ";\n  return " + return_val + "\n})"
-    });
-    return DEFMACRO("require", function() {
-      var c_names, name, names, r_name, ret, _var;
-      names = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-      _var = GETMACRO("var");
-      c_names = function() {
-        var _i, _len, _results;
-        _results = [];
-        for(_i = 0, _len = names.length;_i < _len;_i++) {
-          name = names[_i];
-          r_name = get_raw_text(name);
-          _results.push(ret = __var(name, [to_symbol("js-eval"), "oppo.module.require(" + compile(r_name) + ")"], null, "module"))
-        }
-        return _results
-      }();
-      return c_names.join(",\n")
-    })
-  })();
-  DEFMACRO("str", function() {
-    var c_strs, first_is_str, initial_str, strs;
-    strs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-    first_is_str = null;
-    if(strs.length === 0) {
-      strs.push("")
-    }
-    c_strs = _.map(strs, function(s) {
-      var c_s;
-      if(is_quoted(s) && is_symbol(s[1])) {
-        s = to_js_symbol(s[1][1])
-      }
-      c_s = compile(s);
-      if(first_is_str == null) {
-        first_is_str = is_string(c_s)
-      }
-      return c_s
-    });
-    initial_str = first_is_str ? "" : '"" + ';
-    return"" + initial_str + c_strs.join(" + ")
-  });
-  DEFMACRO("keyword", function(key) {
-    var e_key;
-    if(is_quoted(key) && is_symbol(e_key = oppo.eval(key))) {
-      return compile(e_key[1])
-    }else {
-      if(_.isString(key)) {
-        return compile(key)
-      }else {
-        return compile([to_symbol("str"), key])
-      }
-    }
-  });
-  DEF("root", "typeof global !== 'undefined' ? global : window");
-  DEF("_", "{0}._ || (require && require('underscore'))", ["root"]);
-  (function() {
-    var fname, name, oppo_names, underscore_fns, value, _results;
-    underscore_fns = {include:null, invoke:null, pluck:null, shuffle:null, toArray:["->arr", "->array"], size:null, first:["first", "head"], initial:["initial", "init"], last:null, rest:["rest", "tail"], compact:null, flatten:null, without:null, union:null, intersection:null, difference:null, zip:null, range:null, bind:null, bindAll:["bind-all"], memoize:null, delay:null, defer:null, throttle:null, debounce:null, once:null, after:null, wrap:null, compose:null, keys:null, values:null, functions:null, 
-    clone:null, tap:null, isEmpty:["empty?"], isElement:["element?"], isArray:["array?", "list?"], isArguments:["arguments?"], isFunction:["function?", "fn?"], isString:["string?", "str?"], isNumber:["number?", "num?"], isBoolean:["boolean?", "bool?"], isDate:["date?"], isRegExp:["regex?"], isNaN:["nan?"], isNull:["nil?"], isUndefined:["undefined?"], identity:null, times:null, uniqueId:["unique-id"], escape:["escape-html"], template:null, chain:null, value:null};
-    _results = [];
-    for(fname in underscore_fns) {
-      if(!__hasProp.call(underscore_fns, fname)) {
-        continue
-      }
-      oppo_names = underscore_fns[fname];
-      if(oppo_names == null) {
-        oppo_names = [fname]
-      }
-      value = "{0}." + fname;
-      _results.push(function() {
-        var _i, _len, _results2;
-        _results2 = [];
-        for(_i = 0, _len = oppo_names.length;_i < _len;_i++) {
-          name = oppo_names[_i];
-          _results2.push(DEF(name, value, ["_"]))
-        }
-        return _results2
-      }())
-    }
-    return _results
-  })();
-  get_from_prototype = function(obj, method) {
-    var name;
-    name = "__" + method + "__";
-    DEF(name, "{0}." + obj + ".prototype." + method, ["root"]);
-    return name
-  };
-  use_from_prototype = function(obj, method, oppo_name) {
-    var temp;
-    if(oppo_name == null) {
-      oppo_name = method
-    }
-    temp = get_from_prototype(obj, method);
-    return DEF(oppo_name, "function (base) {\n  var args;\n  args = {0}.call(arguments, 1);\n  return {1}.apply(base, args);\n}", ["__slice__", temp])
-  };
-  get_many_from_prototype = function(obj, methods) {
-    var method, _i, _len, _results;
-    _results = [];
-    for(_i = 0, _len = methods.length;_i < _len;_i++) {
-      method = methods[_i];
-      _results.push(get_from_prototype(obj, method))
-    }
-    return _results
-  };
-  use_many_from_prototype = function(obj, methods) {
-    var args, _i, _len, _results;
-    _results = [];
-    for(_i = 0, _len = methods.length;_i < _len;_i++) {
-      args = methods[_i];
-      if(!_.isArray(args)) {
-        args = [args]
-      }
-      args.unshift(obj);
-      _results.push(use_from_prototype.apply(null, args))
-    }
-    return _results
-  };
-  use_properties = function(obj, props) {
-    var js_name, oppo_name, prop, _i, _len, _obj, _results;
-    _results = [];
-    for(_i = 0, _len = props.length;_i < _len;_i++) {
-      prop = props[_i];
-      if(!_.isArray(prop)) {
-        prop = [prop]
-      }
-      js_name = prop[0], oppo_name = prop[1];
-      if(oppo_name == null) {
-        oppo_name = js_name
-      }
-      _obj = obj != null ? "." + obj : "";
-      _results.push(DEF(oppo_name, "{0}" + _obj + "." + js_name, ["root"]))
-    }
-    return _results
-  };
-  use_root_properties = function(props) {
-    return use_properties(null, props)
-  };
-  make_math_fn = function(symbol, js_symbol) {
-    if(js_symbol == null) {
-      js_symbol = symbol
-    }
-    return DEF(symbol, "function () {\n  var i, num, len, current;\n  num = arguments[0];\n  for (i = 1, len = arguments.length; i < len; i++) {\n    current = arguments[i];\n    num " + js_symbol + "= current;\n  }\n  return num;\n}")
-  };
-  make_math_fn("+");
-  make_math_fn("*");
-  make_math_fn("-");
-  make_math_fn("/");
-  make_math_fn("%");
-  use_properties("Math", ["E", "LN2", "LN10", "LOG2E", "LOG10E", "PI", ["SQRT1_2", "sqrt1/2"], "SQRT2", "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log", "max", "min", ["pow", "**"], "pow", "round", "sin", "sqrt", "tan"]);
-  DEF("random", "function (_1, _2) {\n  var r, min, max;\n  r = Math.random;\n  switch (arguments.length) {\n    case 0: return r();\n    case 1:\n      max = _1;\n      return {0}(r() * max);\n    case 2:\n      min = _1;\n      max = _2;\n      return {0}(r() * (max - min)) + min;\n  }\n}", ["floor"]);
-  DEF("rand", "{0}", ["random"]);
-  use_root_properties([["isFinite", "finite?"], "Infinity", "NaN", ["parseFloat", "->float"]]);
-  DEF("->int", "function (s, r) { return parseInt(s, r == null ? 10 : r); }");
-  DEF("-infinity", "-{0}", ["infinity"]);
-  DEF("->base", "function (n, base) {\n  return (+n).toString(base);\n}");
-  make_comparison_fn = function(symbol, compare_fn, deps) {
-    var js_symbol;
-    if(_.isString(compare_fn)) {
-      js_symbol = compare_fn;
-      compare_fn = null
-    }else {
-      js_symbol = symbol
-    }
-    if(compare_fn == null) {
-      compare_fn = function(a, b) {
-        return"" + a + " " + js_symbol + " " + b
-      }
-    }
-    return DEF(symbol, "function () {\n  var i, item, last, len, result;\n  last = arguments[0];\n  for (i = 1, len = arguments.length; i < len; i++) {\n    item = arguments[i];\n    result = " + compare_fn("last", "item") + ";\n    if (!result) break;\n  }\n  return result;\n}", deps)
-  };
-  make_comparison_fn("<");
-  make_comparison_fn(">");
-  make_comparison_fn("<=");
-  make_comparison_fn(">=");
-  make_comparison_fn("==");
-  make_comparison_fn("===");
-  make_comparison_fn("not==", "!=");
-  make_comparison_fn("not===", "!==");
-  make_comparison_fn("=", function(a, b) {
-    return"{0}.isEqual(" + a + ", " + b + ")"
-  }, ["_"]);
-  DEF("equal?", "{0}", ["="]);
-  DEF("not=", "function () { return !{0}(); }", ["="]);
-  DEF("->bool", compile([to_symbol("lambda"), [to_symbol("x")], [to_symbol("if"), to_symbol("x"), [to_symbol("js-eval"), "true"], [to_symbol("js-eval"), "false"]]]));
-  DEF("->boolean", "{0}", ["->bool"]);
-  DEF("not", "function (x) { return !{0}(x); }", ["->bool"]);
-  DEF("->str", "function (x) {\n  return x.toString ? x.toString : '' + x;\n}");
-  DEF("->string", "{0}", ["->str"]);
-  DEF("->num", "function (x) { return +x; }");
-  DEF("->number", "{0}", ["->num"]);
-  DEF("->js-map", "function (x) { return Object(x); }");
-  DEF("and", "function () {\n  var i, len, item;\n  i = 0;\n  len = arguments.length;\n  for (; i < len; i++) {\n    item = arguments[i];\n    if (!{0}(item))\n      break;\n  }\n  return item;\n}", ["->bool"]);
-  DEF("or", "function () {\n  var i, len, item;\n  i = 0;\n  len = arguments.length;\n  for (; i < len; i++) {\n    item = arguments[i];\n    if ({0}(item))\n      break;\n  }\n  return item;\n}", ["->bool"]);
-  slice = get_from_prototype("Array", "slice");
-  sort = get_from_prototype("Array", "sort");
-  join = get_from_prototype("Array", "join");
-  (function() {
-    var build;
-    DEF("__iterator_builder_1__", "function (method_name) {\n  var method = {0}[method_name];\n  return function (a, fn, context) {\n    var args = {1}(arguments);\n    if (fn) {\n      args[1] = {2}(a) ? function (v, k, o) {\n        return fn(v, k + 1, o);\n      } : fn;\n    }\n    return method.apply({0}, args);\n  };\n}", ["_", "->array", "array?"]);
-    build = function(name, js_name) {
-      if(js_name == null) {
-        js_name = name
-      }
-      return DEF(name, "{0}('" + js_name + "')", ["__iterator_builder_1__"])
-    };
-    build("each");
-    build("map");
-    build("find");
-    build("filter");
-    build("reject");
-    build("all");
-    build("any");
-    return build("group-by", "groupBy")
-  })();
-  (function() {
-    var build;
-    DEF("__iterator_builder_2__", "function (method_name) {\n  var method = {2}[method_name];\n  return function (a, fn, memo, context) {\n    var args = {0}(arguments);\n    if (fn) {\n      args[1] = {1}(a) ? function (main, v, k, o) {\n        return fn(main, v, k + 1, o)\n      } : fn;\n    }\n    return method.apply({2}, args);\n  };\n}", ["->array", "array?", "_"]);
-    build = function(name, js_name) {
-      if(js_name == null) {
-        js_name = name
-      }
-      return DEF(name, "{0}('" + js_name + "')", ["__iterator_builder_2__"])
-    };
-    build("reduce");
-    DEF("foldl", "{0}", ["reduce"]);
-    build("reduce-right", "reduceRight");
-    return DEF("foldr", "{0}", ["reduce-right"])
-  })();
-  DEF("slice", "function (a) {\n  var args;\n  args = {0}.call(arguments, 1);\n  return a.slice.apply(a, args);\n}", [slice]);
-  DEF("sorted-index", "function (a) {\n  return {0}.sortedIndex.apply({0}, arguments) + 1;\n}", ["_"]);
-  DEF("join", "function (a, sep) {\n  return {0}.call(a, sep != null ? sep : '');\n}", [join]);
-  DEF("uniq", "function (a, sorted, fn) {\n  var args = {0}(arguments);\n  if (fn) {\n    args[2] = fn && function (v, k, o) {\n      return fn(v, k + 1, o);\n    };\n  }\n  return {1}.uniq.apply({1}, args);\n}", ["->array", "_"]);
-  DEF("unique", "{0}", ["uniq"]);
-  DEF("concat", "function (base) {\n  var args;\n  args = {0}.call(arguments, 1);\n  return base.concat.apply(base, args);\n}", [slice]);
-  DEF("nth", 'function (a, i) {\n  i = +i;\n  if (i === 0)\n    console.warn("Trying to get 0th item with nth; nth treats lists as 1-based");\n    \n  if (i < 0)\n    i = (a || []).length + i;\n  else\n    i -= 1;\n    \n  return {0}(a) ? a[i] : {1}(a) ? a.charAt(i) : (function () { throw "Can\'t get nth item: collection must be a list or a string"; })();\n}', ["array?", "string?"]);
-  DEF("index-of", "function (a, x, sorted) {\n  return ({0}(a) ? a.indexOf(x) : {1}.indexOf(a, x, sorted)) + 1;\n}", ["string?", "_"]);
-  DEF("last-index-of", "function (a, x) {\n  return ({0}(a) ? a.lastIndexOf(x) : {1}.lastIndexOf(a, x)) + 1;\n}", ["string?", "_"]);
-  DEF("sort", "function (a, fn, context) {\n  var iterator, isArray;\n  if ({0}(a)) {\n    if (!fn) return a.slice().sort();\n    iterator = function (v, k, o) {\n      return fn(v, k + 1, o);\n    };\n  }\n  else iterator = fn;\n  return {1}.sortBy(a, iterator, context);\n}", ["->array", "_"]);
-  DEF("reverse", "function (a) {\n  var str, ret;\n  str = {0}(a);\n  ret = str ? a.split('') : a.slice();\n  ret.reverse();\n  return str ? ret.join('') : ret;\n}", ["string?"]);
-  to_lower = get_from_prototype("String", "toLowerCase");
-  to_upper = get_from_prototype("String", "toUpperCase");
-  split = get_from_prototype("String", "split");
-  trim = get_from_prototype("String", "trim");
-  rtrim = get_from_prototype("String", "trimRight");
-  ltrim = get_from_prototype("String", "trimLeft");
-  DEF("rtrim", "function (s) {\n  return {0} ? {0}.call(s) : s.replace(/s+$/, '');\n}", [rtrim]);
-  DEF("trim-right", "{0}", ["rtrim"]);
-  DEF("ltrim", "function (s) {\n  return {0} ? {0}.call(s) : s.replace(/^s+/, '');\n}", [ltrim]);
-  DEF("trim-left", "{0}", ["ltrim"]);
-  DEF("trim", "function (s) {\n  return {0} ? {0}.call(s) : {1}({2}(s));\n}", [trim, "ltrim", "rtrim"]);
-  DEF("->lower", "function (s) { return {0}.call(s); }", [to_lower]);
-  DEF("->upper", "function (s) { return {0}.call(s); }", [to_upper]);
-  use_many_from_prototype("String", ["split", "replace", ["search", "str-search"], "substr", "substring", ["charCodeAt", "char-code-at"], "match", ["toLocaleLowerCase", "->locale-lower"], ["toLocaleUpperCase", "->locale-upper"], ["localeCompare", "locale-compare"]]);
-  DEF("merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return {1}.extend.apply({1}, args);\n}", ["->array", "_"]);
-  DEF("careful-merge", "function () {\n  var args = {0}(arguments);\n  args.unshift({});\n  return {1}.defaults.apply({1}, args);\n}", ["->array", "_"]);
-  DEF("__create__", "Object.create");
-  DEF("extend", "(function () {\n  return {0} ? function (proto) { return {0}(proto != null ? proto : null); } :\n  function (proto) {\n    function noop() {}\n    noop.prototype = proto != null ? proto : null;\n    return new noop;\n  };\n})()", ["__create__"]);
-  DEF("merge-extend", "function (o, proto) {\n  var ret;\n  ret = {0}(proto);\n  return {1}.extend(ret, o);\n}", ["extend", "_"]);
-  use_many_from_prototype("RegExp", [["exec", "re-exec"], ["test", "re-test"]]);
-  use_many_from_prototype("Number", [["toExponential", "->exponential"], ["toFixed", "->fixed"], ["toLocaleString", "->locale-string"], ["toPrecision", "->precision"]]);
-  DEF("date", "function (a, b, c, d, e, f, g) {\n  var d, D;\n  D = {0}.Date;\n  switch (arguments.length) {\n    case 0: d = new D(); break;\n    case 1: d = new D(a); break;\n    case 2: d = new D(a, b); break;\n    case 3: d = new D(a, b, c); break;\n    case 4: d = new D(a, b, c, d); break;\n    case 5: d = new D(a, b, c, d, e); break;\n    case 6: d = new D(a, b, c, d, e, f); break;\n    case 7: d = new D(a, b, c, d, e, f, g); break;\n  }\n  return d;\n}", ["root"]);
-  DEF("now", "(function () {\n  var D;\n  D = {0}.Date;\n  return D.now ? D.now : function () { return +(new Date); }\n})()", ["root"]);
-  use_many_from_prototype("Date", [["getDate", "get-date"], ["getDay", "get-day"], ["getFullYear", "get-year"], ["getHours", "get-hours"], ["getMilliseconds", "get-milliseconds"], ["getMinutes", "get-minutes"], ["getMonth", "get-month"], ["getSeconds", "get-seconds"], ["getTime", "get-time"], ["getTimezoneOffset", "get-timezone-offset"], ["getUTCDate", "get-utc-date"], ["getUTCDay", "get-utc-day"], ["getUTCFullYear", "get-utc-full-year"], ["getUTCHours", "get-utc-hours"], ["getUTCMilliseconds", "get-utc-milliseconds"], 
-  ["getUTCMinutes", "get-utc-minutes"], ["getUTCMonth", "get-utc-month"], ["getUTCSeconds", "get-utc-seconds"], ["setDate", "set-date!"], ["setFullYear", "set-year!"], ["setHours", "set-hours!"], ["setMilliseconds", "set-milliseconds!"], ["setMinutes", "set-minutes!"], ["setMonth", "set-month!"], ["setSeconds", "set-seconds!"], ["setTime", "set-time!"], ["setUTCDate", "set-utc-date!"], ["setUTCFullYear", "set-utc-year!"], ["setUTCHours", "set-utc-hours!"], ["setUTCMilliseconds", "set-utc-milliseconds!"], 
-  ["setUTCMinutes", "set-utc-minutes!"], ["setUTCMonth", "set-utc-month!"], ["setUTCSeconds", "set-utc-seconds!"], ["toDateString", "->date-string"], ["toISOString", "->iso-string"], ["toJSON", "->json"], ["toLocaleDateString", "->locale-date-string"], ["toLocaleTimeString", "->locale-time-string"], ["toTimeString", "->time-string"], ["toUTCString", "->utc-string"]]);
-  DEF("json-stringify", "{0}.JSON.stringify", ["root"]);
-  DEF("json-parse", "{0}.JSON.parse", ["root"])
-}).call(this);
-
+;
