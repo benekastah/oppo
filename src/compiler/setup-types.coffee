@@ -87,7 +87,7 @@
         
   #---------------------------------------------------------------------------#
         
-  class @Object extends @List
+  class @Object extends @SyntaxNode
     constructor: ->
       super
       
@@ -123,7 +123,7 @@
         "#{c_key}: #{c_value}"
       
       if literal_body.length
-        object = "{\n  #{literal_body.join ',\n  '}\n}"
+        object = "{#{newline_up()}#{literal_body.join ',' + newline()}#{newline_down()}}"
       else
         object = "{}"
       
@@ -138,7 +138,7 @@
           c_value = @dynamic_values[i].compile()
           "#{c_tmp_var}[#{c_key}] = #{c_value}"
           
-        object = "(#{object_definition},\n#{dynamic_body.join ',\n'},\n#{c_tmp_var})"
+        object = "(#{object_definition},#{newline()}#{dynamic_body.join ',' + newline()},#{newline()}#{c_tmp_var})"
         
       object
   
@@ -237,6 +237,7 @@
         @max_arity = Infinity
       
     compile_unquoted: ->
+      indent_up()
       c_name = @name?.compile() ? ''
       if @args?
         c_args = compile_list @args
@@ -256,25 +257,32 @@
       v_length = (types.Symbol.gensym "argslen").compile()
       error_name = if c_name then " in '#{c_name}': " else ""
       
-      c_body = c_body.join ",\n"
-      
       if tail_recursive
+        indent_up()
+        c_body = compile_list @body
+        c_body = c_body.join ",#{newline()}"
         temp_result = (types.Symbol.gensym "result").compile()
         c_body = """
         while (true) {
-          var #{@temp_continue} = false;
-          var #{temp_result} = (#{c_body});
-          if (!#{@temp_continue}) return #{temp_result};
-        }
+        #{INDENT}var #{@temp_continue} = false;
+        #{INDENT}var #{temp_result} = (#{c_body});
+        
+        #{INDENT}if (!#{@temp_continue}) {
+        #{indent_up()}return #{temp_result};
+        #{indent_down()}}
+        #{indent_down()}}
         """
       else
-        c_body = "return #{c_body};"
+        c_body = compile_list @body
+        c_body = "return (#{c_body.join "," + newline()});"
         
-      """
+      result = """
       function #{c_name}(#{c_args.join ', '}) {
-        #{c_body}
+      #{INDENT}#{c_body}
       }
       """
+      indent_down()
+      result
       
     transform_tail_recursive: (code) ->
       scope = last scope_stack
@@ -304,7 +312,7 @@
             ]
             
             code._compile = ->
-              "(#{emulated_call.join ',\n  '})"
+              "(#{emulated_call.join ',' + newline()})"
             
             return yes
             

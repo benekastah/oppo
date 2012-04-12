@@ -4,5 +4,6 @@ read = oppo.read = oppo.compiler.read = ->
 # This function should only be used once as the main entry point to the compilation process for a file.
 # This should never be used internally by the compiler.
 compile = oppo.compile = oppo.compiler.compile = (sexp) ->
+  INDENT = ""
   push_scope()
   sexp.compile()

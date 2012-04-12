@@ -53,3 +53,14 @@ push_scope = ->
   
 pop_scope = ->
   scope_stack.pop()
+  
+INDENT = ""
+indent_up = ->
+  INDENT = "#{INDENT}  "
+  
+indent_down = ->
+  INDENT = INDENT.substr 2
+  
+newline = -> "\n#{INDENT}"
+newline_down = -> "\n#{indent_down()}"
+newline_up = -> "\n#{indent_up()}"

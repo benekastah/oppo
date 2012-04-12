@@ -1,5 +1,5 @@
 (function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, WRAPPER_PREFIX, WRAPPER_REGEX, WRAPPER_SUFFIX, call_macro, char_wrapper, clone, compile, compile_list, last, macro, macro_do, macro_if, macro_let, map, pop_scope, push_scope, read, root, scope_stack, to_js_identifier, trim, type_of, types, wrapper, __toString, _ref, _ref2, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
+  var INDENT, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, WRAPPER_PREFIX, WRAPPER_REGEX, WRAPPER_SUFFIX, call_macro, char_wrapper, clone, compile, compile_list, indent_down, indent_up, last, macro, macro_do, macro_if, macro_let, map, newline, newline_down, newline_up, pop_scope, push_scope, read, root, scope_stack, to_js_identifier, trim, type_of, types, wrapper, __toString, _ref, _ref2, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for(var key in parent) {
       if(__hasProp.call(parent, key)) {
         child[key] = parent[key]
@@ -118,6 +118,22 @@
   };
   pop_scope = function() {
     return scope_stack.pop()
+  };
+  INDENT = "";
+  indent_up = function() {
+    return INDENT = "" + INDENT + "  "
+  };
+  indent_down = function() {
+    return INDENT = INDENT.substr(2)
+  };
+  newline = function() {
+    return"\n" + INDENT
+  };
+  newline_down = function() {
+    return"\n" + indent_down()
+  };
+  newline_up = function() {
+    return"\n" + indent_up()
   };
   (function() {
     this.SyntaxNode = function() {
@@ -279,7 +295,7 @@
           return _results
         }.call(this);
         if(literal_body.length) {
-          object = "{\n  " + literal_body.join(",\n  ") + "\n}"
+          object = "{" + newline_up() + literal_body.join("," + newline()) + newline_down() + "}"
         }else {
           object = "{}"
         }
@@ -300,12 +316,12 @@
             }
             return _results
           }.call(this);
-          object = "(" + object_definition + ",\n" + dynamic_body.join(",\n") + ",\n" + c_tmp_var + ")"
+          object = "(" + object_definition + "," + newline() + dynamic_body.join("," + newline()) + "," + newline() + c_tmp_var + ")"
         }
         return object
       };
       return Object
-    }(this.List);
+    }(this.SyntaxNode);
     this.Number = function(_super) {
       __extends(Number, _super);
       function Number() {
@@ -455,7 +471,8 @@
         }
       }
       Function.prototype.compile_unquoted = function() {
-        var body, c_args, c_body, c_name, code, error_name, tail_recursive, temp_result, v_length, _ref3, _ref4;
+        var body, c_args, c_body, c_name, code, error_name, result, tail_recursive, temp_result, v_length, _ref3, _ref4;
+        indent_up();
         c_name = (_ref3 = (_ref4 = this.name) != null ? _ref4.compile() : void 0) != null ? _ref3 : "";
         if(this.args != null) {
           c_args = compile_list(this.args)
@@ -477,14 +494,19 @@
         c_body = compile_list(this.body);
         v_length = types.Symbol.gensym("argslen").compile();
         error_name = c_name ? " in '" + c_name + "': " : "";
-        c_body = c_body.join(",\n");
         if(tail_recursive) {
+          indent_up();
+          c_body = compile_list(this.body);
+          c_body = c_body.join("," + newline());
           temp_result = types.Symbol.gensym("result").compile();
-          c_body = "while (true) {\n  var " + this.temp_continue + " = false;\n  var " + temp_result + " = (" + c_body + ");\n  if (!" + this.temp_continue + ") return " + temp_result + ";\n}"
+          c_body = "while (true) {\n" + INDENT + "var " + this.temp_continue + " = false;\n" + INDENT + "var " + temp_result + " = (" + c_body + ");\n\n" + INDENT + "if (!" + this.temp_continue + ") {\n" + indent_up() + "return " + temp_result + ";\n" + indent_down() + "}\n" + indent_down() + "}"
         }else {
-          c_body = "return " + c_body + ";"
+          c_body = compile_list(this.body);
+          c_body = "return (" + c_body.join("," + newline()) + ");"
         }
-        return"function " + c_name + "(" + c_args.join(", ") + ") {\n  " + c_body + "\n}"
+        result = "function " + c_name + "(" + c_args.join(", ") + ") {\n" + INDENT + c_body + "\n}";
+        indent_down();
+        return result
       };
       Function.prototype.transform_tail_recursive = function(code) {
         var arg, c_passed_arg, callable, callable_value, emulated_call, i, index, result, scope, temp_args_assignments, temp_args_to_real_args, tmp, _len, _ref3, _ref4;
@@ -519,7 +541,7 @@
               }
               emulated_call = __slice.call(temp_args_assignments).concat(__slice.call(temp_args_to_real_args), ["" + this.temp_continue + " = true"]);
               code._compile = function() {
-                return"(" + emulated_call.join(",\n  ") + ")"
+                return"(" + emulated_call.join("," + newline()) + ")"
               };
               return true
             }else {
@@ -647,7 +669,7 @@
   macro_do = macro("do", function() {
     var c_items;
     c_items = compile_list(arguments);
-    return"(" + c_items.join(", ") + ")"
+    return"(" + c_items.join(",\n") + ")"
   });
   macro("quote", function(x) {
     x.quoted = true;
@@ -683,6 +705,7 @@
     return parser.parse.apply(parser, arguments)
   };
   compile = oppo.compile = oppo.compiler.compile = function(sexp) {
+    INDENT = "";
     push_scope();
     return sexp.compile()
   }

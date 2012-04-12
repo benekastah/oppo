@@ -56,7 +56,7 @@ macro "call", (callable, args...) ->
 
 macro_do = macro "do", ->
   c_items = compile_list arguments
-  "(#{c_items.join ', '})"
+  "(#{c_items.join ',\n'})"
   
 macro "quote", (x) ->
   x.quoted = true
