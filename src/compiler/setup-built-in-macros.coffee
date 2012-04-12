@@ -2,12 +2,14 @@
 macro = (name, fn) ->
   s_name = new types.Symbol name
   m = new types.Macro s_name, null, null, null, fn
+  m.builtin = true
   m.compile()
+  m
   
 call_macro = (name, args...) ->
   scope = last scope_stack
   c_name = to_js_identifier name
-  scope[c_name].call args...
+  scope[c_name].invoke args...
 
 macro "def", (to_define, rest...) ->
   if not rest.length
@@ -42,7 +44,7 @@ macro "call", (callable, args...) ->
     scope = last scope_stack
     item = scope[to_call]
     if item instanceof types.Macro
-      return item.call args...
+      return item.invoke args...
   
   # Make sure function literals are immediately callable
   if callable instanceof types.Function
@@ -52,7 +54,7 @@ macro "call", (callable, args...) ->
     
   "#{to_call}(#{c_args.join ', '})"
 
-macro "do", ->
+macro_do = macro "do", ->
   c_items = compile_list arguments
   "(#{c_items.join ', '})"
   
@@ -85,3 +87,9 @@ macro "assert", (sexp) ->
   (#{c_sexp} || #{raise_call})
   """
   
+macro "js-eval", (js_code) ->
+  js_code
+  
+macro_if = macro "if", ->
+  
+macro_let = macro "let", ->

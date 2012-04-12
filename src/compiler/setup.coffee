@@ -42,3 +42,14 @@ map = (list, fn) ->
 compile_list = (list, arg) ->
   for item in list
     item.compile arg
+    
+trim = String::trim or -> @.replace(/^\s+/, '').replace /\s+$/, ''
+
+push_scope = ->
+  scope = last scope_stack
+  new_scope = clone scope
+  scope_stack.push new_scope
+  new_scope
+  
+pop_scope = ->
+  scope_stack.pop()

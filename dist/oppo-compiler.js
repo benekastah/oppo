@@ -1,5 +1,5 @@
 (function() {
-  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, WRAPPER_PREFIX, WRAPPER_REGEX, WRAPPER_SUFFIX, call_macro, char_wrapper, clone, compile, compile_list, last, macro, map, read, root, scope_stack, to_js_identifier, type_of, types, wrapper, __toString, _ref, _ref2,
+  var JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, WRAPPER_PREFIX, WRAPPER_REGEX, WRAPPER_SUFFIX, call_macro, char_wrapper, clone, compile, compile_list, last, macro, macro_do, macro_if, macro_let, map, pop_scope, push_scope, read, root, scope_stack, to_js_identifier, trim, type_of, types, wrapper, __toString, _ref, _ref2,
     __hasProp = Object.prototype.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor; child.__super__ = parent.prototype; return child; },
     __slice = Array.prototype.slice;
@@ -160,6 +160,22 @@
     return _results;
   };
 
+  trim = String.prototype.trim || function() {
+    return this.replace(/^\s+/, '').replace(/\s+$/, '');
+  };
+
+  push_scope = function() {
+    var new_scope, scope;
+    scope = last(scope_stack);
+    new_scope = clone(scope);
+    scope_stack.push(new_scope);
+    return new_scope;
+  };
+
+  pop_scope = function() {
+    return scope_stack.pop();
+  };
+
   (function() {
     this.SyntaxNode = (function() {
 
@@ -181,11 +197,16 @@
         this.line_number = (_ref3 = this.yy) != null ? _ref3.lexer.yylineno : void 0;
       }
 
+      SyntaxNode.prototype.cache = {};
+
       SyntaxNode.prototype.compile = function(quoted) {
-        if (!(this.quoted || quoted)) {
-          return this.compile_unquoted();
+        if (quoted == null) quoted = this.quoted;
+        if ((type_of(this._compile)) === "function") {
+          return this.cache["_compile"] || this._compile();
+        } else if (!quoted) {
+          return this.cache["compile_unquoted"] || this.compile_unquoted();
         } else {
-          return this.compile_quoted();
+          return this.cache["compile_quoted"] || this.compile_quoted();
         }
       };
 
@@ -241,7 +262,7 @@
       List.prototype.compile_unquoted = function() {
         var scope, _ref3;
         scope = last(scope_stack);
-        return (_ref3 = scope.call).call.apply(_ref3, this.value);
+        return (_ref3 = scope.call).invoke.apply(_ref3, this.value);
       };
 
       List.prototype.compile_quoted = function() {
@@ -288,8 +309,78 @@
       __extends(Object, _super);
 
       function Object() {
+        var i, item, values, _len, _ref3;
         Object.__super__.constructor.apply(this, arguments);
+        this.static_keys = [];
+        this.static_values = [];
+        this.dynamic_keys = [];
+        this.dynamic_values = [];
+        values = null;
+        _ref3 = this.value;
+        for (i = 0, _len = _ref3.length; i < _len; i++) {
+          item = _ref3[i];
+          if (i % 2 === 0) {
+            if (item instanceof types.Symbol && !item.quoted) {
+              this.dynamic_keys.push(item);
+              values = this.dynamic_values;
+            } else {
+              this.static_keys.push(item);
+              values = this.static_values;
+            }
+          } else {
+            values.push(item);
+          }
+        }
+        delete this.value;
+        if ((this.static_keys.length !== this.static_values.length) || (this.dynamic_keys.length !== this.dynamic_values.length)) {
+          this.error("Cannot make an object with an odd number of items.");
+        }
       }
+
+      Object.prototype._compile = function() {
+        var c_key, c_tmp_var, c_value, dynamic_body, i, item, literal_body, object, object_definition, scope, tmp_var;
+        literal_body = (function() {
+          var _len, _ref3, _results;
+          _ref3 = this.static_keys;
+          _results = [];
+          for (i = 0, _len = _ref3.length; i < _len; i++) {
+            item = _ref3[i];
+            if (item instanceof types.Quoted) {
+              c_key = item.value[1].compile(false);
+            } else {
+              c_key = item.compile(false);
+            }
+            c_value = this.static_values[i].compile();
+            _results.push("" + c_key + ": " + c_value);
+          }
+          return _results;
+        }).call(this);
+        if (literal_body.length) {
+          object = "{\n  " + (literal_body.join(',\n  ')) + "\n}";
+        } else {
+          object = "{}";
+        }
+        if (this.dynamic_keys.length) {
+          tmp_var = types.Symbol.gensym("obj");
+          c_tmp_var = tmp_var.compile();
+          scope = last(scope_stack);
+          object_definition = scope.def.invoke(tmp_var, new types.List([new types.Symbol("js-eval"), object]));
+          dynamic_body = (function() {
+            var _len, _ref3, _results;
+            _ref3 = this.dynamic_keys;
+            _results = [];
+            for (i = 0, _len = _ref3.length; i < _len; i++) {
+              item = _ref3[i];
+              c_key = item.compile();
+              c_value = this.dynamic_values[i].compile();
+              _results.push("" + c_tmp_var + "[" + c_key + "] = " + c_value);
+            }
+            return _results;
+          }).call(this);
+          object = "(" + object_definition + ",\n" + (dynamic_body.join(',\n')) + ",\n" + c_tmp_var + ")";
+        }
+        return object;
+      };
 
       return Object;
 
@@ -302,7 +393,7 @@
         Number.__super__.constructor.apply(this, arguments);
       }
 
-      Number.prototype.compile = function() {
+      Number.prototype._compile = function() {
         return this.value;
       };
 
@@ -339,7 +430,7 @@
         String.__super__.constructor.apply(this, arguments);
       }
 
-      String.prototype.compile = function() {
+      String.prototype._compile = function() {
         var val;
         val = this.value instanceof types.Symbol ? this.value.compile() : this.value;
         return "\"" + (val.replace(/\n/g, '\\n')) + "\"";
@@ -498,17 +589,84 @@
       }
 
       Function.prototype.compile_unquoted = function() {
-        var c_args, c_body, c_name, error_name, v_length, _ref3, _ref4;
+        var body, c_args, c_body, c_name, code, error_name, tail_recursive, temp_result, v_length, _ref3, _ref4;
         c_name = (_ref3 = (_ref4 = this.name) != null ? _ref4.compile() : void 0) != null ? _ref3 : '';
         if (this.args != null) {
           c_args = compile_list(this.args);
         } else {
           c_args = [];
         }
+        this.cached_compiled_args = c_args;
+        body = this.body;
+        body = (function() {
+          var _i, _len, _results;
+          _results = [];
+          for (_i = 0, _len = body.length; _i < _len; _i++) {
+            code = body[_i];
+            _results.push(types.Macro.transform(code));
+          }
+          return _results;
+        })();
+        tail_recursive = this.transform_tail_recursive(last(body));
         c_body = compile_list(this.body);
         v_length = (types.Symbol.gensym("argslen")).compile();
         error_name = c_name ? " in '" + c_name + "': " : "";
-        return "function " + c_name + "(" + (c_args.join(', ')) + ") {\n  var " + v_length + " = arguments.length;\n  if (" + v_length + " < " + this.min_arity + " || " + v_length + " > " + this.max_arity + ")\n    throw new oppo.ArityException(\"" + error_name + "Expected between " + this.min_arity + " and " + this.max_arity + " arguments; got \" + " + v_length + " +  \" instead " + (this.location_trace()) + ".\");\n    \n  return (" + (c_body.join(',\n')) + ");\n}";
+        c_body = c_body.join(",\n");
+        if (tail_recursive) {
+          temp_result = (types.Symbol.gensym("result")).compile();
+          c_body = "while (true) {\n  var " + this.temp_continue + " = false;\n  var " + temp_result + " = (" + c_body + ");\n  if (!" + this.temp_continue + ") return " + temp_result + ";\n}";
+        } else {
+          c_body = "return " + c_body + ";";
+        }
+        return "function " + c_name + "(" + (c_args.join(', ')) + ") {\n  " + c_body + "\n}";
+      };
+
+      Function.prototype.transform_tail_recursive = function(code) {
+        var arg, c_passed_arg, callable, callable_value, emulated_call, i, index, result, scope, temp_args_assignments, temp_args_to_real_args, tmp, _len, _ref3, _ref4;
+        scope = last(scope_stack);
+        if ((!code.quoted) && (code instanceof types.List)) {
+          callable = code.value[0];
+          if (callable instanceof types.Symbol) {
+            callable_value = callable.value;
+            if (((_ref3 = this.name) != null ? _ref3.value : void 0) === callable_value) {
+              if (!this.temp_args) {
+                this.temp_args = (function() {
+                  var _i, _len, _ref4, _results;
+                  _ref4 = this.args;
+                  _results = [];
+                  for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
+                    arg = _ref4[_i];
+                    _results.push((types.Symbol.gensym(arg)).compile());
+                  }
+                  return _results;
+                }).call(this);
+                this.temp_continue = (types.Symbol.gensym("continue")).compile();
+              }
+              temp_args_assignments = [];
+              temp_args_to_real_args = [];
+              _ref4 = this.temp_args;
+              for (i = 0, _len = _ref4.length; i < _len; i++) {
+                tmp = _ref4[i];
+                index = i + 1;
+                c_passed_arg = code.value[index].compile();
+                temp_args_assignments.push("" + tmp + " = " + c_passed_arg);
+                temp_args_to_real_args.push("" + this.cached_compiled_args[i] + " = " + tmp);
+              }
+              emulated_call = __slice.call(temp_args_assignments).concat(__slice.call(temp_args_to_real_args), ["" + this.temp_continue + " = true"]);
+              code._compile = function() {
+                return "(" + (emulated_call.join(',\n  ')) + ")";
+              };
+              return true;
+            } else if (callable_value === macro_do.name || callable_value === macro_let.name) {
+              return this.transform_tail_recursive(last(code));
+            } else if (callable_value === macro_if.value) {
+              result = this.transform_tail_recursive(code[2]);
+              result || (result = this.transform_tail_recursive(code[3]));
+              return result;
+            }
+          }
+        }
+        return false;
       };
 
       return Function;
@@ -523,16 +681,36 @@
         this.argnames = argnames;
         this.template = template;
         Macro.__super__.constructor.call(this, null, yy);
-        if (fn != null) this.call = fn;
+        if (fn != null) this.invoke = fn;
       }
 
       Macro.prototype.compile_unquoted = function() {
         var c_name, scope;
         c_name = this.name.compile();
-        if (this.call == null) {}
+        if (this.invoke == null) {}
         scope = last(scope_stack);
         scope[c_name] = this;
         return "null";
+      };
+
+      Macro.transform = function(code) {
+        var c_callable, callable, item, scope;
+        if (code instanceof types.List) {
+          if (code.quoted) {
+            return this.transform(code);
+          } else {
+            callable = code.value[0];
+            if (callable instanceof types.Symbol) {
+              c_callable = callable.compile();
+              scope = last(scope_stack);
+              item = scope[c_callable];
+              if (item instanceof types.Macro && !item.builtin) {
+                return item.transform(code);
+              }
+            }
+          }
+        }
+        return code;
       };
 
       return Macro;
@@ -544,7 +722,9 @@
     var m, s_name;
     s_name = new types.Symbol(name);
     m = new types.Macro(s_name, null, null, null, fn);
-    return m.compile();
+    m.builtin = true;
+    m.compile();
+    return m;
   };
 
   call_macro = function() {
@@ -552,7 +732,7 @@
     name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     scope = last(scope_stack);
     c_name = to_js_identifier(name);
-    return (_ref3 = scope[c_name]).call.apply(_ref3, args);
+    return (_ref3 = scope[c_name]).invoke.apply(_ref3, args);
   };
 
   macro("def", function() {
@@ -590,14 +770,14 @@
     if (callable instanceof types.Symbol) {
       scope = last(scope_stack);
       item = scope[to_call];
-      if (item instanceof types.Macro) return item.call.apply(item, args);
+      if (item instanceof types.Macro) return item.invoke.apply(item, args);
     }
     if (callable instanceof types.Function) to_call = "(" + to_call + ")";
     c_args = compile_list(args);
     return "" + to_call + "(" + (c_args.join(', ')) + ")";
   });
 
-  macro("do", function() {
+  macro_do = macro("do", function() {
     var c_items;
     c_items = compile_list(arguments);
     return "(" + (c_items.join(', ')) + ")";
@@ -629,11 +809,20 @@
     return "(" + c_sexp + " || " + raise_call + ")";
   });
 
+  macro("js-eval", function(js_code) {
+    return js_code;
+  });
+
+  macro_if = macro("if", function() {});
+
+  macro_let = macro("let", function() {});
+
   read = oppo.read = oppo.compiler.read = function() {
     return parser.parse.apply(parser, arguments);
   };
 
   compile = oppo.compile = oppo.compiler.compile = function(sexp) {
+    push_scope();
     return sexp.compile();
   };
 
