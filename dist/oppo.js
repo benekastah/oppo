@@ -1,5 +1,5 @@
 (function() {
-  var INDENT, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, WRAPPER_PREFIX, WRAPPER_REGEX, WRAPPER_SUFFIX, call_macro, char_wrapper, clone, compile, compile_list, indent_down, indent_up, last, macro, macro_do, macro_if, macro_let, map, newline, newline_down, newline_up, pop_scope, push_scope, read, root, scope_stack, to_js_identifier, trim, type_of, types, wrapper, __toString, _ref, _ref2, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
+  var INDENT, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, WRAPPER_PREFIX, WRAPPER_REGEX, WRAPPER_SUFFIX, call_macro, char_wrapper, clone, compile, compile_list, indent_down, indent_up, last, macro, macro_do, macro_if, macro_let, map, newline, newline_down, newline_up, pop_scope, push_scope, read, root, scope_stack, scope_var_statement, to_js_identifier, trim, type_of, types, wrapper, __toString, _ref, _ref2, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for(var key in parent) {
       if(__hasProp.call(parent, key)) {
         child[key] = parent[key]
@@ -119,6 +119,30 @@
   pop_scope = function() {
     return scope_stack.pop()
   };
+  scope_var_statement = function() {
+    var name, names, scope, sym;
+    scope = last(scope_stack);
+    names = [];
+    for(name in scope) {
+      if(!__hasProp.call(scope, name)) {
+        continue
+      }
+      sym = scope[name];
+      if(sym instanceof types.Dynamic) {
+        continue
+      }
+      if(sym.declared_var) {
+        sym.error("Already declared var for this symbol. Possible compiler error?")
+      }
+      sym.declared_var = true;
+      names.push(name)
+    }
+    if(names.length) {
+      return"" + INDENT + "var " + names.join(", ") + ";\n"
+    }else {
+      return""
+    }
+  };
   INDENT = "";
   indent_up = function() {
     return INDENT = "" + INDENT + "  "
@@ -182,17 +206,18 @@
       SyntaxNode.prototype.error_message = function(type, msg) {
         var full_msg, msg_prefix;
         if(arguments.length === 1) {
-          msg = type
+          msg = type;
+          type = null
         }
         if(msg == null) {
           msg = "An error occurred"
         }
         msg.replace(/\.$/, "");
         msg_prefix = "" + (type != null ? type : this.constructor.name) + "Error: ";
-        return full_msg = "" + msg_prefix + msg + this.location_trace() + "."
+        return full_msg = "" + msg_prefix + msg + " " + this.location_trace()
       };
       SyntaxNode.prototype.error = function(type, msg) {
-        throw this.error_message(type, msg);
+        throw this.error_message.apply(this, arguments);
       };
       SyntaxNode.prototype.valueOf = function() {
         return this.value
@@ -204,6 +229,13 @@
       };
       return SyntaxNode
     }();
+    this.Dynamic = function(_super) {
+      __extends(Dynamic, _super);
+      function Dynamic() {
+        Dynamic.__super__.constructor.apply(this, arguments)
+      }
+      return Dynamic
+    }(this.SyntaxNode);
     this.List = function(_super) {
       __extends(List, _super);
       function List() {
@@ -241,7 +273,7 @@
       function Quoted(value, yy) {
         Quoted.__super__.constructor.call(this, null, yy);
         value.quoted = true;
-        this.value = [new types.Symbol("quote", yy), value];
+        this.value = [new types.Symbol("quote", null, yy), value];
         this.quoted_value = value
       }
       return Quoted
@@ -300,7 +332,7 @@
           object = "{}"
         }
         if(this.dynamic_keys.length) {
-          tmp_var = types.Symbol.gensym("obj");
+          tmp_var = types.Symbol.gensym("obj", false);
           c_tmp_var = tmp_var.compile();
           scope = last(scope_stack);
           object_definition = scope.def.invoke(tmp_var, new types.List([new types.Symbol("js-eval"), object]));
@@ -416,19 +448,28 @@
     }(this.Boolean);
     this.Symbol = function(_super) {
       __extends(Symbol, _super);
-      function Symbol(value, yy) {
-        Symbol.__super__.constructor.apply(this, arguments);
+      function Symbol(value, must_exist, yy) {
+        if(must_exist == null) {
+          must_exist = true
+        }
+        Symbol.__super__.constructor.call(this, value, yy);
+        this.must_exist = must_exist != null ? must_exist : true;
         if(this.value.substr(0, 3) === "...") {
           this.splat = true;
           this.value = this.value.substr(3)
         }
       }
       Symbol.prototype.compile_unquoted = function() {
-        var val;
+        var js_val, scope, val;
+        scope = last(scope_stack);
         val = this.value.length > 1 ? this.value.replace(/\-/g, "_") : this.value;
-        return to_js_identifier(val)
+        js_val = to_js_identifier(val);
+        if(this.must_exist && !(scope[js_val] != null)) {
+          this.error("Trying to reference undefined symbol: " + this.value)
+        }
+        return js_val
       };
-      Symbol.gensym = function(sym) {
+      Symbol.gensym = function(sym, must_exist) {
         var random, s_sym, symbol, time;
         if(sym instanceof types.Symbol) {
           s_sym = sym.value;
@@ -443,7 +484,15 @@
         time = (+new Date).toString(36);
         random = Math.floor(Math.random() * 1E5).toString(36);
         s_sym = "" + s_sym + "-" + time + "-" + random;
-        return new types.Symbol(s_sym, symbol)
+        return new types.Symbol(s_sym, must_exist, symbol)
+      };
+      Symbol.compile_non_strict = function(sym) {
+        var result, tmp;
+        tmp = sym.must_exist;
+        sym.must_exist = false;
+        result = sym.compile();
+        sym.must_exist = tmp;
+        return result
       };
       return Symbol
     }(this.SyntaxNode);
@@ -471,11 +520,24 @@
         }
       }
       Function.prototype.compile_unquoted = function() {
-        var body, c_args, c_body, c_name, code, error_name, result, tail_recursive, temp_result, v_length, _ref3, _ref4;
+        var arg, body, c_arg, c_args, c_body, c_name, code, result, scope, tail_recursive, temp_result, _ref3, _ref4;
         indent_up();
+        scope = push_scope();
         c_name = (_ref3 = (_ref4 = this.name) != null ? _ref4.compile() : void 0) != null ? _ref3 : "";
         if(this.args != null) {
-          c_args = compile_list(this.args)
+          c_args = function() {
+            var _i, _len, _ref5, _results;
+            _ref5 = this.args;
+            _results = [];
+            for(_i = 0, _len = _ref5.length;_i < _len;_i++) {
+              arg = _ref5[_i];
+              arg.must_exist = false;
+              c_arg = arg.compile();
+              scope[c_arg] = new types.Dynamic;
+              _results.push(c_arg)
+            }
+            return _results
+          }.call(this)
         }else {
           c_args = []
         }
@@ -491,26 +553,26 @@
           return _results
         }();
         tail_recursive = this.transform_tail_recursive(last(body));
-        c_body = compile_list(this.body);
-        v_length = types.Symbol.gensym("argslen").compile();
-        error_name = c_name ? " in '" + c_name + "': " : "";
         if(tail_recursive) {
           indent_up();
           c_body = compile_list(this.body);
           c_body = c_body.join("," + newline());
-          temp_result = types.Symbol.gensym("result").compile();
+          temp_result = types.Symbol.gensym("result", false).compile();
           c_body = "while (true) {\n" + INDENT + "var " + this.temp_continue + " = false;\n" + INDENT + "var " + temp_result + " = (" + c_body + ");\n\n" + INDENT + "if (!" + this.temp_continue + ") {\n" + indent_up() + "return " + temp_result + ";\n" + indent_down() + "}\n" + indent_down() + "}"
         }else {
           c_body = compile_list(this.body);
           c_body = "return (" + c_body.join("," + newline()) + ");"
         }
-        result = "function " + c_name + "(" + c_args.join(", ") + ") {\n" + INDENT + c_body + "\n}";
-        indent_down();
+        result = "function " + c_name + "(" + c_args.join(", ") + ") {\n" + scope_var_statement() + INDENT + c_body + "\n" + indent_down() + "}";
+        pop_scope();
         return result
       };
       Function.prototype.transform_tail_recursive = function(code) {
-        var arg, c_passed_arg, callable, callable_value, emulated_call, i, index, result, scope, temp_args_assignments, temp_args_to_real_args, tmp, _len, _ref3, _ref4;
+        var arg, c_passed_arg, callable, callable_value, emulated_call, i, index, item, result, scope, temp_args_assignments, temp_args_to_real_args, tmp, _len, _ref3, _ref4;
         scope = last(scope_stack);
+        if(!(this.name != null)) {
+          return false
+        }
         if(!code.quoted && code instanceof types.List) {
           callable = code.value[0];
           if(callable instanceof types.Symbol) {
@@ -523,11 +585,11 @@
                   _results = [];
                   for(_i = 0, _len = _ref4.length;_i < _len;_i++) {
                     arg = _ref4[_i];
-                    _results.push(types.Symbol.gensym(arg).compile())
+                    _results.push(types.Symbol.gensym(arg, false).compile())
                   }
                   return _results
                 }.call(this);
-                this.temp_continue = types.Symbol.gensym("continue").compile()
+                this.temp_continue = types.Symbol.gensym("continue", false).compile()
               }
               temp_args_assignments = [];
               temp_args_to_real_args = [];
@@ -535,7 +597,8 @@
               for(i = 0, _len = _ref4.length;i < _len;i++) {
                 tmp = _ref4[i];
                 index = i + 1;
-                c_passed_arg = code.value[index].compile();
+                item = code.value[index];
+                c_passed_arg = item instanceof types.Symbol ? types.Symbol.compile_non_strict(item) : item.compile();
                 temp_args_assignments.push("" + tmp + " = " + c_passed_arg);
                 temp_args_to_real_args.push("" + this.cached_compiled_args[i] + " = " + tmp)
               }
@@ -545,12 +608,12 @@
               };
               return true
             }else {
-              if(callable_value === macro_do.name || callable_value === macro_let.name) {
-                return this.transform_tail_recursive(last(code))
+              if(callable_value === macro_do.name.value || callable_value === macro_let.name.value) {
+                return this.transform_tail_recursive(last(code.value))
               }else {
-                if(callable_value === macro_if.value) {
-                  result = this.transform_tail_recursive(code[2]);
-                  result || (result = this.transform_tail_recursive(code[3]));
+                if(callable_value === macro_if.name.value) {
+                  result = this.transform_tail_recursive(code.value[2]);
+                  result || (result = this.transform_tail_recursive(code.value[3]));
                   return result
                 }
               }
@@ -589,7 +652,7 @@
           }else {
             callable = code.value[0];
             if(callable instanceof types.Symbol) {
-              c_callable = callable.compile();
+              c_callable = types.Symbol.compile_non_strict(callable);
               scope = last(scope_stack);
               item = scope[c_callable];
               if(item instanceof types.Macro && !item.builtin) {
@@ -606,6 +669,7 @@
   macro = function(name, fn) {
     var m, s_name;
     s_name = new types.Symbol(name);
+    s_name.must_exist = false;
     m = new types.Macro(s_name, null, null, null, fn);
     m.builtin = true;
     m.compile();
@@ -619,30 +683,33 @@
     return(_ref3 = scope[c_name]).invoke.apply(_ref3, args)
   };
   macro("def", function() {
-    var args, body, c_name, c_value, fn, name, rest, scope, to_define, value;
+    var args, body, c_name, c_value, name, rest, scope, to_define, token, value;
     to_define = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     if(!rest.length) {
       to_define.error("Def", "You must provide a value.")
     }
+    scope = last(scope_stack);
+    token = {};
     if(to_define instanceof types.List) {
       name = to_define.value[0];
       args = to_define.value.slice(1);
       body = rest;
-      fn = new types.Function(name, args, body, to_define);
-      c_name = name.compile();
-      c_value = fn.compile()
+      value = new types.Function(name, args, body, to_define)
     }else {
       if(to_define instanceof types.Symbol) {
         name = to_define;
-        value = rest[0];
-        c_name = name.compile();
-        c_value = value.compile()
+        value = rest[0]
       }else {
         to_define.error("Def", "Invalid definition.")
       }
     }
-    scope = last(scope_stack);
-    if(scope[c_name] != null) {
+    name.must_exist = false;
+    c_name = name.compile();
+    if(scope[c_name] == null) {
+      scope[c_name] = token
+    }
+    c_value = value.compile();
+    if(scope[c_name] !== token) {
       name.error("Def", "Cannot define previously defined value.")
     }else {
       scope[c_name] = value
@@ -669,7 +736,7 @@
   macro_do = macro("do", function() {
     var c_items;
     c_items = compile_list(arguments);
-    return"(" + c_items.join(",\n") + ")"
+    return"(" + c_items.join(",\n" + INDENT) + ")"
   });
   macro("quote", function(x) {
     x.quoted = true;
@@ -679,12 +746,12 @@
     var c_error, c_namespace;
     if(arguments.length === 1) {
       error = namespace;
-      c_namespace = "Error"
+      c_namespace = '"Error"'
     }else {
       c_namespace = namespace.compile()
     }
     c_error = error.compile();
-    return"(function () {\n  throw new oppo.Error(" + c_namespace + ", " + c_error + ");\n})()"
+    return"(function () {\n" + indent_up() + "throw new oppo.Error(" + c_namespace + ", " + c_error + ");\n" + indent_down() + "})()"
   });
   macro("assert", function(sexp) {
     var c_sexp, error, error_namespace, raise_call;
@@ -697,16 +764,44 @@
   macro("js-eval", function(js_code) {
     return js_code
   });
-  macro_if = macro("if", function() {
+  macro_if = macro("if", function(cond, tbranch, fbranch) {
+    var result, _ref3;
+    result = "(/* IF */ " + cond.compile() + " ?\n" + indent_up() + "/* THEN */ " + tbranch.compile() + " :\n" + INDENT + "/* ELSE */ " + ((_ref3 = fbranch != null ? fbranch.compile() : void 0) != null ? _ref3 : "null") + ")";
+    indent_down();
+    return result
   });
   macro_let = macro("let", function() {
+    var bindings, body, def_sym, i, item, new_bindings, new_body, sym, _len, _ref3;
+    bindings = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    def_sym = new types.Symbol("def", null, bindings);
+    sym = null;
+    new_bindings = [];
+    _ref3 = bindings.value;
+    for(i = 0, _len = _ref3.length;i < _len;i++) {
+      item = _ref3[i];
+      if(i % 2 === 0) {
+        sym = item
+      }else {
+        if(!(item != null)) {
+          bindings.error("Must have even number of bindings.")
+        }
+        new_bindings.push(new types.List([def_sym, sym, item]))
+      }
+    }
+    new_body = __slice.call(new_bindings).concat(__slice.call(body));
+    return(new types.List([new types.Function(null, null, new_body)])).compile()
+  });
+  macro("lambda", function() {
+    var args, body, fn;
+    args = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    fn = new types.Function(null, args.value, body);
+    return fn.compile()
   });
   read = oppo.read = oppo.compiler.read = function() {
     return parser.parse.apply(parser, arguments)
   };
   compile = oppo.compile = oppo.compiler.compile = function(sexp) {
     INDENT = "";
-    push_scope();
     return sexp.compile()
   }
 }).call(this);
@@ -719,8 +814,8 @@ var parser = function() {
     var $0 = $$.length - 1;
     switch(yystate) {
       case 1:
-        var _do = new types.Symbol("do", yy);
-        return new types.List([_do].concat($$[$0 - 1]), yy);
+        var fn = new types.Function(null, null, $$[$0 - 1], yy);
+        return new types.List([fn], yy);
         break;
       case 2:
         return new types.Nil(yy);
@@ -763,15 +858,15 @@ var parser = function() {
         this.$ = new types.Quoted($$[$0], yy);
         break;
       case 23:
-        var sym = new types.Symbol("quasiquote", yy);
+        var sym = new types.Symbol("quasiquote", null, yy);
         this.$ = new types.List([sym, $$[$0]], yy);
         break;
       case 24:
-        var sym = new types.Symbol("unquote", yy);
+        var sym = new types.Symbol("unquote", null, yy);
         this.$ = new types.List([sym, $$[$0]], yy);
         break;
       case 25:
-        var sym = new types.Symbol("unquote-splicing", yy);
+        var sym = new types.Symbol("unquote-splicing", null, yy);
         this.$ = new types.List([sym, $$[$0]], yy);
         break;
       case 26:
@@ -809,7 +904,7 @@ var parser = function() {
         this.$ = new types.String($$[$0].value, yy);
         break;
       case 39:
-        this.$ = new types.Symbol($$[$0], yy);
+        this.$ = new types.Symbol($$[$0], null, yy);
         break
     }
   }, table:[{3:1, 4:2, 5:[1, 3], 6:4, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 18:[1, 26], 20:[1, 27], 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 22], 29:[1, 23], 30:[1, 24], 31:19, 32:20, 33:21, 34:[1, 30], 36:[1, 31], 37:[1, 32], 38:[1, 33], 39:[1, 28], 40:[1, 29], 41:[1, 18]}, {1:[3]}, {5:[1, 34], 6:35, 7:5, 8:6, 9:7, 10:8, 11:9, 12:15, 13:16, 14:17, 15:[1, 25], 18:[1, 26], 20:[1, 27], 23:[1, 10], 24:[1, 11], 25:[1, 12], 26:[1, 13], 27:[1, 14], 28:[1, 

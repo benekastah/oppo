@@ -54,6 +54,18 @@ push_scope = ->
 pop_scope = ->
   scope_stack.pop()
   
+scope_var_statement = ->
+  scope = last scope_stack
+  names = []
+  for own name, sym of scope
+    if sym instanceof types.Dynamic then continue
+    if sym.declared_var
+      sym.error "Already declared var for this symbol. Possible compiler error?"
+    sym.declared_var = true
+    names.push name
+    
+  if names.length then "#{INDENT}var #{names.join ', '};\n" else ""
+  
 INDENT = ""
 indent_up = ->
   INDENT = "#{INDENT}  "

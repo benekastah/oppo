@@ -54,8 +54,8 @@
 program
   : s_expression_list EOF
     {
-      var _do = new types.Symbol("do", yy);
-      return new types.List([_do].concat($1), yy);
+      var fn = new types.Function(null, null, $1, yy);
+      return new types.List([fn], yy);
     }
   | EOF
     { return new types.Nil(yy); }
@@ -125,17 +125,17 @@ special_form
     { $$ = new types.Quoted($2, yy); }
   | QUASIQUOTE s_expression
     {
-      var sym = new types.Symbol("quasiquote", yy);
+      var sym = new types.Symbol("quasiquote", null, yy);
       $$ = new types.List([sym, $2], yy);
     }
   | UNQUOTE s_expression
     {
-      var sym = new types.Symbol("unquote", yy);
+      var sym = new types.Symbol("unquote", null, yy);
       $$ = new types.List([sym, $2], yy);
     }
   | UNQUOTE_SPLICING s_expression
     {
-      var sym = new types.Symbol("unquote-splicing", yy);
+      var sym = new types.Symbol("unquote-splicing", null, yy);
       $$ = new types.List([sym, $2], yy);
     }
   | FUNCTION element_list ')'
@@ -186,7 +186,7 @@ string
   
 symbol
   : IDENTIFIER
-    { $$ = new types.Symbol($1, yy); }
+    { $$ = new types.Symbol($1, null, yy); }
   ;
   
 %%

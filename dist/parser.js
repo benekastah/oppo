@@ -13,8 +13,8 @@ performAction: function anonymous(yytext,yyleng,yylineno,yy,yystate,$$,_$) {
 var $0 = $$.length - 1;
 switch (yystate) {
 case 1:
-      var _do = new types.Symbol("do", yy);
-      return new types.List([_do].concat($$[$0-1]), yy);
+      var fn = new types.Function(null, null, $$[$0-1], yy);
+      return new types.List([fn], yy);
     
 break;
 case 2: return new types.Nil(yy); 
@@ -48,17 +48,17 @@ break;
 case 22: this.$ = new types.Quoted($$[$0], yy); 
 break;
 case 23:
-      var sym = new types.Symbol("quasiquote", yy);
+      var sym = new types.Symbol("quasiquote", null, yy);
       this.$ = new types.List([sym, $$[$0]], yy);
     
 break;
 case 24:
-      var sym = new types.Symbol("unquote", yy);
+      var sym = new types.Symbol("unquote", null, yy);
       this.$ = new types.List([sym, $$[$0]], yy);
     
 break;
 case 25:
-      var sym = new types.Symbol("unquote-splicing", yy);
+      var sym = new types.Symbol("unquote-splicing", null, yy);
       this.$ = new types.List([sym, $$[$0]], yy);
     
 break;
@@ -88,7 +88,7 @@ case 37: this.$ = new types.String($$[$0], yy);
 break;
 case 38: this.$ = new types.String($$[$0].value, yy); 
 break;
-case 39: this.$ = new types.Symbol($$[$0], yy); 
+case 39: this.$ = new types.Symbol($$[$0], null, yy); 
 break;
 }
 },

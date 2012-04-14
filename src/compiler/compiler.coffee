@@ -5,5 +5,5 @@ read = oppo.read = oppo.compiler.read = ->
 # This should never be used internally by the compiler.
 compile = oppo.compile = oppo.compiler.compile = (sexp) ->
   INDENT = ""
-  push_scope()
+  # push_scope()
   sexp.compile()
