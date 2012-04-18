@@ -54,8 +54,8 @@
 program
   : s_expression_list EOF
     {
-      var fn = new types.Function(null, null, $1, yy);
-      return new types.List([fn], yy);
+      var _do = new types.Symbol("do", null, yy);
+      return new types.List([_do].concat($1), yy);
     }
   | EOF
     { return new types.Nil(yy); }
@@ -92,8 +92,16 @@ callable_list
 quoted_list
   : '[' element_list ']'
     {
+      var i = 0;
+      var len = $2.length;
+      for (; i < len; i++) {
+        var item = $2[i];
+        if (!(item instanceof types.UnquoteSpliced))
+        $2[i] = new types.Unquoted(item, yy);
+      }
+      
       var list = new types.List($2, yy);
-      $$ = new types.Quoted(list, yy);
+      $$ = new types.Quasiquoted(list, yy);
     }
   | '[' ']'
     {
@@ -124,20 +132,11 @@ special_form
   : QUOTE s_expression
     { $$ = new types.Quoted($2, yy); }
   | QUASIQUOTE s_expression
-    {
-      var sym = new types.Symbol("quasiquote", null, yy);
-      $$ = new types.List([sym, $2], yy);
-    }
+    { $$ = new types.Quasiquoted($2, yy); }
   | UNQUOTE s_expression
-    {
-      var sym = new types.Symbol("unquote", null, yy);
-      $$ = new types.List([sym, $2], yy);
-    }
+    { $$ = new types.Unquoted($2, yy); }
   | UNQUOTE_SPLICING s_expression
-    {
-      var sym = new types.Symbol("unquote-splicing", null, yy);
-      $$ = new types.List([sym, $2], yy);
-    }
+    { $$ = new types.UnquoteSpliced($2, yy); }
   | FUNCTION element_list ')'
     { $$ = new types.Function(null, null, $element_list); }
   ;

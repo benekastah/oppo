@@ -1,5 +1,5 @@
 (function() {
-  var INDENT, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, WRAPPER_PREFIX, WRAPPER_REGEX, WRAPPER_SUFFIX, call_macro, char_wrapper, clone, compile, compile_list, indent_down, indent_up, last, macro, macro_do, macro_if, macro_let, map, newline, newline_down, newline_up, pop_scope, push_scope, read, root, scope_stack, scope_var_statement, to_js_identifier, trim, type_of, types, wrapper, __toString, _ref, _ref2,
+  var INDENT, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, WRAPPER_PREFIX, WRAPPER_REGEX, WRAPPER_SUFFIX, call_macro, char_wrapper, clone, compile, compile_list, compiler_scope, indent_down, indent_up, keys, last, macro, macro_do, macro_if, macro_let, map, newline, newline_down, newline_up, pop_scope, push_scope, read, root, scope_stack, scope_var_statement, to_js_identifier, trim, type_of, types, wrapper, __toString, _ref, _ref2, _ref3,
     __hasProp = Object.prototype.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor; child.__super__ = parent.prototype; return child; },
     __slice = Array.prototype.slice;
@@ -129,9 +129,54 @@
     return __toString.call(x).slice(8, -1).toLowerCase();
   };
 
+  oppo.stringify = function(o) {
+    var items, key, type, value;
+    type = type_of(o);
+    switch (type) {
+      case "array":
+        return types.List.prototype.toString.call({
+          value: o
+        });
+      case "object":
+        if (o instanceof types.SyntaxNode) {
+          return o.toString();
+        } else {
+          items = (function() {
+            var _results;
+            _results = [];
+            for (key in o) {
+              value = o[key];
+              _results.push("" + (oppo.stringify(key)) + " " + (oppo.stringify(value)));
+            }
+            return _results;
+          })();
+          return "{ " + (items.join("\n")) + " }";
+        }
+        break;
+      default:
+        return "" + o;
+    }
+  };
+
+  oppo.stringify_html = function(o) {
+    var s;
+    s = oppo.stringify(o);
+    return s.replace(/\n/g, "<br />");
+  };
+
   clone = (_ref2 = Object.create) != null ? _ref2 : function(o) {
     function ObjectClone () {};    ObjectClone.prototype = o;
     return new ObjectClone();
+  };
+
+  keys = (_ref3 = Object.keys) != null ? _ref3 : function(o) {
+    var prop, _results;
+    _results = [];
+    for (prop in o) {
+      if (!__hasProp.call(o, prop)) continue;
+      _results.push(prop);
+    }
+    return _results;
   };
 
   last = function(list) {
@@ -176,9 +221,9 @@
     return scope_stack.pop();
   };
 
-  scope_var_statement = function() {
-    var name, names, scope, sym;
-    scope = last(scope_stack);
+  scope_var_statement = function(scope) {
+    var name, names, sym;
+    if (scope == null) scope = last(scope_stack);
     names = [];
     for (name in scope) {
       if (!__hasProp.call(scope, name)) continue;
@@ -223,7 +268,7 @@
     this.SyntaxNode = (function() {
 
       function SyntaxNode(value, yy_or_node_or_num) {
-        var _ref3;
+        var _ref4;
         this.value = value;
         if (yy_or_node_or_num instanceof types.SyntaxNode) {
           this.transfer_node = yy_or_node_or_num;
@@ -237,19 +282,19 @@
         } else {
           this.yy = yy_or_node_or_num;
         }
-        this.line_number = (_ref3 = this.yy) != null ? _ref3.lexer.yylineno : void 0;
+        this.line_number = (_ref4 = this.yy) != null ? _ref4.lexer.yylineno : void 0;
       }
 
       SyntaxNode.prototype.cache = {};
 
       SyntaxNode.prototype.compile = function(quoted) {
+        var compiled, ret;
         if (quoted == null) quoted = this.quoted;
-        if ((type_of(this._compile)) === "function") {
-          return this.cache["_compile"] || this._compile();
-        } else if (!quoted) {
-          return this.cache["compile_unquoted"] || this.compile_unquoted();
+        compiled = (type_of(this._compile)) === "function" ? this.cache["_compile"] || this._compile() : !quoted ? this.cache["compile_unquoted"] || this.compile_unquoted() : this.cache["compile_quoted"] || this.compile_quoted();
+        if (this.top_level && (keys(compiler_scope)).length) {
+          return ret = "(function () {\n" + (scope_var_statement(compiler_scope)) + "\nreturn " + compiled + ";\n\n})();";
         } else {
-          return this.cache["compile_quoted"] || this.compile_quoted();
+          return compiled;
         }
       };
 
@@ -317,9 +362,9 @@
       }
 
       List.prototype.compile_unquoted = function() {
-        var scope, _ref3;
+        var scope, _ref4;
         scope = last(scope_stack);
-        return (_ref3 = scope.call).invoke.apply(_ref3, this.value);
+        return (_ref4 = scope.call).invoke.apply(_ref4, this.value);
       };
 
       List.prototype.compile_quoted = function() {
@@ -331,16 +376,16 @@
       List.prototype.toString = function() {
         var item, prefix, s_value;
         s_value = (function() {
-          var _i, _len, _ref3, _results;
-          _ref3 = this.value;
+          var _i, _len, _ref4, _results;
+          _ref4 = this.value;
           _results = [];
-          for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
-            item = _ref3[_i];
-            _results.push(item.toString());
+          for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
+            item = _ref4[_i];
+            _results.push(oppo.stringify(item));
           }
           return _results;
         }).call(this);
-        prefix = this.quoted ? "'" : "";
+        prefix = this.quoted ? "'" : this.quasiquoted ? "`" : this.unquoted ? "~" : this.unquote_spliced ? "..." : "";
         return "" + prefix + "(" + (s_value.join(' ')) + ")";
       };
 
@@ -354,6 +399,7 @@
       function Quoted(value, yy) {
         Quoted.__super__.constructor.call(this, null, yy);
         value.quoted = true;
+        value.must_exist = false;
         this.value = [new types.Symbol("quote", null, yy), value];
         this.quoted_value = value;
       }
@@ -361,21 +407,64 @@
       return Quoted;
 
     })(this.List);
+    this.Quasiquoted = (function(_super) {
+
+      __extends(Quasiquoted, _super);
+
+      function Quasiquoted(value, yy) {
+        Quasiquoted.__super__.constructor.call(this, null, yy);
+        value.quasiquoted = true;
+        value.must_exist = false;
+        this.value = [new types.Symbol("quasiquote", null, yy), value];
+        this.quoted_value = value;
+      }
+
+      return Quasiquoted;
+
+    })(this.List);
+    this.Unquoted = (function(_super) {
+
+      __extends(Unquoted, _super);
+
+      function Unquoted(value, yy) {
+        Unquoted.__super__.constructor.call(this, null, yy);
+        value.unquoted = true;
+        this.value = [new types.Symbol("unquote", null, yy), value];
+        this.quoted_value = value;
+      }
+
+      return Unquoted;
+
+    })(this.List);
+    this.UnquoteSpliced = (function(_super) {
+
+      __extends(UnquoteSpliced, _super);
+
+      function UnquoteSpliced(value, yy) {
+        UnquoteSpliced.__super__.constructor.call(this, null, yy);
+        value.unquote_spliced = true;
+        this.value = [new types.Symbol("unquote-splicing", null, yy), value];
+        this.quoted_value = value;
+      }
+
+      return UnquoteSpliced;
+
+    })(this.List);
     this.Object = (function(_super) {
 
       __extends(Object, _super);
 
       function Object() {
-        var i, item, values, _len, _ref3;
+        var i, item, values, _len, _ref4;
         Object.__super__.constructor.apply(this, arguments);
         this.static_keys = [];
         this.static_values = [];
         this.dynamic_keys = [];
         this.dynamic_values = [];
         values = null;
-        _ref3 = this.value;
-        for (i = 0, _len = _ref3.length; i < _len; i++) {
-          item = _ref3[i];
+        _ref4 = this.value;
+        for (i = 0, _len = _ref4.length; i < _len; i++) {
+          item = _ref4[i];
           if (i % 2 === 0) {
             if (item instanceof types.Symbol && !item.quoted) {
               this.dynamic_keys.push(item);
@@ -397,11 +486,11 @@
       Object.prototype._compile = function() {
         var c_key, c_tmp_var, c_value, dynamic_body, i, item, literal_body, object, object_definition, scope, tmp_var;
         literal_body = (function() {
-          var _len, _ref3, _results;
-          _ref3 = this.static_keys;
+          var _len, _ref4, _results;
+          _ref4 = this.static_keys;
           _results = [];
-          for (i = 0, _len = _ref3.length; i < _len; i++) {
-            item = _ref3[i];
+          for (i = 0, _len = _ref4.length; i < _len; i++) {
+            item = _ref4[i];
             if (item instanceof types.Quoted) {
               c_key = item.value[1].compile(false);
             } else {
@@ -423,11 +512,11 @@
           scope = last(scope_stack);
           object_definition = scope.def.invoke(tmp_var, new types.List([new types.Symbol("js-eval"), object]));
           dynamic_body = (function() {
-            var _len, _ref3, _results;
-            _ref3 = this.dynamic_keys;
+            var _len, _ref4, _results;
+            _ref4 = this.dynamic_keys;
             _results = [];
-            for (i = 0, _len = _ref3.length; i < _len; i++) {
-              item = _ref3[i];
+            for (i = 0, _len = _ref4.length; i < _len; i++) {
+              item = _ref4[i];
               c_key = item.compile();
               c_value = this.dynamic_values[i].compile();
               _results.push("" + c_tmp_var + "[" + c_key + "] = " + c_value);
@@ -607,6 +696,10 @@
         return js_val;
       };
 
+      Symbol.prototype.toString = function() {
+        return this.value;
+      };
+
       Symbol.gensym = function(sym, must_exist) {
         var random, s_sym, symbol, time;
         if (sym instanceof types.Symbol) {
@@ -662,17 +755,17 @@
       }
 
       Function.prototype.compile_unquoted = function() {
-        var arg, body, c_arg, c_args, c_body, c_name, code, result, scope, tail_recursive, temp_result, _ref3, _ref4;
+        var arg, body, c_arg, c_args, c_body, c_name, code, result, scope, tail_recursive, temp_result, _ref4, _ref5;
         indent_up();
         scope = push_scope();
-        c_name = (_ref3 = (_ref4 = this.name) != null ? _ref4.compile() : void 0) != null ? _ref3 : '';
+        c_name = (_ref4 = (_ref5 = this.name) != null ? _ref5.compile() : void 0) != null ? _ref4 : '';
         if (this.args != null) {
           c_args = (function() {
-            var _i, _len, _ref5, _results;
-            _ref5 = this.args;
+            var _i, _len, _ref6, _results;
+            _ref6 = this.args;
             _results = [];
-            for (_i = 0, _len = _ref5.length; _i < _len; _i++) {
-              arg = _ref5[_i];
+            for (_i = 0, _len = _ref6.length; _i < _len; _i++) {
+              arg = _ref6[_i];
               arg.must_exist = false;
               c_arg = arg.compile();
               scope[c_arg] = new types.Dynamic();
@@ -711,21 +804,21 @@
       };
 
       Function.prototype.transform_tail_recursive = function(code) {
-        var arg, c_passed_arg, callable, callable_value, emulated_call, i, index, item, result, scope, temp_args_assignments, temp_args_to_real_args, tmp, _len, _ref3, _ref4;
+        var arg, c_passed_arg, callable, callable_value, emulated_call, i, index, item, result, scope, temp_args_assignments, temp_args_to_real_args, tmp, _len, _ref4, _ref5;
         scope = last(scope_stack);
         if (!(this.name != null)) return false;
         if ((!code.quoted) && (code instanceof types.List)) {
           callable = code.value[0];
           if (callable instanceof types.Symbol) {
             callable_value = callable.value;
-            if (((_ref3 = this.name) != null ? _ref3.value : void 0) === callable_value) {
+            if (((_ref4 = this.name) != null ? _ref4.value : void 0) === callable_value) {
               if (!this.temp_args) {
                 this.temp_args = (function() {
-                  var _i, _len, _ref4, _results;
-                  _ref4 = this.args;
+                  var _i, _len, _ref5, _results;
+                  _ref5 = this.args;
                   _results = [];
-                  for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
-                    arg = _ref4[_i];
+                  for (_i = 0, _len = _ref5.length; _i < _len; _i++) {
+                    arg = _ref5[_i];
                     _results.push((types.Symbol.gensym(arg, false)).compile());
                   }
                   return _results;
@@ -734,9 +827,9 @@
               }
               temp_args_assignments = [];
               temp_args_to_real_args = [];
-              _ref4 = this.temp_args;
-              for (i = 0, _len = _ref4.length; i < _len; i++) {
-                tmp = _ref4[i];
+              _ref5 = this.temp_args;
+              for (i = 0, _len = _ref5.length; i < _len; i++) {
+                tmp = _ref5[i];
                 index = i + 1;
                 item = code.value[index];
                 c_passed_arg = item instanceof types.Symbol ? types.Symbol.compile_non_strict(item) : item.compile();
@@ -767,7 +860,7 @@
 
       __extends(Macro, _super);
 
-      function Macro(name, argnames, template, yy, fn) {
+      function Macro(name, argnames, template, yy, fn, oppo_fn) {
         this.name = name;
         this.argnames = argnames;
         this.template = template;
@@ -776,13 +869,16 @@
       }
 
       Macro.prototype.compile_unquoted = function() {
-        var c_name, scope;
+        var c_name, scope, _ref4;
         c_name = this.name.compile();
-        if (this.invoke == null) {}
         scope = last(scope_stack);
         scope[c_name] = this;
-        return "null";
+        return (_ref4 = typeof oppo_fn !== "undefined" && oppo_fn !== null ? oppo_fn.compile() : void 0) != null ? _ref4 : "null";
       };
+
+      Macro.prototype.invoke = function() {};
+
+      Macro.prototype.transform = function() {};
 
       Macro.transform = function(code) {
         var c_callable, callable, item, scope;
@@ -820,18 +916,18 @@
   };
 
   call_macro = function() {
-    var args, c_name, name, scope, _ref3;
+    var args, c_name, name, scope, _ref4;
     name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     scope = last(scope_stack);
     c_name = to_js_identifier(name);
-    return (_ref3 = scope[c_name]).invoke.apply(_ref3, args);
+    return (_ref4 = scope[c_name]).invoke.apply(_ref4, args);
   };
 
   macro("def", function() {
     var args, body, c_name, c_value, name, rest, scope, to_define, token, value;
     to_define = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     if (!rest.length) to_define.error("Def", "You must provide a value.");
-    scope = last(scope_stack);
+    scope = compiler_scope;
     token = {};
     if (to_define instanceof types.List) {
       name = to_define.value[0];
@@ -854,6 +950,16 @@
       scope[c_name] = value;
     }
     return "" + c_name + " = " + c_value;
+  });
+
+  macro("def-default", function(to_define) {
+    var scope, _ref4;
+    scope = last(scope_stack);
+    try {
+      return (_ref4 = scope.def).invoke.apply(_ref4, arguments);
+    } catch (e) {
+      return "/* def-default: '" + to_define.value + " already defined */ null";
+    }
   });
 
   macro("call", function() {
@@ -879,6 +985,46 @@
   macro("quote", function(x) {
     x.quoted = true;
     return x.compile();
+  });
+
+  macro("quasiquote", function(x) {
+    var c_item, compiled, current_group, first, item, push_group, _i, _len, _ref4;
+    current_group = [];
+    compiled = [];
+    push_group = function() {
+      if (current_group.length) {
+        compiled.push("[" + (current_group.join(', ')) + "]");
+      }
+      return current_group = [];
+    };
+    _ref4 = x.value;
+    for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
+      item = _ref4[_i];
+      if (item instanceof types.UnquoteSpliced) {
+        c_item = "Array.prototype.slice.call(" + (item.compile()) + ")";
+        push_group();
+        compiled.push(c_item);
+      } else if (item instanceof types.Unquoted) {
+        current_group.push(item.compile());
+      } else {
+        current_group.push(item.compile(true));
+      }
+    }
+    push_group();
+    first = compiled.shift();
+    if (compiled.length) {
+      return "" + first + ".concat(" + (compiled.join(', ')) + ")";
+    } else {
+      return first;
+    }
+  });
+
+  macro("unquote", function(x) {
+    return x.compile(false);
+  });
+
+  macro("unquote-splicing", function(x) {
+    return x.compile(false);
   });
 
   macro("raise", function(namespace, error) {
@@ -907,21 +1053,21 @@
   });
 
   macro_if = macro("if", function(cond, tbranch, fbranch) {
-    var result, _ref3;
-    result = "(/* IF */ " + (cond.compile()) + " ?\n" + (indent_up()) + "/* THEN */ " + (tbranch.compile()) + " :\n" + INDENT + "/* ELSE */ " + ((_ref3 = fbranch != null ? fbranch.compile() : void 0) != null ? _ref3 : "null") + ")";
+    var result, _ref4;
+    result = "(/* IF */ " + (cond.compile()) + " ?\n" + (indent_up()) + "/* THEN */ " + (tbranch.compile()) + " :\n" + INDENT + "/* ELSE */ " + ((_ref4 = fbranch != null ? fbranch.compile() : void 0) != null ? _ref4 : "null") + ")";
     indent_down();
     return result;
   });
 
   macro_let = macro("let", function() {
-    var bindings, body, def_sym, i, item, new_bindings, new_body, sym, _len, _ref3;
+    var bindings, body, def_sym, i, item, new_bindings, new_body, sym, _len, _ref4;
     bindings = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     def_sym = new types.Symbol('def', null, bindings);
     sym = null;
     new_bindings = [];
-    _ref3 = bindings.value;
-    for (i = 0, _len = _ref3.length; i < _len; i++) {
-      item = _ref3[i];
+    _ref4 = bindings.value;
+    for (i = 0, _len = _ref4.length; i < _len; i++) {
+      item = _ref4[i];
       if (i % 2 === 0) {
         sym = item;
       } else {
@@ -944,9 +1090,16 @@
     return parser.parse.apply(parser, arguments);
   };
 
+  compiler_scope = null;
+
   compile = oppo.compile = oppo.compiler.compile = function(sexp) {
+    var compiled;
     INDENT = "";
-    return sexp.compile();
+    compiler_scope = push_scope();
+    sexp.top_level = true;
+    compiled = sexp.compile();
+    pop_scope();
+    return compiled;
   };
 
 }).call(this);

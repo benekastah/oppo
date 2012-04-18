@@ -1,3 +1,4 @@
+#-----------------------------------------------------------------------------#
 
 macro = (name, fn) ->
   s_name = new types.Symbol name
@@ -7,16 +8,20 @@ macro = (name, fn) ->
   m.compile()
   m
   
+#-----------------------------------------------------------------------------#
+  
 call_macro = (name, args...) ->
   scope = last scope_stack
   c_name = to_js_identifier name
   scope[c_name].invoke args...
 
+#-----------------------------------------------------------------------------#
+
 macro "def", (to_define, rest...) ->
   if not rest.length
     to_define.error "Def", "You must provide a value."
   
-  scope = last scope_stack
+  scope = compiler_scope
   token = {}
   if to_define instanceof types.List
     name = to_define.value[0]
@@ -41,6 +46,15 @@ macro "def", (to_define, rest...) ->
   
   "#{c_name} = #{c_value}"
   
+#-----------------------------------------------------------------------------#
+
+macro "def-default", (to_define) ->
+  scope = last scope_stack
+  try scope.def.invoke arguments...
+  catch e then "/* def-default: '#{to_define.value} already defined */ null"
+
+#-----------------------------------------------------------------------------#
+  
 macro "call", (callable, args...) ->
   to_call = callable.compile()
   if callable instanceof types.Symbol
@@ -57,13 +71,57 @@ macro "call", (callable, args...) ->
     
   "#{to_call}(#{c_args.join ', '})"
 
+#-----------------------------------------------------------------------------#
+
 macro_do = macro "do", ->
   c_items = compile_list arguments
   "(#{c_items.join ',\n' + INDENT})"
   
+#-----------------------------------------------------------------------------#
+  
 macro "quote", (x) ->
   x.quoted = true
   x.compile()
+  
+#-----------------------------------------------------------------------------#
+  
+macro "quasiquote", (x) ->
+  scope = last scope_stack
+  current_group = []
+  compiled = []
+  push_group = ->
+    if current_group.length
+      compiled.push "[#{current_group.join ', '}]"
+    current_group = []
+    
+  for item in x.value
+    if item instanceof types.UnquoteSpliced
+      c_item = "Array.prototype.slice.call(#{item.compile()})"
+      push_group()
+      compiled.push c_item
+    else if item instanceof types.Unquoted
+      current_group.push item.compile()
+    else
+      current_group.push (item.compile true)
+      
+  push_group()
+  first = compiled.shift()
+  if compiled.length
+    "#{first}.concat(#{compiled.join ', '})"
+  else
+    first
+  
+#-----------------------------------------------------------------------------#
+  
+macro "unquote", (x) ->
+  x.compile false
+  
+#-----------------------------------------------------------------------------#
+  
+macro "unquote-splicing", (x) ->
+  x.compile false
+  
+#-----------------------------------------------------------------------------#
   
 macro "raise", (namespace, error) ->
   if arguments.length is 1
@@ -80,6 +138,8 @@ macro "raise", (namespace, error) ->
   #{indent_down()}})()
   """
 
+#-----------------------------------------------------------------------------#
+
 macro "assert", (sexp) ->
   c_sexp = sexp.compile()
   
@@ -90,8 +150,12 @@ macro "assert", (sexp) ->
   (#{c_sexp} || #{raise_call})
   """
   
+#-----------------------------------------------------------------------------#
+  
 macro "js-eval", (js_code) ->
   js_code
+  
+#-----------------------------------------------------------------------------#
   
 macro_if = macro "if", (cond, tbranch, fbranch) ->
   result = """
@@ -101,6 +165,8 @@ macro_if = macro "if", (cond, tbranch, fbranch) ->
   """
   indent_down()
   result
+  
+#-----------------------------------------------------------------------------#
   
 macro_let = macro "let", (bindings, body...) ->
   def_sym = new types.Symbol 'def', null, bindings
@@ -117,6 +183,10 @@ macro_let = macro "let", (bindings, body...) ->
   new_body = [new_bindings..., body...]
   (new types.List [new types.Function null, null, new_body]).compile()
 
+#-----------------------------------------------------------------------------#
+
 macro "lambda", (args, body...) ->
   fn = new types.Function null, args.value, body
   fn.compile()
+  
+#-----------------------------------------------------------------------------#

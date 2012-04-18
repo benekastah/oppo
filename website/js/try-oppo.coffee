@@ -11,12 +11,7 @@ $.domReady ->
     js = $js.val()
     try
       evald = eval js
-      try
-        result = JSON.stringify evald
-        if typeof result isnt "string"
-          throw ""
-      catch e
-        result = evald
+      result = oppo.stringify_html evald
     catch e then result = e
     
     if typeof result is 'undefined'

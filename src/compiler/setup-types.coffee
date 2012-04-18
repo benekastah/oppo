@@ -22,12 +22,23 @@
     cache: {}
       
     compile: (quoted = @quoted) ->
-      if (type_of @_compile) is "function"
+      compiled = if (type_of @_compile) is "function"
         @cache["_compile"] or @_compile()
       else if not quoted
         @cache["compile_unquoted"] or @compile_unquoted()
       else
         @cache["compile_quoted"] or @compile_quoted()
+        
+      if @top_level and (keys compiler_scope).length
+        ret = """
+        (function () {
+        #{scope_var_statement compiler_scope}
+        return #{compiled};
+        
+        })();
+        """
+      else
+        compiled
       
     compile_unquoted: ->
       "#{@value}"
@@ -77,8 +88,19 @@
       
     toString: ->
       s_value = for item in @value
-        item.toString()
-      prefix = if @quoted then "'" else ""
+        oppo.stringify item
+        
+      prefix = if @quoted
+        "'"
+      else if @quasiquoted
+        "`"
+      else if @unquoted
+        "~"
+      else if @unquote_spliced
+        "..."
+      else
+        ""
+        
       "#{prefix}(#{s_value.join ' '})"
         
   #---------------------------------------------------------------------------#
@@ -87,9 +109,38 @@
     constructor: (value, yy) ->
       super null, yy
       value.quoted = true
-      @value = [new types.Symbol("quote", null, yy), value]
+      value.must_exist = false
+      @value = [(new types.Symbol "quote", null, yy), value]
       @quoted_value = value
         
+  #---------------------------------------------------------------------------#
+  
+  class @Quasiquoted extends @List
+    constructor: (value, yy) ->
+      super null, yy
+      value.quasiquoted = true
+      value.must_exist = false
+      @value = [(new types.Symbol "quasiquote", null, yy), value]
+      @quoted_value = value
+      
+  #---------------------------------------------------------------------------#
+  
+  class @Unquoted extends @List
+    constructor: (value, yy) ->
+      super null, yy
+      value.unquoted = true
+      @value = [(new types.Symbol "unquote", null, yy), value]
+      @quoted_value = value
+  
+  #---------------------------------------------------------------------------#
+  
+  class @UnquoteSpliced extends @List
+    constructor: (value, yy) ->
+      super null, yy
+      value.unquote_spliced = true
+      @value = [(new types.Symbol "unquote-splicing", null, yy), value]
+      @quoted_value = value
+  
   #---------------------------------------------------------------------------#
         
   class @Object extends @SyntaxNode
@@ -200,10 +251,7 @@
     constructor: (value, must_exist = true, yy) ->
       super value, yy
       
-      @must_exist = must_exist ? true
-      if (@value.substr 0, 3) == "..."
-        @splat = true
-        @value = @value.substr 3
+      @must_exist = must_exist
     
     compile_unquoted: ->
       scope = last scope_stack
@@ -218,6 +266,8 @@
         @error "Trying to reference undefined symbol: #{@value}"
         
       js_val
+      
+    toString: -> @value
       
     @gensym: (sym, must_exist) ->
       if sym instanceof types.Symbol
@@ -249,7 +299,7 @@
       if @args
         @min_arity = @max_arity = @args.length
         for arg, i in args
-          if arg.splat
+          if arg instanceof types.UnquoteSpliced
             @min_arity = i
             @max_arity = Infinity
             break
@@ -360,22 +410,23 @@
   #---------------------------------------------------------------------------#
   
   class @Macro extends @SyntaxNode
-    constructor: (@name, @argnames, @template, yy, fn) ->
+    constructor: (@name, @argnames, @template, yy, fn, oppo_fn) ->
       super null, yy
       if fn?
         @invoke = fn
       
     compile_unquoted: ->
       c_name = @name.compile()
-      unless @invoke?
-        # make macro here
-        # need an invoke function
-        # need a transform function that will simply turn it into the compiled oppo code.
-        # the transform function needs to transform its result recursively until the code is pure, non-macro code (actually, any builtin macros will still be there)
-        ;
       scope = last scope_stack
       scope[c_name] = this
-      "null"
+      oppo_fn?.compile() ? "null"
+      
+    invoke: ->
+      
+    transform: ->
+      # Transform this macro into non-macro oppo code
+      # Leave in builtin macros, since they only compile to plain javascript
+      
       
     @transform: (code) ->
       if code instanceof types.List

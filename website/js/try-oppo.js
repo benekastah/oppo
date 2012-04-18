@@ -15,12 +15,7 @@
       js = $js.val();
       try {
         evald = eval(js);
-        try {
-          result = JSON.stringify(evald);
-          if (typeof result !== "string") throw "";
-        } catch (e) {
-          result = evald;
-        }
+        result = oppo.stringify_html(evald);
       } catch (e) {
         result = e;
       }

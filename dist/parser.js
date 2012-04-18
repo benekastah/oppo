@@ -13,8 +13,8 @@ performAction: function anonymous(yytext,yyleng,yylineno,yy,yystate,$$,_$) {
 var $0 = $$.length - 1;
 switch (yystate) {
 case 1:
-      var fn = new types.Function(null, null, $$[$0-1], yy);
-      return new types.List([fn], yy);
+      var _do = new types.Symbol("do", null, yy);
+      return new types.List([_do].concat($$[$0-1]), yy);
     
 break;
 case 2: return new types.Nil(yy); 
@@ -28,8 +28,16 @@ break;
 case 14: this.$ = new types.Nil(yy); 
 break;
 case 15:
+      var i = 0;
+      var len = $$[$0-1].length;
+      for (; i < len; i++) {
+        var item = $$[$0-1][i];
+        if (!(item instanceof types.UnquoteSpliced))
+        $$[$0-1][i] = new types.Unquoted(item, yy);
+      }
+      
       var list = new types.List($$[$0-1], yy);
-      this.$ = new types.Quoted(list, yy);
+      this.$ = new types.Quasiquoted(list, yy);
     
 break;
 case 16:
@@ -47,20 +55,11 @@ case 20: this.$ = $$[$0-1]; this.$.push($$[$0]);
 break;
 case 22: this.$ = new types.Quoted($$[$0], yy); 
 break;
-case 23:
-      var sym = new types.Symbol("quasiquote", null, yy);
-      this.$ = new types.List([sym, $$[$0]], yy);
-    
+case 23: this.$ = new types.Quasiquoted($$[$0], yy); 
 break;
-case 24:
-      var sym = new types.Symbol("unquote", null, yy);
-      this.$ = new types.List([sym, $$[$0]], yy);
-    
+case 24: this.$ = new types.Unquoted($$[$0], yy); 
 break;
-case 25:
-      var sym = new types.Symbol("unquote-splicing", null, yy);
-      this.$ = new types.List([sym, $$[$0]], yy);
-    
+case 25: this.$ = new types.UnquoteSpliced($$[$0], yy); 
 break;
 case 26: this.$ = new types.Function(null, null, $$[$0-1]); 
 break;
