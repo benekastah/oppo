@@ -190,3 +190,20 @@ macro "lambda", (args, body...) ->
   fn.compile()
   
 #-----------------------------------------------------------------------------#
+
+operator_macro = (name, op=name) ->
+  macro name, (args...) ->
+    c_args = compile_list args
+    c_args.join " #{op} "
+
+operator_macro "=", "==="
+operator_macro "-"
+operator_macro "+"
+operator_macro "*"
+operator_macro "/"
+operator_macro "%"
+operator_macro "or", "||"
+operator_macro "and", "&&"
+
+#-----------------------------------------------------------------------------#
+

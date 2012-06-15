@@ -12,6 +12,7 @@
   , "dependencies": {
       "underscore": "1.x.x"
     , "optimist": "0.2.x"
+    , "text-to-js-identifier": ">=0.0.1"
   }
   , "devDependencies": {
       "coffee-script": "1.x.x"

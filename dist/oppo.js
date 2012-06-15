@@ -1,5 +1,5 @@
 (function() {
-  var INDENT, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, WRAPPER_PREFIX, WRAPPER_REGEX, WRAPPER_SUFFIX, call_macro, char_wrapper, clone, compile, compile_list, compiler_scope, indent_down, indent_up, keys, last, macro, macro_do, macro_if, macro_let, map, newline, newline_down, newline_up, pop_scope, push_scope, read, root, scope_stack, scope_var_statement, to_js_identifier, trim, type_of, types, wrapper, __toString, _ref, _ref2, _ref3, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, 
+  var INDENT, JS_ILLEGAL_IDENTIFIER_CHARS, JS_KEYWORDS, WRAPPER_PREFIX, WRAPPER_REGEX, WRAPPER_SUFFIX, call_macro, char_wrapper, clone, compile, compile_list, compiler_scope, indent_down, indent_up, keys, last, macro, macro_do, macro_if, macro_let, map, newline, newline_down, newline_up, operator_macro, pop_scope, push_scope, read, root, scope_stack, scope_var_statement, to_js_identifier, trim, type_of, types, wrapper, __toString, _ref, _ref1, _ref2, __hasProp = {}.hasOwnProperty, __extends = function(child, 
   parent) {
     for(var key in parent) {
       if(__hasProp.call(parent, key)) {
@@ -13,7 +13,7 @@
     child.prototype = new ctor;
     child.__super__ = parent.prototype;
     return child
-  }, __slice = Array.prototype.slice;
+  }, __slice = [].slice;
   JS_KEYWORDS = ["break", "case", "catch", "char", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "function", "if", "implements", "import", "in", "instanceof", "interface", "let", "new", "null", "package", "private", "protected", "public", "return", "static", "switch", "super", "this", "throw", "true", "try", "typeof", "undefined", "var", "void", "while", "with", "yield"];
   JS_ILLEGAL_IDENTIFIER_CHARS = {"~":"tilde", "`":"backtick", "!":"exclamationmark", "@":"at", "#":"pound", "%":"percent", "^":"carat", "&":"amperstand", "*":"asterisk", "(":"leftparen", ")":"rightparen", "-":"dash", "+":"plus", "=":"equals", "{":"leftcurly", "}":"rightcurly", "[":"leftsquare", "]":"rightsquare", "|":"pipe", "\\":"backslash", '"':"doublequote", "'":"singlequote", ":":"colon", ";":"semicolon", "<":"leftangle", ">":"rightangle", ",":"comma", ".":"period", "?":"questionmark", "/":"forwardslash", 
   " ":"space", "\t":"tab", "\n":"newline", "\r":"carriagereturn"};
@@ -54,6 +54,7 @@
   _ref = oppo.compiler, scope_stack = _ref.scope_stack, types = _ref.types;
   oppo.Error = function(_super) {
     __extends(Error, _super);
+    Error.name = "Error";
     function Error(name, message) {
       this.name = name;
       this.message = message
@@ -65,6 +66,7 @@
   }(Error);
   oppo.ArityException = function(_super) {
     __extends(ArityException, _super);
+    ArityException.name = "ArityException";
     function ArityException(message) {
       if(message != null) {
         this.message = message
@@ -109,13 +111,13 @@
     s = oppo.stringify(o);
     return s.replace(/\n/g, "<br />")
   };
-  clone = (_ref2 = Object.create) != null ? _ref2 : function(o) {
+  clone = (_ref1 = Object.create) != null ? _ref1 : function(o) {
     function ObjectClone() {
     }
     ObjectClone.prototype = o;
     return new ObjectClone
   };
-  keys = (_ref3 = Object.keys) != null ? _ref3 : function(o) {
+  keys = (_ref2 = Object.keys) != null ? _ref2 : function(o) {
     var prop, _results;
     _results = [];
     for(prop in o) {
@@ -206,8 +208,9 @@
   };
   (function() {
     this.SyntaxNode = function() {
+      SyntaxNode.name = "SyntaxNode";
       function SyntaxNode(value, yy_or_node_or_num) {
-        var _ref4;
+        var _ref3;
         this.value = value;
         if(yy_or_node_or_num instanceof types.SyntaxNode) {
           this.transfer_node = yy_or_node_or_num;
@@ -219,7 +222,7 @@
             this.yy = yy_or_node_or_num
           }
         }
-        this.line_number = (_ref4 = this.yy) != null ? _ref4.lexer.yylineno : void 0
+        this.line_number = (_ref3 = this.yy) != null ? _ref3.lexer.yylineno : void 0
       }
       SyntaxNode.prototype.cache = {};
       SyntaxNode.prototype.compile = function(quoted) {
@@ -274,20 +277,22 @@
     }();
     this.Dynamic = function(_super) {
       __extends(Dynamic, _super);
+      Dynamic.name = "Dynamic";
       function Dynamic() {
-        Dynamic.__super__.constructor.apply(this, arguments)
+        return Dynamic.__super__.constructor.apply(this, arguments)
       }
       return Dynamic
     }(this.SyntaxNode);
     this.List = function(_super) {
       __extends(List, _super);
+      List.name = "List";
       function List() {
-        List.__super__.constructor.apply(this, arguments)
+        return List.__super__.constructor.apply(this, arguments)
       }
       List.prototype.compile_unquoted = function() {
-        var scope, _ref4;
+        var scope, _ref3;
         scope = last(scope_stack);
-        return(_ref4 = scope.call).invoke.apply(_ref4, this.value)
+        return(_ref3 = scope.call).invoke.apply(_ref3, this.value)
       };
       List.prototype.compile_quoted = function() {
         var c_value;
@@ -297,11 +302,11 @@
       List.prototype.toString = function() {
         var item, prefix, s_value;
         s_value = function() {
-          var _i, _len, _ref4, _results;
-          _ref4 = this.value;
+          var _i, _len, _ref3, _results;
+          _ref3 = this.value;
           _results = [];
-          for(_i = 0, _len = _ref4.length;_i < _len;_i++) {
-            item = _ref4[_i];
+          for(_i = 0, _len = _ref3.length;_i < _len;_i++) {
+            item = _ref3[_i];
             _results.push(oppo.stringify(item))
           }
           return _results
@@ -313,6 +318,7 @@
     }(this.SyntaxNode);
     this.Quoted = function(_super) {
       __extends(Quoted, _super);
+      Quoted.name = "Quoted";
       function Quoted(value, yy) {
         Quoted.__super__.constructor.call(this, null, yy);
         value.quoted = true;
@@ -324,6 +330,7 @@
     }(this.List);
     this.Quasiquoted = function(_super) {
       __extends(Quasiquoted, _super);
+      Quasiquoted.name = "Quasiquoted";
       function Quasiquoted(value, yy) {
         Quasiquoted.__super__.constructor.call(this, null, yy);
         value.quasiquoted = true;
@@ -335,6 +342,7 @@
     }(this.List);
     this.Unquoted = function(_super) {
       __extends(Unquoted, _super);
+      Unquoted.name = "Unquoted";
       function Unquoted(value, yy) {
         Unquoted.__super__.constructor.call(this, null, yy);
         value.unquoted = true;
@@ -345,6 +353,7 @@
     }(this.List);
     this.UnquoteSpliced = function(_super) {
       __extends(UnquoteSpliced, _super);
+      UnquoteSpliced.name = "UnquoteSpliced";
       function UnquoteSpliced(value, yy) {
         UnquoteSpliced.__super__.constructor.call(this, null, yy);
         value.unquote_spliced = true;
@@ -355,17 +364,18 @@
     }(this.List);
     this.Object = function(_super) {
       __extends(Object, _super);
+      Object.name = "Object";
       function Object() {
-        var i, item, values, _len, _ref4;
+        var i, item, values, _i, _len, _ref3;
         Object.__super__.constructor.apply(this, arguments);
         this.static_keys = [];
         this.static_values = [];
         this.dynamic_keys = [];
         this.dynamic_values = [];
         values = null;
-        _ref4 = this.value;
-        for(i = 0, _len = _ref4.length;i < _len;i++) {
-          item = _ref4[i];
+        _ref3 = this.value;
+        for(i = _i = 0, _len = _ref3.length;_i < _len;i = ++_i) {
+          item = _ref3[i];
           if(i % 2 === 0) {
             if(item instanceof types.Symbol && !item.quoted) {
               this.dynamic_keys.push(item);
@@ -386,11 +396,11 @@
       Object.prototype._compile = function() {
         var c_key, c_tmp_var, c_value, dynamic_body, i, item, literal_body, object, object_definition, scope, tmp_var;
         literal_body = function() {
-          var _len, _ref4, _results;
-          _ref4 = this.static_keys;
+          var _i, _len, _ref3, _results;
+          _ref3 = this.static_keys;
           _results = [];
-          for(i = 0, _len = _ref4.length;i < _len;i++) {
-            item = _ref4[i];
+          for(i = _i = 0, _len = _ref3.length;_i < _len;i = ++_i) {
+            item = _ref3[i];
             if(item instanceof types.Quoted) {
               c_key = item.value[1].compile(false)
             }else {
@@ -412,11 +422,11 @@
           scope = last(scope_stack);
           object_definition = scope.def.invoke(tmp_var, new types.List([new types.Symbol("js-eval"), object]));
           dynamic_body = function() {
-            var _len, _ref4, _results;
-            _ref4 = this.dynamic_keys;
+            var _i, _len, _ref3, _results;
+            _ref3 = this.dynamic_keys;
             _results = [];
-            for(i = 0, _len = _ref4.length;i < _len;i++) {
-              item = _ref4[i];
+            for(i = _i = 0, _len = _ref3.length;_i < _len;i = ++_i) {
+              item = _ref3[i];
               c_key = item.compile();
               c_value = this.dynamic_values[i].compile();
               _results.push("" + c_tmp_var + "[" + c_key + "] = " + c_value)
@@ -431,8 +441,9 @@
     }(this.SyntaxNode);
     this.Number = function(_super) {
       __extends(Number, _super);
+      Number.name = "Number";
       function Number() {
-        Number.__super__.constructor.apply(this, arguments)
+        return Number.__super__.constructor.apply(this, arguments)
       }
       Number.prototype._compile = function() {
         return this.value
@@ -441,22 +452,25 @@
     }(this.SyntaxNode);
     this.Fixnum = function(_super) {
       __extends(Fixnum, _super);
+      Fixnum.name = "Fixnum";
       function Fixnum() {
-        Fixnum.__super__.constructor.apply(this, arguments)
+        return Fixnum.__super__.constructor.apply(this, arguments)
       }
       return Fixnum
     }(this.Number);
     this.Float = function(_super) {
       __extends(Float, _super);
+      Float.name = "Float";
       function Float() {
-        Float.__super__.constructor.apply(this, arguments)
+        return Float.__super__.constructor.apply(this, arguments)
       }
       return Float
     }(this.Number);
     this.String = function(_super) {
       __extends(String, _super);
+      String.name = "String";
       function String() {
-        String.__super__.constructor.apply(this, arguments)
+        return String.__super__.constructor.apply(this, arguments)
       }
       String.prototype._compile = function() {
         var val;
@@ -467,6 +481,7 @@
     }(this.SyntaxNode);
     this.Regex = function(_super) {
       __extends(Regex, _super);
+      Regex.name = "Regex";
       function Regex(body, flags, yy) {
         this.body = body;
         this.flags = flags;
@@ -479,6 +494,7 @@
     }(this.SyntaxNode);
     this.Atom = function(_super) {
       __extends(Atom, _super);
+      Atom.name = "Atom";
       function Atom(yy) {
         Atom.__super__.constructor.call(this, this.value, yy)
       }
@@ -486,23 +502,26 @@
     }(this.SyntaxNode);
     this.Nil = function(_super) {
       __extends(Nil, _super);
+      Nil.name = "Nil";
       function Nil() {
-        Nil.__super__.constructor.apply(this, arguments)
+        return Nil.__super__.constructor.apply(this, arguments)
       }
       Nil.prototype.value = null;
       return Nil
     }(this.Atom);
     this.Boolean = function(_super) {
       __extends(Boolean, _super);
+      Boolean.name = "Boolean";
       function Boolean() {
-        Boolean.__super__.constructor.apply(this, arguments)
+        return Boolean.__super__.constructor.apply(this, arguments)
       }
       return Boolean
     }(this.Atom);
     this.True = function(_super) {
       __extends(True, _super);
+      True.name = "True";
       function True() {
-        True.__super__.constructor.apply(this, arguments)
+        return True.__super__.constructor.apply(this, arguments)
       }
       True.prototype.value = true;
       True.prototype.toString = function() {
@@ -512,8 +531,9 @@
     }(this.Boolean);
     this.False = function(_super) {
       __extends(False, _super);
+      False.name = "False";
       function False() {
-        False.__super__.constructor.apply(this, arguments)
+        return False.__super__.constructor.apply(this, arguments)
       }
       False.prototype.value = false;
       False.prototype.toString = function() {
@@ -523,16 +543,13 @@
     }(this.Boolean);
     this.Symbol = function(_super) {
       __extends(Symbol, _super);
+      Symbol.name = "Symbol";
       function Symbol(value, must_exist, yy) {
         if(must_exist == null) {
           must_exist = true
         }
         Symbol.__super__.constructor.call(this, value, yy);
-        this.must_exist = must_exist != null ? must_exist : true;
-        if(this.value.substr(0, 3) === "...") {
-          this.splat = true;
-          this.value = this.value.substr(3)
-        }
+        this.must_exist = must_exist
       }
       Symbol.prototype.compile_unquoted = function() {
         var js_val, scope, val;
@@ -576,17 +593,18 @@
     }(this.SyntaxNode);
     this.Function = function(_super) {
       __extends(Function, _super);
+      Function.name = "Function";
       function Function(name, args, body, yy) {
-        var arg, i, _len;
+        var arg, i, _i, _len;
         this.name = name;
         this.args = args;
         this.body = body;
         Function.__super__.constructor.call(this, null, yy);
         if(this.args) {
           this.min_arity = this.max_arity = this.args.length;
-          for(i = 0, _len = args.length;i < _len;i++) {
+          for(i = _i = 0, _len = args.length;_i < _len;i = ++_i) {
             arg = args[i];
-            if(arg.splat) {
+            if(arg instanceof types.UnquoteSpliced) {
               this.min_arity = i;
               this.max_arity = Infinity;
               break
@@ -598,17 +616,17 @@
         }
       }
       Function.prototype.compile_unquoted = function() {
-        var arg, body, c_arg, c_args, c_body, c_name, code, result, scope, tail_recursive, temp_result, _ref4, _ref5;
+        var arg, body, c_arg, c_args, c_body, c_name, code, result, scope, tail_recursive, temp_result, _ref3, _ref4;
         indent_up();
         scope = push_scope();
-        c_name = (_ref4 = (_ref5 = this.name) != null ? _ref5.compile() : void 0) != null ? _ref4 : "";
+        c_name = (_ref3 = (_ref4 = this.name) != null ? _ref4.compile() : void 0) != null ? _ref3 : "";
         if(this.args != null) {
           c_args = function() {
-            var _i, _len, _ref6, _results;
-            _ref6 = this.args;
+            var _i, _len, _ref5, _results;
+            _ref5 = this.args;
             _results = [];
-            for(_i = 0, _len = _ref6.length;_i < _len;_i++) {
-              arg = _ref6[_i];
+            for(_i = 0, _len = _ref5.length;_i < _len;_i++) {
+              arg = _ref5[_i];
               arg.must_exist = false;
               c_arg = arg.compile();
               scope[c_arg] = new types.Dynamic;
@@ -646,7 +664,7 @@
         return result
       };
       Function.prototype.transform_tail_recursive = function(code) {
-        var arg, c_passed_arg, callable, callable_value, emulated_call, i, index, item, result, scope, temp_args_assignments, temp_args_to_real_args, tmp, _len, _ref4, _ref5;
+        var arg, c_passed_arg, callable, callable_value, emulated_call, i, index, item, result, scope, temp_args_assignments, temp_args_to_real_args, tmp, _i, _len, _ref3, _ref4;
         scope = last(scope_stack);
         if(!(this.name != null)) {
           return false
@@ -655,14 +673,14 @@
           callable = code.value[0];
           if(callable instanceof types.Symbol) {
             callable_value = callable.value;
-            if(((_ref4 = this.name) != null ? _ref4.value : void 0) === callable_value) {
+            if(((_ref3 = this.name) != null ? _ref3.value : void 0) === callable_value) {
               if(!this.temp_args) {
                 this.temp_args = function() {
-                  var _i, _len, _ref5, _results;
-                  _ref5 = this.args;
+                  var _i, _len, _ref4, _results;
+                  _ref4 = this.args;
                   _results = [];
-                  for(_i = 0, _len = _ref5.length;_i < _len;_i++) {
-                    arg = _ref5[_i];
+                  for(_i = 0, _len = _ref4.length;_i < _len;_i++) {
+                    arg = _ref4[_i];
                     _results.push(types.Symbol.gensym(arg, false).compile())
                   }
                   return _results
@@ -671,9 +689,9 @@
               }
               temp_args_assignments = [];
               temp_args_to_real_args = [];
-              _ref5 = this.temp_args;
-              for(i = 0, _len = _ref5.length;i < _len;i++) {
-                tmp = _ref5[i];
+              _ref4 = this.temp_args;
+              for(i = _i = 0, _len = _ref4.length;_i < _len;i = ++_i) {
+                tmp = _ref4[i];
                 index = i + 1;
                 item = code.value[index];
                 c_passed_arg = item instanceof types.Symbol ? types.Symbol.compile_non_strict(item) : item.compile();
@@ -704,6 +722,7 @@
     }(this.SyntaxNode);
     return this.Macro = function(_super) {
       __extends(Macro, _super);
+      Macro.name = "Macro";
       function Macro(name, argnames, template, yy, fn, oppo_fn) {
         this.name = name;
         this.argnames = argnames;
@@ -714,11 +733,11 @@
         }
       }
       Macro.prototype.compile_unquoted = function() {
-        var c_name, scope, _ref4;
+        var c_name, scope, _ref3;
         c_name = this.name.compile();
         scope = last(scope_stack);
         scope[c_name] = this;
-        return(_ref4 = typeof oppo_fn !== "undefined" && oppo_fn !== null ? oppo_fn.compile() : void 0) != null ? _ref4 : "null"
+        return(_ref3 = typeof oppo_fn !== "undefined" && oppo_fn !== null ? oppo_fn.compile() : void 0) != null ? _ref3 : "null"
       };
       Macro.prototype.invoke = function() {
       };
@@ -756,11 +775,11 @@
     return m
   };
   call_macro = function() {
-    var args, c_name, name, scope, _ref4;
+    var args, c_name, name, scope, _ref3;
     name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     scope = last(scope_stack);
     c_name = to_js_identifier(name);
-    return(_ref4 = scope[c_name]).invoke.apply(_ref4, args)
+    return(_ref3 = scope[c_name]).invoke.apply(_ref3, args)
   };
   macro("def", function() {
     var args, body, c_name, c_value, name, rest, scope, to_define, token, value;
@@ -797,10 +816,10 @@
     return"" + c_name + " = " + c_value
   });
   macro("def-default", function(to_define) {
-    var scope, _ref4;
+    var scope, _ref3;
     scope = last(scope_stack);
     try {
-      return(_ref4 = scope.def).invoke.apply(_ref4, arguments)
+      return(_ref3 = scope.def).invoke.apply(_ref3, arguments)
     }catch(e) {
       return"/* def-default: '" + to_define.value + " already defined */ null"
     }
@@ -832,7 +851,8 @@
     return x.compile()
   });
   macro("quasiquote", function(x) {
-    var c_item, compiled, current_group, first, item, push_group, _i, _len, _ref4;
+    var c_item, compiled, current_group, first, item, push_group, scope, _i, _len, _ref3;
+    scope = last(scope_stack);
     current_group = [];
     compiled = [];
     push_group = function() {
@@ -841,9 +861,9 @@
       }
       return current_group = []
     };
-    _ref4 = x.value;
-    for(_i = 0, _len = _ref4.length;_i < _len;_i++) {
-      item = _ref4[_i];
+    _ref3 = x.value;
+    for(_i = 0, _len = _ref3.length;_i < _len;_i++) {
+      item = _ref3[_i];
       if(item instanceof types.UnquoteSpliced) {
         c_item = "Array.prototype.slice.call(" + item.compile() + ")";
         push_group();
@@ -893,20 +913,20 @@
     return js_code
   });
   macro_if = macro("if", function(cond, tbranch, fbranch) {
-    var result, _ref4;
-    result = "(/* IF */ " + cond.compile() + " ?\n" + indent_up() + "/* THEN */ " + tbranch.compile() + " :\n" + INDENT + "/* ELSE */ " + ((_ref4 = fbranch != null ? fbranch.compile() : void 0) != null ? _ref4 : "null") + ")";
+    var result, _ref3;
+    result = "(/* IF */ " + cond.compile() + " ?\n" + indent_up() + "/* THEN */ " + tbranch.compile() + " :\n" + INDENT + "/* ELSE */ " + ((_ref3 = fbranch != null ? fbranch.compile() : void 0) != null ? _ref3 : "null") + ")";
     indent_down();
     return result
   });
   macro_let = macro("let", function() {
-    var bindings, body, def_sym, i, item, new_bindings, new_body, sym, _len, _ref4;
+    var bindings, body, def_sym, i, item, new_bindings, new_body, sym, _i, _len, _ref3;
     bindings = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     def_sym = new types.Symbol("def", null, bindings);
     sym = null;
     new_bindings = [];
-    _ref4 = bindings.value;
-    for(i = 0, _len = _ref4.length;i < _len;i++) {
-      item = _ref4[i];
+    _ref3 = bindings.value;
+    for(i = _i = 0, _len = _ref3.length;_i < _len;i = ++_i) {
+      item = _ref3[i];
       if(i % 2 === 0) {
         sym = item
       }else {
@@ -925,6 +945,25 @@
     fn = new types.Function(null, args.value, body);
     return fn.compile()
   });
+  operator_macro = function(name, op) {
+    if(op == null) {
+      op = name
+    }
+    return macro(name, function() {
+      var args, c_args;
+      args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      c_args = compile_list(args);
+      return c_args.join(" " + op + " ")
+    })
+  };
+  operator_macro("=", "===");
+  operator_macro("-");
+  operator_macro("+");
+  operator_macro("*");
+  operator_macro("/");
+  operator_macro("%");
+  operator_macro("or", "||");
+  operator_macro("and", "&&");
   read = oppo.read = oppo.compiler.read = function() {
     return parser.parse.apply(parser, arguments)
   };
@@ -940,7 +979,6 @@
   }
 }).call(this);
 var parser = function() {
-  var types = oppo.compiler.types;
   var parser = {trace:function trace() {
   }, yy:{}, symbols_:{"error":2, "program":3, "s_expression_list":4, "EOF":5, "s_expression":6, "special_form":7, "list":8, "symbol":9, "literal":10, "atom":11, "callable_list":12, "quoted_list":13, "object":14, "(":15, "element_list":16, ")":17, "[":18, "]":19, "OBJECT":20, "OBJECT_END":21, "element":22, "QUOTE":23, "QUASIQUOTE":24, "UNQUOTE":25, "UNQUOTE_SPLICING":26, "FUNCTION":27, "NIL":28, "BOOLEAN_TRUE":29, "BOOLEAN_FALSE":30, "string":31, "regex":32, "number":33, "REGEX":34, "FLAGS":35, "FIXNUM":36, 
   "FLOAT":37, "BASENUM":38, "STRING":39, "KEYWORD":40, "IDENTIFIER":41, "$accept":0, "$end":1}, terminals_:{2:"error", 5:"EOF", 15:"(", 17:")", 18:"[", 19:"]", 20:"OBJECT", 21:"OBJECT_END", 23:"QUOTE", 24:"QUASIQUOTE", 25:"UNQUOTE", 26:"UNQUOTE_SPLICING", 27:"FUNCTION", 28:"NIL", 29:"BOOLEAN_TRUE", 30:"BOOLEAN_FALSE", 34:"REGEX", 35:"FLAGS", 36:"FIXNUM", 37:"FLOAT", 38:"BASENUM", 39:"STRING", 40:"KEYWORD", 41:"IDENTIFIER"}, productions_:[0, [3, 2], [3, 1], [4, 2], [4, 1], [6, 1], [6, 1], [6, 1], 
@@ -1202,6 +1240,7 @@ var parser = function() {
     }
     return true
   }};
+  var types = oppo.compiler.types;
   var lexer = function() {
     var lexer = {EOF:1, parseError:function parseError(str, hash) {
       if(this.yy.parseError) {
@@ -1235,6 +1274,8 @@ var parser = function() {
     }, more:function() {
       this._more = true;
       return this
+    }, less:function(n) {
+      this._input = this.match.slice(n) + this._input
     }, pastInput:function() {
       var past = this.matched.substr(0, this.matched.length - this.match.length);
       return(past.length > 20 ? "..." : "") + past.substr(-20).replace(/\n/g, "")
@@ -1255,33 +1296,42 @@ var parser = function() {
       if(!this._input) {
         this.done = true
       }
-      var token, match, col, lines;
+      var token, match, tempMatch, index, col, lines;
       if(!this._more) {
         this.yytext = "";
         this.match = ""
       }
       var rules = this._currentRules();
       for(var i = 0;i < rules.length;i++) {
-        match = this._input.match(this.rules[rules[i]]);
-        if(match) {
-          lines = match[0].match(/\n.*/g);
-          if(lines) {
-            this.yylineno += lines.length
+        tempMatch = this._input.match(this.rules[rules[i]]);
+        if(tempMatch && (!match || tempMatch[0].length > match[0].length)) {
+          match = tempMatch;
+          index = i;
+          if(!this.options.flex) {
+            break
           }
-          this.yylloc = {first_line:this.yylloc.last_line, last_line:this.yylineno + 1, first_column:this.yylloc.last_column, last_column:lines ? lines[lines.length - 1].length - 1 : this.yylloc.last_column + match[0].length};
-          this.yytext += match[0];
-          this.match += match[0];
-          this.matches = match;
-          this.yyleng = this.yytext.length;
-          this._more = false;
-          this._input = this._input.slice(match[0].length);
-          this.matched += match[0];
-          token = this.performAction.call(this, this.yy, this, rules[i], this.conditionStack[this.conditionStack.length - 1]);
-          if(token) {
-            return token
-          }else {
-            return
-          }
+        }
+      }
+      if(match) {
+        lines = match[0].match(/\n.*/g);
+        if(lines) {
+          this.yylineno += lines.length
+        }
+        this.yylloc = {first_line:this.yylloc.last_line, last_line:this.yylineno + 1, first_column:this.yylloc.last_column, last_column:lines ? lines[lines.length - 1].length - 1 : this.yylloc.last_column + match[0].length};
+        this.yytext += match[0];
+        this.match += match[0];
+        this.yyleng = this.yytext.length;
+        this._more = false;
+        this._input = this._input.slice(match[0].length);
+        this.matched += match[0];
+        token = this.performAction.call(this, this.yy, this, rules[index], this.conditionStack[this.conditionStack.length - 1]);
+        if(this.done && this._input) {
+          this.done = false
+        }
+        if(token) {
+          return token
+        }else {
+          return
         }
       }
       if(this._input === "") {
@@ -1307,6 +1357,7 @@ var parser = function() {
     }, pushState:function begin(condition) {
       this.begin(condition)
     }};
+    lexer.options = {};
     lexer.performAction = function anonymous(yy, yy_, $avoiding_name_collisions, YY_START) {
       var YYSTATE = YY_START;
       switch($avoiding_name_collisions) {
@@ -1429,4 +1480,64 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     exports.main(typeof process !== "undefined" ? process.argv.slice(1) : require("system").args)
   }
 }
-;
+;(function() {
+  var oppo;
+  if(typeof window === "undefined") {
+    oppo = exports
+  }else {
+    oppo = window.oppo
+  }
+  (function() {
+    var isNaN, sym;
+    sym = to_js_identifier;
+    isNaN = this[sym("NaN?")] = function(x) {
+      return to_type(x) !== "number" || x !== x
+    };
+    this[sym("+")] = function() {
+      var num, x, _i, _len;
+      num = 0;
+      if(arguments.length < 2) {
+        throw new Error("Can't add less than two numbers.,");
+      }
+      for(_i = 0, _len = arguments.length;_i < _len;_i++) {
+        x = arguments[_i];
+        num += x
+      }
+      if(isNaN(num)) {
+        throw new TypeError("Can't add non-numbers.");
+      }
+      return num
+    };
+    this[sym("-")] = function() {
+      var num, x, _i, _len;
+      num = null;
+      for(_i = 0, _len = arguments.length;_i < _len;_i++) {
+        x = arguments[_i];
+        if(num != null) {
+          num -= x
+        }else {
+          num = x
+        }
+      }
+      if(isNaN(num)) {
+        throw new TypeError("Can't subtract non-numbers.");
+      }
+      return num
+    };
+    return this[sym("*")] = function() {
+      var num, x, _i, _len, _results;
+      num = null;
+      _results = [];
+      for(_i = 0, _len = arguments.length;_i < _len;_i++) {
+        x = arguments[_i];
+        if(num != null) {
+          _results.push(num *= x)
+        }else {
+          _results.push(void 0)
+        }
+      }
+      return _results
+    }
+  }).call(oppo)
+})();
+
