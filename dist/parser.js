@@ -1,6 +1,5 @@
 /* Jison generated parser */
 var parser = (function(){
-
 var parser = {trace: function trace() { },
 yy: {},
 symbols_: {"error":2,"program":3,"s_expression_list":4,"EOF":5,"s_expression":6,"special_form":7,"list":8,"symbol":9,"keyword":10,"literal":11,"atom":12,"callable_list":13,"quoted_list":14,"js_map":15,"(":16,"element_list":17,")":18,"[":19,"]":20,"JS_MAP_START":21,"MAP_END":22,"element":23,"QUOTE":24,"SYNTAX_QUOTE":25,"UNQUOTE":26,"SPLAT":27,"FUNCTION":28,"ARGUMENTS_ACCESSOR":29,"NIL":30,"BOOLEAN_TRUE":31,"BOOLEAN_FALSE":32,"STRING":33,"regex":34,"number":35,"REGEX":36,"FLAGS":37,"DECIMAL_NUMBER":38,"OCTAL_NUMBER":39,"HEXIDECIMAL_NUMBER":40,"BINARY_NUMBER":41,"KEYWORD":42,"IDENTIFIER":43,"$accept":0,"$end":1},
@@ -282,9 +281,9 @@ parse: function parse(input) {
     }
 
     return true;
-}};/* Jison generated lexer */
+}};
+/* Jison generated lexer */
 var lexer = (function(){
-
 var lexer = ({EOF:1,
 parseError:function parseError(str, hash) {
         if (this.yy.parseError) {
@@ -321,6 +320,9 @@ more:function () {
         this._more = true;
         return this;
     },
+less:function (n) {
+        this._input = this.match.slice(n) + this._input;
+    },
 pastInput:function () {
         var past = this.matched.substr(0, this.matched.length - this.match.length);
         return (past.length > 20 ? '...':'') + past.substr(-20).replace(/\n/g, "");
@@ -345,6 +347,8 @@ next:function () {
 
         var token,
             match,
+            tempMatch,
+            index,
             col,
             lines;
         if (!this._more) {
@@ -353,25 +357,30 @@ next:function () {
         }
         var rules = this._currentRules();
         for (var i=0;i < rules.length; i++) {
-            match = this._input.match(this.rules[rules[i]]);
-            if (match) {
-                lines = match[0].match(/\n.*/g);
-                if (lines) this.yylineno += lines.length;
-                this.yylloc = {first_line: this.yylloc.last_line,
-                               last_line: this.yylineno+1,
-                               first_column: this.yylloc.last_column,
-                               last_column: lines ? lines[lines.length-1].length-1 : this.yylloc.last_column + match[0].length}
-                this.yytext += match[0];
-                this.match += match[0];
-                this.matches = match;
-                this.yyleng = this.yytext.length;
-                this._more = false;
-                this._input = this._input.slice(match[0].length);
-                this.matched += match[0];
-                token = this.performAction.call(this, this.yy, this, rules[i],this.conditionStack[this.conditionStack.length-1]);
-                if (token) return token;
-                else return;
+            tempMatch = this._input.match(this.rules[rules[i]]);
+            if (tempMatch && (!match || tempMatch[0].length > match[0].length)) {
+                match = tempMatch;
+                index = i;
+                if (!this.options.flex) break;
             }
+        }
+        if (match) {
+            lines = match[0].match(/\n.*/g);
+            if (lines) this.yylineno += lines.length;
+            this.yylloc = {first_line: this.yylloc.last_line,
+                           last_line: this.yylineno+1,
+                           first_column: this.yylloc.last_column,
+                           last_column: lines ? lines[lines.length-1].length-1 : this.yylloc.last_column + match[0].length}
+            this.yytext += match[0];
+            this.match += match[0];
+            this.yyleng = this.yytext.length;
+            this._more = false;
+            this._input = this._input.slice(match[0].length);
+            this.matched += match[0];
+            token = this.performAction.call(this, this.yy, this, rules[index],this.conditionStack[this.conditionStack.length-1]);
+            if (this.done && this._input) this.done = false;
+            if (token) return token;
+            else return;
         }
         if (this._input === "") {
             return this.EOF;
@@ -403,6 +412,7 @@ topState:function () {
 pushState:function begin(condition) {
         this.begin(condition);
     }});
+lexer.options = {};
 lexer.performAction = function anonymous(yy,yy_,$avoiding_name_collisions,YY_START) {
 
 var YYSTATE=YY_START
@@ -474,7 +484,8 @@ break;
 }
 };
 lexer.rules = [/^;.*/,/^\s+/,/^"/,/^"/,/^(\\"|[^"])*/,/^#\//,/^\/[a-zA-Z]*/,/^(\\\/|[^\/])*/,/^[+-]?[0-9]+(\.[0-9]+)?\b/,/^[+-]?#0[0-9]+\b/,/^[+-]?#x[0-9a-fA-F]+\b/,/^[+-]?#b[0-9]+\b/,/^#(n|N)/,/^#(t|T)/,/^#(f|F)/,/^\(/,/^\)/,/^\[/,/^\]/,/^#\{/,/^\{/,/^\}/,/^~/,/^'/,/^`/,/^\.\.\./,/^#\(/,/^%\d+/,/^:/,/^[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>,]+/,/^$/,/^./];
-lexer.conditions = {"string":{"rules":[3,4],"inclusive":false},"regex":{"rules":[6,7],"inclusive":false},"INITIAL":{"rules":[0,1,2,5,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],"inclusive":true}};return lexer;})()
+lexer.conditions = {"string":{"rules":[3,4],"inclusive":false},"regex":{"rules":[6,7],"inclusive":false},"INITIAL":{"rules":[0,1,2,5,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],"inclusive":true}};
+return lexer;})()
 parser.lexer = lexer;
 return parser;
 })();
