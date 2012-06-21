@@ -54,7 +54,6 @@
   _ref = oppo.compiler, scope_stack = _ref.scope_stack, types = _ref.types;
   oppo.Error = function(_super) {
     __extends(Error, _super);
-    Error.name = "Error";
     function Error(name, message) {
       this.name = name;
       this.message = message
@@ -66,7 +65,6 @@
   }(Error);
   oppo.ArityException = function(_super) {
     __extends(ArityException, _super);
-    ArityException.name = "ArityException";
     function ArityException(message) {
       if(message != null) {
         this.message = message
@@ -208,7 +206,6 @@
   };
   (function() {
     this.SyntaxNode = function() {
-      SyntaxNode.name = "SyntaxNode";
       function SyntaxNode(value, yy_or_node_or_num) {
         var _ref3;
         this.value = value;
@@ -277,7 +274,6 @@
     }();
     this.Dynamic = function(_super) {
       __extends(Dynamic, _super);
-      Dynamic.name = "Dynamic";
       function Dynamic() {
         return Dynamic.__super__.constructor.apply(this, arguments)
       }
@@ -285,7 +281,6 @@
     }(this.SyntaxNode);
     this.List = function(_super) {
       __extends(List, _super);
-      List.name = "List";
       function List() {
         return List.__super__.constructor.apply(this, arguments)
       }
@@ -318,7 +313,6 @@
     }(this.SyntaxNode);
     this.Quoted = function(_super) {
       __extends(Quoted, _super);
-      Quoted.name = "Quoted";
       function Quoted(value, yy) {
         Quoted.__super__.constructor.call(this, null, yy);
         value.quoted = true;
@@ -330,7 +324,6 @@
     }(this.List);
     this.Quasiquoted = function(_super) {
       __extends(Quasiquoted, _super);
-      Quasiquoted.name = "Quasiquoted";
       function Quasiquoted(value, yy) {
         Quasiquoted.__super__.constructor.call(this, null, yy);
         value.quasiquoted = true;
@@ -342,7 +335,6 @@
     }(this.List);
     this.Unquoted = function(_super) {
       __extends(Unquoted, _super);
-      Unquoted.name = "Unquoted";
       function Unquoted(value, yy) {
         Unquoted.__super__.constructor.call(this, null, yy);
         value.unquoted = true;
@@ -353,7 +345,6 @@
     }(this.List);
     this.UnquoteSpliced = function(_super) {
       __extends(UnquoteSpliced, _super);
-      UnquoteSpliced.name = "UnquoteSpliced";
       function UnquoteSpliced(value, yy) {
         UnquoteSpliced.__super__.constructor.call(this, null, yy);
         value.unquote_spliced = true;
@@ -364,7 +355,6 @@
     }(this.List);
     this.Object = function(_super) {
       __extends(Object, _super);
-      Object.name = "Object";
       function Object() {
         var i, item, values, _i, _len, _ref3;
         Object.__super__.constructor.apply(this, arguments);
@@ -441,7 +431,6 @@
     }(this.SyntaxNode);
     this.Number = function(_super) {
       __extends(Number, _super);
-      Number.name = "Number";
       function Number() {
         return Number.__super__.constructor.apply(this, arguments)
       }
@@ -452,7 +441,6 @@
     }(this.SyntaxNode);
     this.Fixnum = function(_super) {
       __extends(Fixnum, _super);
-      Fixnum.name = "Fixnum";
       function Fixnum() {
         return Fixnum.__super__.constructor.apply(this, arguments)
       }
@@ -460,7 +448,6 @@
     }(this.Number);
     this.Float = function(_super) {
       __extends(Float, _super);
-      Float.name = "Float";
       function Float() {
         return Float.__super__.constructor.apply(this, arguments)
       }
@@ -468,7 +455,6 @@
     }(this.Number);
     this.String = function(_super) {
       __extends(String, _super);
-      String.name = "String";
       function String() {
         return String.__super__.constructor.apply(this, arguments)
       }
@@ -481,7 +467,6 @@
     }(this.SyntaxNode);
     this.Regex = function(_super) {
       __extends(Regex, _super);
-      Regex.name = "Regex";
       function Regex(body, flags, yy) {
         this.body = body;
         this.flags = flags;
@@ -494,7 +479,6 @@
     }(this.SyntaxNode);
     this.Atom = function(_super) {
       __extends(Atom, _super);
-      Atom.name = "Atom";
       function Atom(yy) {
         Atom.__super__.constructor.call(this, this.value, yy)
       }
@@ -502,7 +486,6 @@
     }(this.SyntaxNode);
     this.Nil = function(_super) {
       __extends(Nil, _super);
-      Nil.name = "Nil";
       function Nil() {
         return Nil.__super__.constructor.apply(this, arguments)
       }
@@ -511,7 +494,6 @@
     }(this.Atom);
     this.Boolean = function(_super) {
       __extends(Boolean, _super);
-      Boolean.name = "Boolean";
       function Boolean() {
         return Boolean.__super__.constructor.apply(this, arguments)
       }
@@ -519,7 +501,6 @@
     }(this.Atom);
     this.True = function(_super) {
       __extends(True, _super);
-      True.name = "True";
       function True() {
         return True.__super__.constructor.apply(this, arguments)
       }
@@ -531,7 +512,6 @@
     }(this.Boolean);
     this.False = function(_super) {
       __extends(False, _super);
-      False.name = "False";
       function False() {
         return False.__super__.constructor.apply(this, arguments)
       }
@@ -543,13 +523,9 @@
     }(this.Boolean);
     this.Symbol = function(_super) {
       __extends(Symbol, _super);
-      Symbol.name = "Symbol";
       function Symbol(value, must_exist, yy) {
-        if(must_exist == null) {
-          must_exist = true
-        }
-        Symbol.__super__.constructor.call(this, value, yy);
-        this.must_exist = must_exist
+        this.must_exist = must_exist != null ? must_exist : true;
+        Symbol.__super__.constructor.call(this, value, yy)
       }
       Symbol.prototype.compile_unquoted = function() {
         var js_val, scope, val;
@@ -593,7 +569,6 @@
     }(this.SyntaxNode);
     this.Function = function(_super) {
       __extends(Function, _super);
-      Function.name = "Function";
       function Function(name, args, body, yy) {
         var arg, i, _i, _len;
         this.name = name;
@@ -722,22 +697,23 @@
     }(this.SyntaxNode);
     return this.Macro = function(_super) {
       __extends(Macro, _super);
-      Macro.name = "Macro";
       function Macro(name, argnames, template, yy, fn, oppo_fn) {
         this.name = name;
         this.argnames = argnames;
         this.template = template;
+        this.oppo_fn = oppo_fn;
         Macro.__super__.constructor.call(this, null, yy);
         if(fn != null) {
           this.invoke = fn
         }
       }
       Macro.prototype.compile_unquoted = function() {
-        var c_name, scope, _ref3;
+        var c_name, compile_to, scope, _ref3, _ref4, _ref5;
         c_name = this.name.compile();
         scope = last(scope_stack);
         scope[c_name] = this;
-        return(_ref3 = typeof oppo_fn !== "undefined" && oppo_fn !== null ? oppo_fn.compile() : void 0) != null ? _ref3 : "null"
+        compile_to = (_ref3 = (_ref4 = (_ref5 = this.oppo_fn) != null ? typeof _ref5.compile === "function" ? _ref5.compile() : void 0 : void 0) != null ? _ref4 : "" + this.oppo_fn) != null ? _ref3 : "null";
+        return"" + c_name + " = " + compile_to
       };
       Macro.prototype.invoke = function() {
       };
@@ -765,11 +741,11 @@
       return Macro
     }(this.SyntaxNode)
   }).call(types);
-  macro = function(name, fn) {
+  macro = function(name, fn, oppo_fn) {
     var m, s_name;
     s_name = new types.Symbol(name);
     s_name.must_exist = false;
-    m = new types.Macro(s_name, null, null, null, fn);
+    m = new types.Macro(s_name, null, null, null, fn, oppo_fn);
     m.builtin = true;
     m.compile();
     return m
@@ -1488,8 +1464,8 @@ if(typeof require !== "undefined" && typeof exports !== "undefined") {
     oppo = window.oppo
   }
   (function() {
-    var isNaN, sym;
-    sym = to_js_identifier;
+    var isNaN, sym, _ref;
+    sym = (_ref = typeof to_js_identifier !== "undefined" && to_js_identifier !== null ? to_js_identifier : ender.to_js_identifier) != null ? _ref : require("text-to-js-identifier");
     isNaN = this[sym("NaN?")] = function(x) {
       return to_type(x) !== "number" || x !== x
     };

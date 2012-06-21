@@ -1,9 +1,9 @@
 #-----------------------------------------------------------------------------#
 
-macro = (name, fn) ->
+macro = (name, fn, oppo_fn) ->
   s_name = new types.Symbol name
   s_name.must_exist = false
-  m = new types.Macro s_name, null, null, null, fn
+  m = new types.Macro s_name, null, null, null, fn, oppo_fn
   m.builtin = true
   m.compile()
   m
@@ -191,19 +191,74 @@ macro "lambda", (args, body...) ->
   
 #-----------------------------------------------------------------------------#
 
-operator_macro = (name, op=name) ->
-  macro name, (args...) ->
+operator_macro = (name, op=name, fn) ->
+  macro_fn = (args...) ->
     c_args = compile_list args
     c_args.join " #{op} "
+    
+  macro name, macro_fn, fn
 
-operator_macro "=", "==="
-operator_macro "-"
-operator_macro "+"
-operator_macro "*"
-operator_macro "/"
-operator_macro "%"
-operator_macro "or", "||"
-operator_macro "and", "&&"
+operator_macro "=", "===", ->
+  for item in arguments
+    if not last?
+      last = item
+    else
+      eq = last === item
+      if not eq
+        break
+  eq
+
+operator_macro "-", ->
+  for n in arguments
+    if not result?
+      result = n
+    else
+      result -= n
+  result
+
+operator_macro "+", ->
+  for n in arguments
+    if not result?
+      result = n
+    else
+      result += n
+  result
+  
+operator_macro "*", ->
+  result = 1
+  for n in arguments
+    result *= n
+  result
+  
+operator_macro "/", ->
+  for n in arguments
+    if not result?
+      result = n
+    else
+      result /= n
+  result
+  
+operator_macro "%", (a, b) -> a % b
+
+operator_macro "or", "||", ->
+  for item in arguments
+    if not last?
+      last = item
+    else
+      _or = last or item
+      if not _or
+        break
+  _or
+  
+operator_macro "and", "&&", ->
+  for item in arguments
+    if not last?
+      last = item
+    else
+      _and = last and item
+      if not _and
+        break
+  _and
 
 #-----------------------------------------------------------------------------#
 

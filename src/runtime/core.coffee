@@ -1,6 +1,5 @@
 (->
-  
-  sym = to_js_identifier
+  sym = to_js_identifier ? ender.to_js_identifier ? (require "text-to-js-identifier")
   
   isNaN = @[sym 'NaN?'] = (x) -> (to_type x) isnt "number" or x isnt x
   

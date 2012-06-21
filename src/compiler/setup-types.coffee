@@ -248,10 +248,8 @@
   #---------------------------------------------------------------------------#
     
   class @Symbol extends @SyntaxNode
-    constructor: (value, must_exist = true, yy) ->
+    constructor: (value, @must_exist = true, yy) ->
       super value, yy
-      
-      @must_exist = must_exist
     
     compile_unquoted: ->
       scope = last scope_stack
@@ -410,7 +408,7 @@
   #---------------------------------------------------------------------------#
   
   class @Macro extends @SyntaxNode
-    constructor: (@name, @argnames, @template, yy, fn, oppo_fn) ->
+    constructor: (@name, @argnames, @template, yy, fn, @oppo_fn) ->
       super null, yy
       if fn?
         @invoke = fn
@@ -419,7 +417,8 @@
       c_name = @name.compile()
       scope = last scope_stack
       scope[c_name] = this
-      oppo_fn?.compile() ? "null"
+      compile_to = @oppo_fn?.compile?() ? "#{@oppo_fn}" ? "null"
+      "#{c_name} = #{compile_to}"
       
     invoke: ->
       
