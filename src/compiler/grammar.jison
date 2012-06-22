@@ -1,5 +1,21 @@
 /* Oppo - the awesome/experimental lisp on the JSVM */
 
+%{
+  var L = lemur;
+  var C = L.compiler;
+
+  var sym = function (s) {
+    return new C.Symbol(s, yy);
+  };
+
+  var slice = Array.prototype.slice;
+  var call = function (sname) {
+    var args = slice.call(arguments, 1);
+    var s = sym(sname);
+    return new C.Call([sym].concat(args));
+  };
+%}
+
 %lex
 %x string regex
 %%

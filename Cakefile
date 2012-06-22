@@ -93,7 +93,8 @@ task "closure:compile", "Compile existing build files into single oppo.js file",
   
   command = """
   java -jar google-closure-compiler/compiler.jar
-    --js 
+    --js
+      node_modules/lemur/build/lemur.js
       #{dir}/oppo-compiler.js 
       #{dir}/parser.js 
       #{runtime}

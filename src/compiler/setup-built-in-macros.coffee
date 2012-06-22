@@ -1,21 +1,105 @@
-#-----------------------------------------------------------------------------#
+L = lemur
+C = L.compiler
 
-macro = (name, fn, oppo_fn) ->
+###
+HELPERS
+###
+
+macro = (name, fn) ->
   s_name = new types.Symbol name
   s_name.must_exist = false
-  m = new types.Macro s_name, null, null, null, fn, oppo_fn
+  m = new types.Macro s_name, null, null, null, fn
   m.builtin = true
   m.compile()
   m
-  
-#-----------------------------------------------------------------------------#
   
 call_macro = (name, args...) ->
   scope = last scope_stack
   c_name = to_js_identifier name
   scope[c_name].invoke args...
 
-#-----------------------------------------------------------------------------#
+
+
+
+
+###
+JAVASCRIPT BUILTINS
+###
+  
+macro "js-eval", (js_code) ->
+  js_code
+  
+macro_if = macro "if", (cond, tbranch, fbranch) ->
+  result = """
+  (/* IF */ #{cond.compile()} ?
+  #{indent_up()}/* THEN */ #{tbranch.compile()} :
+  #{INDENT}/* ELSE */ #{fbranch?.compile() ? "null"})
+  """
+  indent_down()
+  result
+
+macro "lambda", (args, body...) ->
+  fn = new C.Function {args, body, autoreturn: true}
+  fn.compile()
+
+macro "js-for", (a, b, c, body...) ->
+  _for = new C.ForLoop condition: [a, b, c], body: body
+  _for.compile()
+
+macro "foreach", (coll, body...) ->
+  foreach = new C.ForEachLoop collection: coll, body: body
+
+op_macro = (name, className, prefix, postfix) ->
+  name = "js-#{name}"
+  macro_fn = (args...) ->
+    Cls = C[className]
+    results = while args.length
+      x = args.unshift()
+      (if prefix or postfix
+        new Cls x, x.yy
+      else
+        y = args.unshift()
+        new Cls [x, y], x.yy
+      ).compile()
+
+    results.join ' '
+    
+  macro name, macro_fn
+
+operator_macro "-", "Subtract"
+operator_macro "+", "Add"
+operator_macro "*", "Multiply"
+operator_macro "/", "Divide"
+operator_macro "%", "Mod"
+
+operator_macro "==", "Eq2"
+operator_macro "===", "Eq3"
+operator_macro ">", "GT"
+operator_macro "<", "LT"
+operator_macro ">=", "GTE"
+operator_macro "<=", "LTE"
+operator_macro "!==", "NotEq3"
+operator_macro "!=", "NotEq2"
+operator_macro "!", "Not"
+
+operator_macro "||", "Or"
+operator_macro "&&", "And"
+
+operator_macro "&", "BAnd"
+operator_macro "|", "BOr"
+operator_macro "^", "BXor"
+operator_macro "<<", "BLeftShift"
+operator_macro ">>", "BRightShift"
+operator_macro ">>>", "BZeroFillRightShift"
+operator_macro "~", "BNot"
+
+operator_macro "delete", "Delete"
+
+
+
+###
+OPPO BUILTINS
+###
 
 macro "def", (to_define, rest...) ->
   if not rest.length
@@ -46,15 +130,6 @@ macro "def", (to_define, rest...) ->
   
   "#{c_name} = #{c_value}"
   
-#-----------------------------------------------------------------------------#
-
-macro "def-default", (to_define) ->
-  scope = last scope_stack
-  try scope.def.invoke arguments...
-  catch e then "/* def-default: '#{to_define.value} already defined */ null"
-
-#-----------------------------------------------------------------------------#
-  
 macro "call", (callable, args...) ->
   to_call = callable.compile()
   if callable instanceof types.Symbol
@@ -71,19 +146,34 @@ macro "call", (callable, args...) ->
     
   "#{to_call}(#{c_args.join ', '})"
 
-#-----------------------------------------------------------------------------#
+macro_let = macro "let", (bindings, body...) ->
+  def_sym = new types.Symbol 'def', null, bindings
+  sym = null
+  new_bindings = []
+  for item, i in bindings.value
+    if i % 2 is 0
+      sym = item
+    else
+      if not item?
+        bindings.error "Must have even number of bindings."
+      new_bindings.push new types.List [def_sym, sym, item]
+      
+  new_body = [new_bindings..., body...]
+  (new types.List [new types.Function null, null, new_body]).compile()
 
 macro_do = macro "do", ->
   c_items = compile_list arguments
   "(#{c_items.join ',\n' + INDENT})"
   
-#-----------------------------------------------------------------------------#
+
+
+###
+QUOTING
+###
   
 macro "quote", (x) ->
   x.quoted = true
   x.compile()
-  
-#-----------------------------------------------------------------------------#
   
 macro "quasiquote", (x) ->
   scope = last scope_stack
@@ -111,17 +201,17 @@ macro "quasiquote", (x) ->
   else
     first
   
-#-----------------------------------------------------------------------------#
-  
 macro "unquote", (x) ->
   x.compile false
-  
-#-----------------------------------------------------------------------------#
   
 macro "unquote-splicing", (x) ->
   x.compile false
   
-#-----------------------------------------------------------------------------#
+
+
+###
+ERRORS & VALIDATIONS
+###
   
 macro "raise", (namespace, error) ->
   if arguments.length is 1
@@ -138,8 +228,6 @@ macro "raise", (namespace, error) ->
   #{indent_down()}})()
   """
 
-#-----------------------------------------------------------------------------#
-
 macro "assert", (sexp) ->
   c_sexp = sexp.compile()
   
@@ -149,116 +237,3 @@ macro "assert", (sexp) ->
   """
   (#{c_sexp} || #{raise_call})
   """
-  
-#-----------------------------------------------------------------------------#
-  
-macro "js-eval", (js_code) ->
-  js_code
-  
-#-----------------------------------------------------------------------------#
-  
-macro_if = macro "if", (cond, tbranch, fbranch) ->
-  result = """
-  (/* IF */ #{cond.compile()} ?
-  #{indent_up()}/* THEN */ #{tbranch.compile()} :
-  #{INDENT}/* ELSE */ #{fbranch?.compile() ? "null"})
-  """
-  indent_down()
-  result
-  
-#-----------------------------------------------------------------------------#
-  
-macro_let = macro "let", (bindings, body...) ->
-  def_sym = new types.Symbol 'def', null, bindings
-  sym = null
-  new_bindings = []
-  for item, i in bindings.value
-    if i % 2 is 0
-      sym = item
-    else
-      if not item?
-        bindings.error "Must have even number of bindings."
-      new_bindings.push new types.List [def_sym, sym, item]
-      
-  new_body = [new_bindings..., body...]
-  (new types.List [new types.Function null, null, new_body]).compile()
-
-#-----------------------------------------------------------------------------#
-
-macro "lambda", (args, body...) ->
-  fn = new types.Function null, args.value, body
-  fn.compile()
-  
-#-----------------------------------------------------------------------------#
-
-operator_macro = (name, op=name, fn) ->
-  macro_fn = (args...) ->
-    c_args = compile_list args
-    c_args.join " #{op} "
-    
-  macro name, macro_fn, fn
-
-operator_macro "=", "===", ->
-  for item in arguments
-    if not last?
-      last = item
-    else
-      eq = last === item
-      if not eq
-        break
-  eq
-
-operator_macro "-", ->
-  for n in arguments
-    if not result?
-      result = n
-    else
-      result -= n
-  result
-
-operator_macro "+", ->
-  for n in arguments
-    if not result?
-      result = n
-    else
-      result += n
-  result
-  
-operator_macro "*", ->
-  result = 1
-  for n in arguments
-    result *= n
-  result
-  
-operator_macro "/", ->
-  for n in arguments
-    if not result?
-      result = n
-    else
-      result /= n
-  result
-  
-operator_macro "%", (a, b) -> a % b
-
-operator_macro "or", "||", ->
-  for item in arguments
-    if not last?
-      last = item
-    else
-      _or = last or item
-      if not _or
-        break
-  _or
-  
-operator_macro "and", "&&", ->
-  for item in arguments
-    if not last?
-      last = item
-    else
-      _and = last and item
-      if not _and
-        break
-  _and
-
-#-----------------------------------------------------------------------------#
-
