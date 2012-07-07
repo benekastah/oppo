@@ -1,4 +1,6 @@
 root = global ? window
+L = lemur
+C = L.Compiler
 
 #-----------------------------------------------------------------------------#
 
@@ -30,9 +32,7 @@ class oppo.ArityException extends oppo.Error
 
 #-----------------------------------------------------------------------------#
 
-__toString = Object::toString 
-type_of = (x) ->
-  __toString.call(x).slice(8, -1).toLowerCase()
+type_of = lemur.core.to_type
     
 #-----------------------------------------------------------------------------#
     
@@ -42,7 +42,7 @@ oppo.stringify = (o) ->
     when "array"
       types.List::toString.call {value: o}
     when "object"
-      if o instanceof types.SyntaxNode
+      if o instanceof C.Construct
         o.toString()
       else
         items = for key, value of o
@@ -82,40 +82,15 @@ map = (list, fn) ->
     
 #-----------------------------------------------------------------------------#
     
-compile_list = (list, arg) ->
+compile_list = (list, arg, unquoted) ->
   for item in list
+    item.quoted = false if unquoted
     item.compile arg
     
 #-----------------------------------------------------------------------------#
     
 trim = String::trim or -> @.replace(/^\s+/, '').replace /\s+$/, ''
 
-#-----------------------------------------------------------------------------#
-
-push_scope = ->
-  scope = last scope_stack
-  new_scope = clone scope
-  scope_stack.push new_scope
-  new_scope
-  
-#-----------------------------------------------------------------------------#
-  
-pop_scope = ->
-  scope_stack.pop()
-  
-#-----------------------------------------------------------------------------#
-  
-scope_var_statement = (scope = last scope_stack) ->
-  names = []
-  for own name, sym of scope
-    if sym instanceof types.Dynamic then continue
-    if sym.declared_var
-      sym.error "Already declared var for this symbol. Possible compiler error?"
-    sym.declared_var = true
-    names.push name
-    
-  if names.length then "#{INDENT}var #{names.join ', '};\n" else ""
-  
 #-----------------------------------------------------------------------------#
   
 INDENT = ""
@@ -132,5 +107,17 @@ indent_down = ->
 newline = -> "\n#{INDENT}"
 newline_down = -> "\n#{indent_down()}"
 newline_up = -> "\n#{indent_up()}"
+
+#-----------------------------------------------------------------------------#
+
+read = oppo.read = oppo.compiler.read = ->
+  parser.parse arguments...
+
+#-----------------------------------------------------------------------------#
+
+compile = oppo.compile = oppo.compiler.compile = (sexp) ->
+  new lemur.Compiler().compile ->
+    setup_built_in_macros()
+    sexp.compile()
 
 #-----------------------------------------------------------------------------#

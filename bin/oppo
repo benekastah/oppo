@@ -3,6 +3,6 @@
 # require 'coffee-script'
 fs = require 'fs'
 path = require 'path'
-lib = path.join (path.dirname fs.realpathSync __filename), '../lib'
+lib = path.join (path.dirname (fs.realpathSync __filename)), '../lib'
 
 require "#{lib}/cli"

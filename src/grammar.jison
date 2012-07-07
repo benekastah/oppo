@@ -1,18 +1,17 @@
 /* Oppo - the awesome/experimental lisp on the JSVM */
 
 %{
-  var L = lemur;
-  var C = L.compiler;
+  var L = typeof lemur === "undefined" ? require('lemur') : lemur;
+  var C = L.Compiler;
 
-  var sym = function (s) {
-    return new C.Symbol(s, yy);
+  var sym = function (s, yy) {
+    return new C.Symbol(s, yy)
   };
 
   var slice = Array.prototype.slice;
-  var call = function (sname) {
-    var args = slice.call(arguments, 1);
-    var s = sym(sname);
-    return new C.Call([sym].concat(args));
+  var call_by_name = function (sname, args, yy) {
+    var s = sym(sname, yy);
+    return new C.Call([sym].concat(args), yy);
   };
 %}
 
@@ -35,9 +34,8 @@
 \d{1,2}"#"[\+\-]?\w+                    { return 'BASENUM'; }
 [\+\-]?\d+                              { return 'FIXNUM'; }
 
-"#"("n"|"N")                            { return 'NIL'; }
-"#"("t"|"T")                            { return 'BOOLEAN_TRUE'; }
-"#"("f"|"F")                            { return 'BOOLEAN_FALSE'; }
+"#"[tT]{1}                              { return 'BOOLEAN_TRUE'; }
+"#"[fF]{1}                              { return 'BOOLEAN_FALSE'; }
 
 "("                                     { return '('; }
 ")"                                     { return ')'; }
@@ -46,14 +44,14 @@
 "{"                                     { return 'OBJECT'; }
 "}"                                     { return 'OBJECT_END'; }
 
-"~"                                     { return 'UNQUOTE'; }
+","                                     { return 'UNQUOTE'; }
 "'"                                     { return 'QUOTE'; }
 "`"                                     { return 'QUASIQUOTE'; }
-"..."                                   { return 'UNQUOTE_SPLICING'; }
+",@"                                    { return 'UNQUOTE_SPLICING'; }
 "#("                                    { return 'FUNCTION'; }
 
 ":"                                     { return 'KEYWORD'; }
-[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>,]+   { return 'IDENTIFIER'; } //'
+[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+   { return 'IDENTIFIER'; } //'
 
 <<EOF>>                                 { return 'EOF'; }
 .                                       { return 'INVALID'; }
@@ -61,7 +59,7 @@
 /lex
 
 %{
-  var types = oppo.compiler.types;
+  var types = {}; // oppo.compiler.types;
 %}
 
 %start program
@@ -70,8 +68,10 @@
 program
   : s_expression_list EOF
     {
-      var _do = new types.Symbol("do", null, yy);
-      return new types.List([_do].concat($1), yy);
+      return new C.Call({
+        fn: sym("do", yy),
+        args: $1
+      }, yy);
     }
   | EOF
     { return new types.Nil(yy); }
@@ -89,7 +89,6 @@ s_expression
   | list
   | symbol
   | literal
-  | atom
   ;
 
 list
@@ -100,9 +99,7 @@ list
 
 callable_list
   : '(' element_list ')'
-    { $$ = new types.List($2, yy); }
-  | '(' ')'
-    { $$ = new types.Nil(yy); }
+    { $$ = new C.List($2, yy); }
   ;
 
 quoted_list
@@ -127,10 +124,22 @@ quoted_list
   ;
   
 object
-  : OBJECT element_list OBJECT_END
-    { $$ = new types.Object($2, yy); }
+  : OBJECT kvpair_list OBJECT_END
+    { $$ = new C.Object($2, yy); }
   | OBJECT OBJECT_END
-    { $$ = new types.Object([], yy); }
+    { $$ = new C.Object([], yy); }
+  ;
+
+kvpair_list
+  : kvpair
+    { $$ = [$1]; }
+  | kvpair_list kvpair
+    { $$ = $1; $$.push($2); }
+  ;
+
+kvpair
+  : element element
+    { $$ = [$1, $2]; }
   ;
 
 element_list
@@ -154,54 +163,65 @@ special_form
   | UNQUOTE_SPLICING s_expression
     { $$ = new types.UnquoteSpliced($2, yy); }
   | FUNCTION element_list ')'
-    { $$ = new types.Function(null, null, $element_list); }
-  ;
-
-atom
-  : NIL
-    { $$ = new types.Nil(yy); }
-  | BOOLEAN_TRUE
-    { $$ = new types.True(yy); }
-  | BOOLEAN_FALSE
-    { $$ = new types.False(yy); }
+    { $$ = new C.Lambda({body: $element_list, arity: Infinity}, yy); }
   ;
 
 literal
   : string
   | regex
   | number
+  | atom
   ;
   
+atom
+  : '(' ')'
+    { $$ = new C.Null(yy); }
+  | BOOLEAN_TRUE
+    { $$ = new C.True(yy); }
+  | BOOLEAN_FALSE
+    { $$ = new C.False(yy); }
+  ;
+
 regex
   : REGEX FLAGS
-    { $$ = new types.Regex($1, $2.substr(1), yy); }
+    { $$ = new C.Regex({pattern: $1, flags: $2.substr(1)}, yy); }
   ;
   
 number
   : FIXNUM
-    { $$ = new types.Fixnum($1, yy); }
+    { $$ = new C.Number($1, yy); }
   | FLOAT
-    { $$ = new types.Float($1, yy); }
+    { $$ = new C.Number($1, yy); }
   | BASENUM
     {
       var basenum = $1.split('#');
-      var base = basenum[0];
-      var snum = basenum[1];
-      var num = parseInt(snum, +base);
-      $$ = new types.Fixnum(num, yy);
+      $$ = new C.Number({value: basenum[1], base: basenum[0]}, yy);
     }
   ;
   
 string
   : STRING
-    { $$ = new types.String($1, yy); }
-  | KEYWORD symbol
-    { $$ = new types.String($symbol.value, yy); }
+    { $$ = new C.String($1, yy); }
+  | keyword
   ;
   
+keyword
+  : KEYWORD symbol
+    { $$ = new C.Keyword($symbol.value, yy); }
+  ;
+
 symbol
   : IDENTIFIER
-    { $$ = new types.Symbol($1, null, yy); }
+    {
+      if (/^nil$/i.test($1))
+        $$ = new C.Null(yy);
+      else if (/^true$/i.test($1))
+        $$ = new C.True(yy);
+      else if (/^false$/i.test($1))
+        $$ = new C.False(yy);
+      else
+        $$ = new C.Symbol($1, yy);
+    }
   ;
   
 %%

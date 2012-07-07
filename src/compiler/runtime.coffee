@@ -1,3 +1,0 @@
-
-defruntime = (name, fn) ->
-  
