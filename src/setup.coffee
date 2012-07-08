@@ -40,7 +40,7 @@ oppo.stringify = (o) ->
   type = type_of o
   switch type
     when "array"
-      types.List::toString.call {value: o}
+      C.List::toString.call {value: o}
     when "object"
       if o instanceof C.Construct
         o.toString()
@@ -85,28 +85,36 @@ map = (list, fn) ->
 compile_list = (list, arg, unquoted) ->
   for item in list
     item.quoted = false if unquoted
-    item.compile arg
+    item._compile arg
     
 #-----------------------------------------------------------------------------#
     
 trim = String::trim or -> @.replace(/^\s+/, '').replace /\s+$/, ''
 
 #-----------------------------------------------------------------------------#
-  
-INDENT = ""
-indent_up = ->
-  INDENT = "#{INDENT}  "
-  
-#-----------------------------------------------------------------------------#
-  
-indent_down = ->
-  INDENT = INDENT.substr 2
-  
-#-----------------------------------------------------------------------------#
-  
-newline = -> "\n#{INDENT}"
-newline_down = -> "\n#{indent_down()}"
-newline_up = -> "\n#{indent_up()}"
+
+do ->
+  C.Construct::_compile = ->
+    compile_fn = if @quoted
+      @compile_quoted
+    else if @quasiquoted
+      @compile_quasiquoted
+    else if @unquoted
+      @compile_unquoted
+    else if @unquote_spliced
+      @compile_unquote_spliced
+    else
+      @compile
+    compile_fn.apply this, arguments
+
+  C.Construct::compile_quoted = ->
+    "new lemur.Compiler.#{@constructor.name}('#{@value}')"
+
+  C.Construct::compile_quasiquoted = C.Construct::compile
+
+  C.Construct::compile_unquoted = C.Construct::compile
+
+  C.Construct::compile_unquote_spliced = C.Construct::compile
 
 #-----------------------------------------------------------------------------#
 
@@ -118,6 +126,11 @@ read = oppo.read = oppo.compiler.read = ->
 compile = oppo.compile = oppo.compiler.compile = (sexp) ->
   new lemur.Compiler().compile ->
     setup_built_in_macros()
-    sexp.compile()
+    r = compile_runtime()
+    prog = sexp._compile()
+    """
+    #{r}
+    #{prog}
+    """
 
 #-----------------------------------------------------------------------------#

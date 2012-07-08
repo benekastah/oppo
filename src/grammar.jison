@@ -68,13 +68,11 @@
 program
   : s_expression_list EOF
     {
-      return new C.Call({
-        fn: sym("do", yy),
-        args: $1
-      }, yy);
+      var lambda = new C.Lambda({body: $1}, yy);
+      return new C.List([lambda], yy);
     }
   | EOF
-    { return new types.Nil(yy); }
+    { return new C.Null(yy); }
   ;
 
 s_expression_list
@@ -93,7 +91,7 @@ s_expression
 
 list
   : callable_list
-  | quoted_list
+  | array
   | object
   ;
 
@@ -102,25 +100,11 @@ callable_list
     { $$ = new C.List($2, yy); }
   ;
 
-quoted_list
+array
   : '[' element_list ']'
-    {
-      var i = 0;
-      var len = $2.length;
-      for (; i < len; i++) {
-        var item = $2[i];
-        if (!(item instanceof types.UnquoteSpliced))
-        $2[i] = new types.Unquoted(item, yy);
-      }
-      
-      var list = new types.List($2, yy);
-      $$ = new types.Quasiquoted(list, yy);
-    }
+    { $$ = new C.Array($2, yy); }
   | '[' ']'
-    {
-      var list = new types.List([], yy);
-      $$ = new types.Quoted(list, yy);
-    }
+    { $$ = new C.Array([], yy); }
   ;
   
 object
@@ -155,13 +139,13 @@ element
 
 special_form
   : QUOTE s_expression
-    { $$ = new types.Quoted($2, yy); }
+    { $$ = $2; $$.quoted = true; }
   | QUASIQUOTE s_expression
-    { $$ = new types.Quasiquoted($2, yy); }
+    { $$ = $1; $$.quasiquoted = true; }
   | UNQUOTE s_expression
-    { $$ = new types.Unquoted($2, yy); }
+    { $$ = $2; $$.unquoted = true; }
   | UNQUOTE_SPLICING s_expression
-    { $$ = new types.UnquoteSpliced($2, yy); }
+    { $$ = $2; $$.unquote_spliced = true; }
   | FUNCTION element_list ')'
     { $$ = new C.Lambda({body: $element_list, arity: Infinity}, yy); }
   ;

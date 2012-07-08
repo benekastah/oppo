@@ -2,21 +2,16 @@
 HELPERS
 ###
 
-macro = (name, fn) ->
+defmacro = (name, fn) ->
   s_name = new C.Symbol name
-  s_name.must_exist = false
   m = new C.Macro name: s_name, invoke: fn
   m.builtin = true
-  m.compile()
-
-  scope = C.current_scope()
-  scope.def_var s_name, m
-
+  m._compile()
   m
   
 call_macro = (name, args...) ->
-  macro = C.get_var_val (C.Symbol name)
-  macro.invoke args...
+  to_call = C.get_var_val (new C.Symbol name)
+  to_call.invoke args...
 
 
 
@@ -25,27 +20,34 @@ setup_built_in_macros = ->
   JAVASCRIPT BUILTINS
   ###
     
-  macro "js-eval", (js_code) ->
-    js_code
+  defmacro "js-eval", (js_code) ->
+    if js_code instanceof C.String
+      js_code.value
+    else if js_code instanceof C.Number
+      js_code._compile()
+    else if (js_code instanceof C.Symbol) and js_code.quoted
+      js_code.name
+    else
+      "window.eval(#{js_code._compile()})"
 
-  macro_if = macro "if", (cond, tbranch, fbranch) ->
+  defmacro "if", (cond, tbranch, fbranch) ->
     result = """
-    (/* IF */ #{cond.compile()} ?
-    #{indent_up()}/* THEN */ #{tbranch.compile()} :
-    #{INDENT}/* ELSE */ #{fbranch?.compile() ? "null"})
+    (/* IF */ #{cond._compile()} ?
+    /* THEN */ #{tbranch._compile()} :
+    /* ELSE */ #{fbranch?.compile() ? "null"})
     """
     indent_down()
     result
 
-  macro "lambda", (args, body...) ->
+  defmacro "lambda", (args, body...) ->
     fn = new C.Lambda {args: args.value, body}
-    fn.compile()
+    fn._compile()
 
-  macro "js-for", (a, b, c, body...) ->
+  defmacro "js-for", (a, b, c, body...) ->
     _for = new C.ForLoop condition: [a, b, c], body: body
-    _for.compile()
+    _for._compile()
 
-  macro "foreach", (coll, body...) ->
+  defmacro "foreach", (coll, body...) ->
     foreach = new C.ForEachLoop collection: coll, body: body
 
   operator_macro = (name, className) ->
@@ -64,7 +66,7 @@ setup_built_in_macros = ->
 
       results.join ' '
       
-    macro name, macro_fn
+    defmacro name, macro_fn
 
   operator_macro "subtract", "Subtract"
   operator_macro "add", "Add"
@@ -101,7 +103,7 @@ setup_built_in_macros = ->
   OPPO BUILTINS
   ###
 
-  macro "def", (to_define, rest...) ->
+  defmacro "def", (to_define, rest...) ->
     if not rest.length
       to_define.error "Def", "You must provide a value."
     
@@ -117,30 +119,20 @@ setup_built_in_macros = ->
     else
       to_define.error "Def", "Invalid definition."
     
-    scope.def_var name, value
-    c_name = name.compile()
-    c_value = value.compile()
+    name = new C.Var name
+    set_ = new C.Var.Set {_var: name, value}
+    set_._compile()
     
-    "#{c_name} = #{c_value}"
-    
-  macro "call", (callable, args...) ->
-    to_call = callable.compile()
-    if callable instanceof types.Symbol
-      scope = last scope_stack
-      item = scope[to_call]
-      if item instanceof types.Macro
+  defmacro "call", (callable, args...) ->
+    if callable instanceof C.Symbol
+      item = C.get_var_val callable
+      if item instanceof C.Macro
         return item.invoke args...
-    
-    # Make sure function literals are immediately callable
-    if callable instanceof types.Function
-      to_call = "(#{to_call})"
-      
-    c_args = compile_list args
-      
-    "#{to_call}(#{c_args.join ', '})"
+    fcall = new C.FunctionCall {fn: callable, args}, callable.yy
+    fcall._compile()
 
-  macro_let = macro "let", (bindings, body...) ->
-    def_sym = new types.Symbol 'def', null, bindings
+  macro_let = defmacro "let", (bindings, body...) ->
+    def_sym = new C.Symbol 'def'
     sym = null
     new_bindings = []
     for item, i in bindings.value
@@ -154,9 +146,9 @@ setup_built_in_macros = ->
     new_body = [new_bindings..., body...]
     (new types.List [new types.Lambda body: new_body]).compile()
 
-  macro_do = macro "do", ->
+  macro_do = defmacro "do", ->
     c_items = compile_list arguments, null, true
-    "(#{c_items.join ',\n' + INDENT})"
+    "(#{c_items.join ',\n'})"
     
 
 
@@ -164,11 +156,11 @@ setup_built_in_macros = ->
   QUOTING
   ###
     
-  macro "quote", (x) ->
+  defmacro "quote", (x) ->
     x.quoted = true
-    x.compile()
+    x._compile()
     
-  macro "quasiquote", (x) ->
+  defmacro "quasiquote", (x) ->
     scope = last scope_stack
     current_group = []
     compiled = []
@@ -179,13 +171,13 @@ setup_built_in_macros = ->
       
     for item in x.value
       if item instanceof types.UnquoteSpliced
-        c_item = "Array.prototype.slice.call(#{item.compile()})"
+        c_item = "Array.prototype.slice.call(#{item._compile()})"
         push_group()
         compiled.push c_item
       else if item instanceof types.Unquoted
-        current_group.push item.compile()
+        current_group.push item._compile()
       else
-        current_group.push (item.compile true)
+        current_group.push (item._compile true)
         
     push_group()
     first = compiled.shift()
@@ -194,11 +186,11 @@ setup_built_in_macros = ->
     else
       first
     
-  macro "unquote", (x) ->
-    x.compile false
+  defmacro "unquote", (x) ->
+    x._compile false
     
-  macro "unquote-splicing", (x) ->
-    x.compile false
+  defmacro "unquote-splicing", (x) ->
+    x._compile false
     
 
 
@@ -206,14 +198,14 @@ setup_built_in_macros = ->
   ERRORS & VALIDATIONS
   ###
     
-  macro "raise", (namespace, error) ->
+  defmacro "raise", (namespace, error) ->
     if arguments.length is 1
       error = namespace
       c_namespace = "\"Error\""
     else
-      c_namespace = namespace.compile()
+      c_namespace = namespace._compile()
       
-    c_error = error.compile()
+    c_error = error._compile()
     
     """
     (function () {
@@ -221,8 +213,8 @@ setup_built_in_macros = ->
     #{indent_down()}})()
     """
 
-  macro "assert", (sexp) ->
-    c_sexp = sexp.compile()
+  defmacro "assert", (sexp) ->
+    c_sexp = sexp._compile()
     
     error_namespace = new types.String "Assertion-Error"
     error = new types.String sexp.toString()

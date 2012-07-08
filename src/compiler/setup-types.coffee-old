@@ -172,7 +172,7 @@
         if item instanceof types.Quoted
           c_key = item.value[1].compile false
         else
-          c_key = item.compile false
+          c_key = item._compile false
           
         c_value = @static_values[i].compile()
           
@@ -185,12 +185,12 @@
       
       if @dynamic_keys.length
         tmp_var = types.Symbol.gensym "obj", false
-        c_tmp_var = tmp_var.compile()
+        c_tmp_var = tmp_var._compile()
         scope = last scope_stack
         object_definition = scope.def.invoke tmp_var, (new types.List [(new types.Symbol "js-eval"), object])
         
         dynamic_body = for item, i in @dynamic_keys
-          c_key = item.compile()
+          c_key = item._compile()
           c_value = @dynamic_values[i].compile()
           "#{c_tmp_var}[#{c_key}] = #{c_value}"
           
@@ -212,7 +212,7 @@
   class @String extends @SyntaxNode
     _compile: ->
       val = if @value instanceof types.Symbol
-        @value.compile()
+        @value._compile()
       else
         @value
       "\"#{val.replace /\n/g, '\\n'}\""
@@ -284,7 +284,7 @@
     @compile_non_strict: (sym) ->
       tmp = sym.must_exist
       sym.must_exist = false
-      result = sym.compile()
+      result = sym._compile()
       sym.must_exist = tmp
       result
       
@@ -312,7 +312,7 @@
       if @args?
         c_args = for arg in @args
           arg.must_exist = false
-          c_arg = arg.compile()
+          c_arg = arg._compile()
           scope[c_arg] = new types.Dynamic()
           c_arg
       else
@@ -379,7 +379,7 @@
               c_passed_arg = if item instanceof types.Symbol
                 types.Symbol.compile_non_strict item
               else
-                item.compile()
+                item._compile()
               
               temp_args_assignments.push "#{tmp} = #{c_passed_arg}"
               temp_args_to_real_args.push "#{@cached_compiled_args[i]} = #{tmp}"
@@ -414,7 +414,7 @@
         @invoke = fn
       
     compile_unquoted: ->
-      c_name = @name.compile()
+      c_name = @name._compile()
       scope = last scope_stack
       scope[c_name] = this
       compile_to = @oppo_fn?.compile?() ? "#{@oppo_fn}" ? "null"

@@ -310,6 +310,10 @@
       }
     };
 
+    Construct.prototype._compile = function() {
+      return this.compile.apply(this, arguments);
+    };
+
     Construct.prototype.error = function(message) {
       var filename, location, type;
       filename = C.current_filename;
@@ -344,7 +348,7 @@
     }
 
     ReturnedConstruct.prototype.compile = function() {
-      return "return " + (this.value.compile());
+      return "return " + (this.value._compile());
     };
 
     return ReturnedConstruct;
@@ -368,7 +372,7 @@
         _results = [];
         for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
           item = _ref1[_i];
-          _results.push(item.compile());
+          _results.push(item._compile());
         }
         return _results;
       }).call(this);
@@ -504,7 +508,7 @@
         _results = [];
         for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
           _ref2 = _ref1[_i], prop = _ref2[0], val = _ref2[1];
-          _results.push("" + prefix + "." + (prop.compile()) + " = " + (val.compile()));
+          _results.push("" + prefix + "." + (prop._compile()) + " = " + (val._compile()));
         }
         return _results;
       })();
@@ -515,7 +519,7 @@
       var proto, statics;
       statics = object_compile(this.name, this.statics);
       proto = object_compile("" + this.name + ".prototype", this.prototype);
-      return "" + this.name + " = (function () {\n  " + (this.class_constructor.compile()) + ";\n  " + statics + ";\n  " + proto + ";\n  return " + this.name + ";\n})()";
+      return "" + this.name + " = (function () {\n  " + (this.class_constructor._compile()) + ";\n  " + statics + ";\n  " + proto + ";\n  return " + this.name + ";\n})()";
     };
 
     return Class;
@@ -542,16 +546,16 @@
     }
 
     Function.prototype.compile = function() {
-      var arg, c_args, c_body, c_name, i, last_stmt_index, scope, stmt, var_stmt, vars, _var;
+      var arg, c_args, c_body, c_name, i, last_stmt_index, scope, stmt, var_stmt;
       scope = new C.Scope();
-      c_name = this.name.compile();
+      c_name = L.core.to_type(this.name) === "string" ? this.name : this.name._compile();
       c_args = (function() {
         var _i, _len, _ref1, _results;
         _ref1 = this.args;
         _results = [];
         for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
           arg = _ref1[_i];
-          _results.push(arg.compile());
+          _results.push(arg._compile());
         }
         return _results;
       }).call(this);
@@ -566,23 +570,13 @@
             if (i === last_stmt_index) {
               stmt = stmt.should_return();
             }
-            _results.push(stmt.compile());
+            _results.push(stmt._compile());
           }
           return _results;
         }).call(this);
       }
-      vars = (function() {
-        var _ref1, _results;
-        _ref1 = scope.vars;
-        _results = [];
-        for (_var in _ref1) {
-          if (!__hasProp.call(_ref1, _var)) continue;
-          _results.push(_var.compile());
-        }
-        return _results;
-      })();
-      var_stmt = vars.length ? "var " + (vars.join(', ')) + ";\n  " : '';
-      return "(function " + c_name + "(" + (c_args.join(", ")) + ") {\n  " + var_stmt + (c_body.join(";\n  ")) + ";\n})";
+      var_stmt = scope.var_stmt();
+      return "function " + c_name + "(" + (c_args.join(", ")) + ") {\n  " + var_stmt + (c_body.join(";\n  ")) + ";\n}";
     };
 
     return Function;
@@ -604,9 +598,9 @@
 
     FunctionCall.prototype.compile = function() {
       var arg, args, c_args, c_fn;
-      c_fn = this.fn.compile();
+      c_fn = this.fn._compile();
       if (!(this.fn instanceof C.Symbol)) {
-        c_fn = "(c_fn)";
+        c_fn = "(" + c_fn + ")";
       }
       if (this.apply || this.call) {
         args = [this.scope].concat(this.args);
@@ -619,7 +613,7 @@
         _results = [];
         for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
           arg = _ref1[_i];
-          _results.push(arg.compile());
+          _results.push(arg._compile());
         }
         return _results;
       }).call(this);
@@ -667,16 +661,16 @@
 
     ForLoop.prototype.compile = function() {
       var c_a, c_b, c_body, c_c, item;
-      c_a = this.a.compile();
-      c_b = this.b.compile();
-      c_c = this.c.compile();
+      c_a = this.a._compile();
+      c_b = this.b._compile();
+      c_c = this.c._compile();
       c_body = (function() {
         var _i, _len, _ref1, _results;
         _ref1 = this.body;
         _results = [];
         for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
           item = _ref1[_i];
-          _results.push(item.compile());
+          _results.push(item._compile());
         }
         return _results;
       }).call(this);
@@ -724,15 +718,15 @@
 
     ForInLoop.prototype.compile = function() {
       var c_body, c_object, c_property, item;
-      c_property = this.property.compile();
-      c_object = this.object.compile();
+      c_property = this.property._compile();
+      c_object = this.object._compile();
       c_body = (function() {
         var _i, _len, _ref1, _results;
         _ref1 = this.body;
         _results = [];
         for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
           item = _ref1[_i];
-          _results.push(item.compile());
+          _results.push(item._compile());
         }
         return _results;
       }).call(this);
@@ -754,14 +748,14 @@
 
     WhileLoop.prototype.compile = function() {
       var c_body, c_condition, item;
-      c_condition = this.condition.compile();
+      c_condition = this.condition._compile();
       c_body = (function() {
         var _i, _len, _ref1, _results;
         _ref1 = this.body;
         _results = [];
         for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
           item = _ref1[_i];
-          _results.push(item.compile());
+          _results.push(item._compile());
         }
         return _results;
       }).call(this);
@@ -783,14 +777,14 @@
 
     DoWhileLoop.prototype.compile = function() {
       var c_body, c_condition, item;
-      c_condition = this.condition.compile();
+      c_condition = this.condition._compile();
       c_body = (function() {
         var _i, _len, _ref1, _results;
         _ref1 = this.body;
         _results = [];
         for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
           item = _ref1[_i];
-          _results.push(item.compile());
+          _results.push(item._compile());
         }
         return _results;
       }).call(this);
@@ -845,7 +839,7 @@
         _results = [];
         for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
           _ref2 = _ref1[_i], prop = _ref2[0], val = _ref2[1];
-          _results.push("" + (prop.compile()) + ": " + (val.compile()));
+          _results.push("" + (prop._compile()) + ": " + (val._compile()));
         }
         return _results;
       }).call(this);
@@ -867,12 +861,12 @@
 
     ProperyAccess.prototype.compile = function() {
       var base, c_prop, prop, _i, _len, _ref1, _results;
-      base = this.obj.compile();
+      base = this.obj._compile();
       _ref1 = this.props;
       _results = [];
       for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
         prop = _ref1[_i];
-        c_prop = prop.compile();
+        c_prop = prop._compile();
         if (prop instanceof C.Var) {
           _results.push(base = "" + base + "." + c_prop);
         } else {
@@ -897,8 +891,8 @@
 
     Operation.prototype.compile = function() {
       var c_x, c_y;
-      c_x = this.x.compile();
-      c_y = this.y.compile();
+      c_x = this.x._compile();
+      c_y = this.y._compile();
       return "" + c_x + " " + this.op + " " + c_y;
     };
 
@@ -917,7 +911,7 @@
 
     PrefixOperation.prototype.compile = function() {
       var c_x;
-      c_x = this.x.compile();
+      c_x = this.x._compile();
       return "" + this.op + c_x;
     };
 
@@ -936,7 +930,7 @@
 
     PostfixOperation.prototype.compile = function() {
       var c_x;
-      c_x = this.x.compile();
+      c_x = this.x._compile();
       return "" + c_x + this.op;
     };
 
@@ -1108,6 +1102,26 @@
       } catch (_error) {}
     };
 
+    Scope.prototype.var_stmt = function() {
+      var c_vars, _var;
+      if (Object.keys(this.vars).length) {
+        c_vars = (function() {
+          var _ref1, _results;
+          _ref1 = this.vars;
+          _results = [];
+          for (name in _ref1) {
+            if (!__hasProp.call(_ref1, name)) continue;
+            _var = _ref1[name]._var;
+            _results.push(_var._compile());
+          }
+          return _results;
+        }).call(this);
+        return "var " + (c_vars.join(', ')) + ";\n";
+      } else {
+        return '';
+      }
+    };
+
     return Scope;
 
   })();
@@ -1141,6 +1155,9 @@
 
     function Symbol(name) {
       this.name = name;
+      if (this.name instanceof C.Symbol) {
+        this.name = this.name.name;
+      }
       Symbol.__super__.constructor.apply(this, arguments);
     }
 
@@ -1244,14 +1261,11 @@
 
     __extends(Var, _super);
 
-    function Var(name) {
+    function Var() {
       var scope;
-      this.name = name;
       Var.__super__.constructor.apply(this, arguments);
       scope = C.current_scope();
-      if (!scope.var_defined(this)) {
-        scope.def_var(this);
-      }
+      scope.def_var(this);
     }
 
     Var.gensym = function() {
@@ -1268,20 +1282,21 @@
 
     __extends(Set, _super);
 
-    function Set(_arg) {
-      var scope;
-      this["var"] = _arg["var"], this.value = _arg.value;
-      scope = C.find_scope_with_var(this["var"]);
-      if (!scope) {
-        this["var"].error_cant_set();
-      }
+    function Set(_arg, yy) {
+      var scope, value;
+      this._var = _arg._var, value = _arg.value;
       Set.__super__.constructor.apply(this, arguments);
+      this.value = value;
+      scope = C.find_scope_with_var(this._var);
+      if (!scope) {
+        this._var.error_cant_set();
+      }
     }
 
     Set.prototype.compile = function() {
       var c_val, c_var;
-      c_var = this["var"].compile();
-      c_val = this.value.compile();
+      c_var = this._var._compile();
+      c_val = this.value._compile();
       return "" + c_var + " = " + c_val;
     };
 
@@ -1294,7 +1309,7 @@
 var parser = (function(){
 var parser = {trace: function trace() { },
 yy: {},
-symbols_: {"error":2,"program":3,"s_expression_list":4,"EOF":5,"s_expression":6,"special_form":7,"list":8,"symbol":9,"literal":10,"callable_list":11,"quoted_list":12,"object":13,"(":14,"element_list":15,")":16,"[":17,"]":18,"OBJECT":19,"kvpair_list":20,"OBJECT_END":21,"kvpair":22,"element":23,"QUOTE":24,"QUASIQUOTE":25,"UNQUOTE":26,"UNQUOTE_SPLICING":27,"FUNCTION":28,"string":29,"regex":30,"number":31,"atom":32,"BOOLEAN_TRUE":33,"BOOLEAN_FALSE":34,"REGEX":35,"FLAGS":36,"FIXNUM":37,"FLOAT":38,"BASENUM":39,"STRING":40,"keyword":41,"KEYWORD":42,"IDENTIFIER":43,"$accept":0,"$end":1},
+symbols_: {"error":2,"program":3,"s_expression_list":4,"EOF":5,"s_expression":6,"special_form":7,"list":8,"symbol":9,"literal":10,"callable_list":11,"array":12,"object":13,"(":14,"element_list":15,")":16,"[":17,"]":18,"OBJECT":19,"kvpair_list":20,"OBJECT_END":21,"kvpair":22,"element":23,"QUOTE":24,"QUASIQUOTE":25,"UNQUOTE":26,"UNQUOTE_SPLICING":27,"FUNCTION":28,"string":29,"regex":30,"number":31,"atom":32,"BOOLEAN_TRUE":33,"BOOLEAN_FALSE":34,"REGEX":35,"FLAGS":36,"FIXNUM":37,"FLOAT":38,"BASENUM":39,"STRING":40,"keyword":41,"KEYWORD":42,"IDENTIFIER":43,"$accept":0,"$end":1},
 terminals_: {2:"error",5:"EOF",14:"(",16:")",17:"[",18:"]",19:"OBJECT",21:"OBJECT_END",24:"QUOTE",25:"QUASIQUOTE",26:"UNQUOTE",27:"UNQUOTE_SPLICING",28:"FUNCTION",33:"BOOLEAN_TRUE",34:"BOOLEAN_FALSE",35:"REGEX",36:"FLAGS",37:"FIXNUM",38:"FLOAT",39:"BASENUM",40:"STRING",42:"KEYWORD",43:"IDENTIFIER"},
 productions_: [0,[3,2],[3,1],[4,2],[4,1],[6,1],[6,1],[6,1],[6,1],[8,1],[8,1],[8,1],[11,3],[12,3],[12,2],[13,3],[13,2],[20,1],[20,2],[22,2],[15,1],[15,2],[23,1],[7,2],[7,2],[7,2],[7,2],[7,3],[10,1],[10,1],[10,1],[10,1],[32,2],[32,1],[32,1],[30,2],[31,1],[31,1],[31,1],[29,1],[29,1],[41,2],[9,1]],
 performAction: function anonymous(yytext,yyleng,yylineno,yy,yystate,$$,_$) {
@@ -1302,13 +1317,11 @@ performAction: function anonymous(yytext,yyleng,yylineno,yy,yystate,$$,_$) {
 var $0 = $$.length - 1;
 switch (yystate) {
 case 1:
-      return new C.Call({
-        fn: sym("do", yy),
-        args: $$[$0-1]
-      }, yy);
+      var lambda = new C.Lambda({body: $$[$0-1]}, yy);
+      return new C.List([lambda], yy);
     
 break;
-case 2: return new types.Nil(yy); 
+case 2: return new C.Null(yy); 
 break;
 case 3: this.$ = $$[$0-1]; this.$.push($$[$0]); 
 break;
@@ -1316,23 +1329,9 @@ case 4: this.$ = [$$[$0]];
 break;
 case 12: this.$ = new C.List($$[$0-1], yy); 
 break;
-case 13:
-      var i = 0;
-      var len = $$[$0-1].length;
-      for (; i < len; i++) {
-        var item = $$[$0-1][i];
-        if (!(item instanceof types.UnquoteSpliced))
-        $$[$0-1][i] = new types.Unquoted(item, yy);
-      }
-      
-      var list = new types.List($$[$0-1], yy);
-      this.$ = new types.Quasiquoted(list, yy);
-    
+case 13: this.$ = new C.Array($$[$0-1], yy); 
 break;
-case 14:
-      var list = new types.List([], yy);
-      this.$ = new types.Quoted(list, yy);
-    
+case 14: this.$ = new C.Array([], yy); 
 break;
 case 15: this.$ = new C.Object($$[$0-1], yy); 
 break;
@@ -1348,13 +1347,13 @@ case 20: this.$ = [$$[$0]];
 break;
 case 21: this.$ = $$[$0-1]; this.$.push($$[$0]); 
 break;
-case 23: this.$ = new types.Quoted($$[$0], yy); 
+case 23: this.$ = $$[$0]; this.$.quoted = true; 
 break;
-case 24: this.$ = new types.Quasiquoted($$[$0], yy); 
+case 24: this.$ = $$[$0-1]; this.$.quasiquoted = true; 
 break;
-case 25: this.$ = new types.Unquoted($$[$0], yy); 
+case 25: this.$ = $$[$0]; this.$.unquoted = true; 
 break;
-case 26: this.$ = new types.UnquoteSpliced($$[$0], yy); 
+case 26: this.$ = $$[$0]; this.$.unquote_spliced = true; 
 break;
 case 27: this.$ = new C.Lambda({body: $$[$0-1], arity: Infinity}, yy); 
 break;
@@ -1773,7 +1772,7 @@ if (typeof module !== 'undefined' && require.main === module) {
 }
 }// Generated by CoffeeScript 1.3.3
 (function() {
-  var C, INDENT, L, call_macro, clone, compile, compile_list, indent_down, indent_up, keys, last, macro, map, newline, newline_down, newline_up, read, root, scope_stack, setup_built_in_macros, trim, type_of, types, _ref, _ref1, _ref2,
+  var C, L, call_macro, clone, compile, compile_list, compile_runtime, define, defmacro, keys, last, map, read, root, scope_stack, setup_built_in_macros, trim, type_of, types, _ref, _ref1, _ref2,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     __slice = [].slice;
@@ -1839,7 +1838,7 @@ if (typeof module !== 'undefined' && require.main === module) {
     type = type_of(o);
     switch (type) {
       case "array":
-        return types.List.prototype.toString.call({
+        return C.List.prototype.toString.call({
           value: o
         });
       case "object":
@@ -1909,7 +1908,7 @@ if (typeof module !== 'undefined' && require.main === module) {
       if (unquoted) {
         item.quoted = false;
       }
-      _results.push(item.compile(arg));
+      _results.push(item._compile(arg));
     }
     return _results;
   };
@@ -1918,27 +1917,19 @@ if (typeof module !== 'undefined' && require.main === module) {
     return this.replace(/^\s+/, '').replace(/\s+$/, '');
   };
 
-  INDENT = "";
-
-  indent_up = function() {
-    return INDENT = "" + INDENT + "  ";
-  };
-
-  indent_down = function() {
-    return INDENT = INDENT.substr(2);
-  };
-
-  newline = function() {
-    return "\n" + INDENT;
-  };
-
-  newline_down = function() {
-    return "\n" + (indent_down());
-  };
-
-  newline_up = function() {
-    return "\n" + (indent_up());
-  };
+  (function() {
+    C.Construct.prototype._compile = function() {
+      var compile_fn;
+      compile_fn = this.quoted ? this.compile_quoted : this.quasiquoted ? this.compile_quasiquoted : this.unquoted ? this.compile_unquoted : this.unquote_spliced ? this.compile_unquote_spliced : this.compile;
+      return compile_fn.apply(this, arguments);
+    };
+    C.Construct.prototype.compile_quoted = function() {
+      return "new lemur.Compiler." + this.constructor.name + "('" + this.value + "')";
+    };
+    C.Construct.prototype.compile_quasiquoted = C.Construct.prototype.compile;
+    C.Construct.prototype.compile_unquoted = C.Construct.prototype.compile;
+    return C.Construct.prototype.compile_unquote_spliced = C.Construct.prototype.compile;
+  })();
 
   read = oppo.read = oppo.compiler.read = function() {
     return parser.parse.apply(parser, arguments);
@@ -1946,37 +1937,13 @@ if (typeof module !== 'undefined' && require.main === module) {
 
   compile = oppo.compile = oppo.compiler.compile = function(sexp) {
     return new lemur.Compiler().compile(function() {
+      var prog, r;
       setup_built_in_macros();
-      return sexp.compile();
+      r = compile_runtime();
+      prog = sexp._compile();
+      return "" + r + "\n" + prog;
     });
   };
-
-  C.Call = (function(_super) {
-
-    __extends(Call, _super);
-
-    function Call() {
-      return Call.__super__.constructor.apply(this, arguments);
-    }
-
-    Call.prototype.compile = function() {
-      var arg, val, _i, _len, _ref3;
-      val = C.get_var_val(this.fn);
-      if (val instanceof C.Macro) {
-        _ref3 = this.args;
-        for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
-          arg = _ref3[_i];
-          arg.quoted = true;
-        }
-        return val.invoke.apply(val, this.args);
-      } else {
-        return Call.__super__.compile.apply(this, arguments);
-      }
-    };
-
-    return Call;
-
-  })(C.FunctionCall);
 
   C.Keyword = (function(_super) {
 
@@ -2017,14 +1984,42 @@ if (typeof module !== 'undefined' && require.main === module) {
     }
 
     List.prototype.compile = function() {
-      if (!this.quoted) {
-        return (new C.Call({
-          fn: this.items[0],
-          args: this.items.slice(1)
-        })).compile();
-      } else {
-        return List.__super__.compile.apply(this, arguments);
-      }
+      return call_macro.apply(null, ["call"].concat(__slice.call(this.value)));
+    };
+
+    List.prototype.compile_quoted = function() {
+      var item, items, sym_js_eval;
+      sym_js_eval = new C.Symbol("js-eval");
+      items = (function() {
+        var _i, _len, _ref3, _results;
+        _ref3 = this.items;
+        _results = [];
+        for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
+          item = _ref3[_i];
+          if (!item.unquoted) {
+            item.quoted = true;
+          }
+          _results.push(new C.List([sym_js_eval, new C.String(item._compile())]));
+        }
+        return _results;
+      }).call(this);
+      return (new C.Array(items)).compile();
+    };
+
+    List.prototype.toString = function() {
+      var item, prefix, s_value;
+      s_value = (function() {
+        var _i, _len, _ref3, _results;
+        _ref3 = this.value;
+        _results = [];
+        for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
+          item = _ref3[_i];
+          _results.push(oppo.stringify(item));
+        }
+        return _results;
+      }).call(this);
+      prefix = this.quoted ? "'" : this.quasiquoted ? "`" : this.unquoted ? "~" : this.unquote_spliced ? "..." : "";
+      return "" + prefix + "(" + (s_value.join(' ')) + ")";
     };
 
     return List;
@@ -2036,17 +2031,16 @@ if (typeof module !== 'undefined' && require.main === module) {
     __extends(Macro, _super);
 
     function Macro(_arg, yy) {
-      this.name = _arg.name, this.argnames = _arg.argnames, this.template = _arg.template, this.invoke = _arg.invoke, this.oppo_fn = _arg.oppo_fn;
+      var name, scope;
+      name = _arg.name, this.argnames = _arg.argnames, this.template = _arg.template, this.invoke = _arg.invoke, this.oppo_fn = _arg.oppo_fn;
+      this.name = new C.Var(name);
+      scope = C.current_scope();
+      scope.set_var(this.name, this);
       Macro.__super__.constructor.call(this, null, yy);
     }
 
     Macro.prototype.compile_unquoted = function() {
-      var c_name, compile_to, scope, _ref3, _ref4, _ref5;
-      c_name = this.name.compile();
-      scope = last(scope_stack);
-      scope[c_name] = this;
-      compile_to = (_ref3 = (_ref4 = (_ref5 = this.oppo_fn) != null ? typeof _ref5.compile === "function" ? _ref5.compile() : void 0 : void 0) != null ? _ref4 : "" + this.oppo_fn) != null ? _ref3 : "null";
-      return "" + c_name + " = " + compile_to;
+      return "null";
     };
 
     Macro.prototype.invoke = function() {};
@@ -2077,84 +2071,105 @@ if (typeof module !== 'undefined' && require.main === module) {
 
   })(C.Construct);
 
-  (function() {
-    var isNaN, sym, _ref3;
-    sym = (_ref3 = typeof to_js_identifier !== "undefined" && to_js_identifier !== null ? to_js_identifier : ender.to_js_identifier) != null ? _ref3 : require("text-to-js-identifier");
-    isNaN = this[sym('NaN?')] = function(x) {
-      return (to_type(x)) !== "number" || x !== x;
-    };
-    this[sym('+')] = function() {
-      var num, x, _i, _len;
-      num = 0;
-      if (arguments.length < 2) {
-        throw new Error("Can't add less than two numbers.,");
-      }
-      for (_i = 0, _len = arguments.length; _i < _len; _i++) {
-        x = arguments[_i];
-        num += x;
-      }
-      if (isNaN(num)) {
-        throw new TypeError("Can't add non-numbers.");
-      }
-      return num;
-    };
-    this[sym('-')] = function() {
-      var num, x, _i, _len;
-      num = null;
-      for (_i = 0, _len = arguments.length; _i < _len; _i++) {
-        x = arguments[_i];
-        if (num != null) {
-          num -= x;
-        } else {
-          num = x;
-        }
-      }
-      if (isNaN(num)) {
-        throw new TypeError("Can't subtract non-numbers.");
-      }
-      return num;
-    };
-    return this[sym('*')] = function() {
-      var num, x, _i, _len, _results;
-      num = null;
+  define = function(o) {
+    var defs, name, o_val, result, scope, sym, sym_def, sym_do, sym_js_eval, val, var_stmt;
+    sym_js_eval = new C.Symbol("js-eval");
+    sym_do = new C.Symbol("do");
+    sym_def = new C.Symbol("def");
+    defs = (function() {
+      var _results;
       _results = [];
-      for (_i = 0, _len = arguments.length; _i < _len; _i++) {
-        x = arguments[_i];
-        if (num != null) {
-          _results.push(num *= x);
-        } else {
-          _results.push(void 0);
-        }
+      for (name in o) {
+        if (!__hasProp.call(o, name)) continue;
+        val = o[name];
+        sym = new C.Symbol(name);
+        o_val = new C.List([sym_js_eval, new C.String("" + val)]);
+        _results.push(new C.List([sym_def, sym, o_val]));
       }
       return _results;
-    };
-  });
+    })();
+    result = new C.List([sym_do].concat(__slice.call(defs)));
+    scope = C.current_scope();
+    var_stmt = scope.var_stmt();
+    return "" + var_stmt + (result._compile()) + ";";
+  };
+
+  compile_runtime = function() {
+    return define({
+      '+': function () {
+      var x = arguments[0];
+      for (var i=1, len=arguments.length; i<len; i++) {
+        x += +arguments[i];
+      }
+      return x;
+    },
+      '-': function () {
+      var x = arguments[0];
+      for (var i=1, len=arguments.length; i<len; i++) {
+        x -= arguments[i];
+      }
+      return x;
+    },
+      '*': function () {
+      var x = arguments[0];
+      for (var i=1, len=arguments.length; i<len; i++) {
+        x *= arguments[i];
+      }
+      return x;
+    },
+      '/': function () {
+      var x = arguments[0];
+      for (var i=1, len=arguments.length; i<len; i++) {
+        x /= arguments[i];
+      }
+      return x;
+    },
+      '**': "Math.pow",
+      "first": function(a) {
+        return a[0];
+      },
+      "second": function(a) {
+        return a[1];
+      },
+      "last": function(a) {
+        return a[a.length - 1];
+      },
+      "nth": function(a, n) {
+        if (n < 0) {
+          n += a.length;
+        } else if (n === 0) {
+          console.warn("nth treats collections as 1-based instead of 0 based. Don't try to access the 0th element.");
+          return null;
+        } else {
+          n -= 1;
+        }
+        return a[n];
+      }
+    });
+  };
 
   /*
   HELPERS
   */
 
 
-  macro = function(name, fn) {
-    var m, s_name, scope;
+  defmacro = function(name, fn) {
+    var m, s_name;
     s_name = new C.Symbol(name);
-    s_name.must_exist = false;
     m = new C.Macro({
       name: s_name,
       invoke: fn
     });
     m.builtin = true;
-    m.compile();
-    scope = C.current_scope();
-    scope.def_var(s_name, m);
+    m._compile();
     return m;
   };
 
   call_macro = function() {
-    var args, name;
+    var args, name, to_call;
     name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    macro = C.get_var_val(C.Symbol(name));
-    return macro.invoke.apply(macro, args);
+    to_call = C.get_var_val(new C.Symbol(name));
+    return to_call.invoke.apply(to_call, args);
   };
 
   setup_built_in_macros = function() {
@@ -2162,35 +2177,43 @@ if (typeof module !== 'undefined' && require.main === module) {
       JAVASCRIPT BUILTINS
     */
 
-    var macro_do, macro_if, macro_let, operator_macro;
-    macro("js-eval", function(js_code) {
-      return js_code;
+    var macro_do, macro_let, operator_macro;
+    defmacro("js-eval", function(js_code) {
+      if (js_code instanceof C.String) {
+        return js_code.value;
+      } else if (js_code instanceof C.Number) {
+        return js_code._compile();
+      } else if ((js_code instanceof C.Symbol) && js_code.quoted) {
+        return js_code.name;
+      } else {
+        return "window.eval(" + (js_code._compile()) + ")";
+      }
     });
-    macro_if = macro("if", function(cond, tbranch, fbranch) {
+    defmacro("if", function(cond, tbranch, fbranch) {
       var result, _ref3;
-      result = "(/* IF */ " + (cond.compile()) + " ?\n" + (indent_up()) + "/* THEN */ " + (tbranch.compile()) + " :\n" + INDENT + "/* ELSE */ " + ((_ref3 = fbranch != null ? fbranch.compile() : void 0) != null ? _ref3 : "null") + ")";
+      result = "(/* IF */ " + (cond._compile()) + " ?\n/* THEN */ " + (tbranch._compile()) + " :\n/* ELSE */ " + ((_ref3 = fbranch != null ? fbranch.compile() : void 0) != null ? _ref3 : "null") + ")";
       indent_down();
       return result;
     });
-    macro("lambda", function() {
+    defmacro("lambda", function() {
       var args, body, fn;
       args = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       fn = new C.Lambda({
         args: args.value,
         body: body
       });
-      return fn.compile();
+      return fn._compile();
     });
-    macro("js-for", function() {
+    defmacro("js-for", function() {
       var a, b, body, c, _for;
       a = arguments[0], b = arguments[1], c = arguments[2], body = 4 <= arguments.length ? __slice.call(arguments, 3) : [];
       _for = new C.ForLoop({
         condition: [a, b, c],
         body: body
       });
-      return _for.compile();
+      return _for._compile();
     });
-    macro("foreach", function() {
+    defmacro("foreach", function() {
       var body, coll, foreach;
       coll = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       return foreach = new C.ForEachLoop({
@@ -2217,7 +2240,7 @@ if (typeof module !== 'undefined' && require.main === module) {
         })();
         return results.join(' ');
       };
-      return macro(name, macro_fn);
+      return defmacro(name, macro_fn);
     };
     operator_macro("subtract", "Subtract");
     operator_macro("add", "Add");
@@ -2247,8 +2270,8 @@ if (typeof module !== 'undefined' && require.main === module) {
       OPPO BUILTINS
     */
 
-    macro("def", function() {
-      var args, body, c_name, c_value, name, rest, scope, to_define, value;
+    defmacro("def", function() {
+      var args, body, name, rest, scope, set_, to_define, value;
       to_define = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       if (!rest.length) {
         to_define.error("Def", "You must provide a value.");
@@ -2269,32 +2292,32 @@ if (typeof module !== 'undefined' && require.main === module) {
       } else {
         to_define.error("Def", "Invalid definition.");
       }
-      scope.def_var(name, value);
-      c_name = name.compile();
-      c_value = value.compile();
-      return "" + c_name + " = " + c_value;
+      name = new C.Var(name);
+      set_ = new C.Var.Set({
+        _var: name,
+        value: value
+      });
+      return set_._compile();
     });
-    macro("call", function() {
-      var args, c_args, callable, item, scope, to_call;
+    defmacro("call", function() {
+      var args, callable, fcall, item;
       callable = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      to_call = callable.compile();
-      if (callable instanceof types.Symbol) {
-        scope = last(scope_stack);
-        item = scope[to_call];
-        if (item instanceof types.Macro) {
+      if (callable instanceof C.Symbol) {
+        item = C.get_var_val(callable);
+        if (item instanceof C.Macro) {
           return item.invoke.apply(item, args);
         }
       }
-      if (callable instanceof types.Function) {
-        to_call = "(" + to_call + ")";
-      }
-      c_args = compile_list(args);
-      return "" + to_call + "(" + (c_args.join(', ')) + ")";
+      fcall = new C.FunctionCall({
+        fn: callable,
+        args: args
+      }, callable.yy);
+      return fcall._compile();
     });
-    macro_let = macro("let", function() {
+    macro_let = defmacro("let", function() {
       var bindings, body, def_sym, i, item, new_bindings, new_body, sym, _i, _len, _ref3;
       bindings = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      def_sym = new types.Symbol('def', null, bindings);
+      def_sym = new C.Symbol('def');
       sym = null;
       new_bindings = [];
       _ref3 = bindings.value;
@@ -2316,20 +2339,20 @@ if (typeof module !== 'undefined' && require.main === module) {
         })
       ])).compile();
     });
-    macro_do = macro("do", function() {
+    macro_do = defmacro("do", function() {
       var c_items;
       c_items = compile_list(arguments, null, true);
-      return "(" + (c_items.join(',\n' + INDENT)) + ")";
+      return "(" + (c_items.join(',\n')) + ")";
     });
     /*
       QUOTING
     */
 
-    macro("quote", function(x) {
+    defmacro("quote", function(x) {
       x.quoted = true;
-      return x.compile();
+      return x._compile();
     });
-    macro("quasiquote", function(x) {
+    defmacro("quasiquote", function(x) {
       var c_item, compiled, current_group, first, item, push_group, scope, _i, _len, _ref3;
       scope = last(scope_stack);
       current_group = [];
@@ -2344,13 +2367,13 @@ if (typeof module !== 'undefined' && require.main === module) {
       for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
         item = _ref3[_i];
         if (item instanceof types.UnquoteSpliced) {
-          c_item = "Array.prototype.slice.call(" + (item.compile()) + ")";
+          c_item = "Array.prototype.slice.call(" + (item._compile()) + ")";
           push_group();
           compiled.push(c_item);
         } else if (item instanceof types.Unquoted) {
-          current_group.push(item.compile());
+          current_group.push(item._compile());
         } else {
-          current_group.push(item.compile(true));
+          current_group.push(item._compile(true));
         }
       }
       push_group();
@@ -2361,30 +2384,30 @@ if (typeof module !== 'undefined' && require.main === module) {
         return first;
       }
     });
-    macro("unquote", function(x) {
-      return x.compile(false);
+    defmacro("unquote", function(x) {
+      return x._compile(false);
     });
-    macro("unquote-splicing", function(x) {
-      return x.compile(false);
+    defmacro("unquote-splicing", function(x) {
+      return x._compile(false);
     });
     /*
       ERRORS & VALIDATIONS
     */
 
-    macro("raise", function(namespace, error) {
+    defmacro("raise", function(namespace, error) {
       var c_error, c_namespace;
       if (arguments.length === 1) {
         error = namespace;
         c_namespace = "\"Error\"";
       } else {
-        c_namespace = namespace.compile();
+        c_namespace = namespace._compile();
       }
-      c_error = error.compile();
+      c_error = error._compile();
       return "(function () {\n" + (indent_up()) + "throw new oppo.Error(" + c_namespace + ", " + c_error + ");\n" + (indent_down()) + "})()";
     });
-    return macro("assert", function(sexp) {
+    return defmacro("assert", function(sexp) {
       var c_sexp, error, error_namespace, raise_call;
-      c_sexp = sexp.compile();
+      c_sexp = sexp._compile();
       error_namespace = new types.String("Assertion-Error");
       error = new types.String(sexp.toString());
       raise_call = call_macro("raise", error_namespace, error);

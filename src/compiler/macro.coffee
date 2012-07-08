@@ -1,20 +1,18 @@
 
 class C.Macro extends C.Construct
-  constructor: ({@name, @argnames, @template, @invoke, @oppo_fn}, yy) ->
+  constructor: ({name, @argnames, @template, @invoke, @oppo_fn}, yy) ->
+    @name = new C.Var name
+    scope = C.current_scope()
+    scope.set_var @name, this
     super null, yy
     
-  compile_unquoted: ->
-    c_name = @name.compile()
-    scope = last scope_stack
-    scope[c_name] = this
-    compile_to = @oppo_fn?.compile?() ? "#{@oppo_fn}" ? "null"
-    "#{c_name} = #{compile_to}"
+  compile_unquoted: -> "null"
     
   invoke: ->
     
   transform: ->
     # Transform this macro into non-macro oppo code
-    # Leave in builtin macros, since they only compile to plain javascript
+    # Leave in builtin macros unchanged, since they compile straight to javascript
     
     
   @transform: (code) ->
@@ -29,5 +27,4 @@ class C.Macro extends C.Construct
           item = scope[c_callable]
           if item instanceof C.Macro and not item.builtin
             return item.transform code
-    
     code

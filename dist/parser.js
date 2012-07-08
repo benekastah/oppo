@@ -2,7 +2,7 @@
 var parser = (function(){
 var parser = {trace: function trace() { },
 yy: {},
-symbols_: {"error":2,"program":3,"s_expression_list":4,"EOF":5,"s_expression":6,"special_form":7,"list":8,"symbol":9,"literal":10,"callable_list":11,"quoted_list":12,"object":13,"(":14,"element_list":15,")":16,"[":17,"]":18,"OBJECT":19,"kvpair_list":20,"OBJECT_END":21,"kvpair":22,"element":23,"QUOTE":24,"QUASIQUOTE":25,"UNQUOTE":26,"UNQUOTE_SPLICING":27,"FUNCTION":28,"string":29,"regex":30,"number":31,"atom":32,"BOOLEAN_TRUE":33,"BOOLEAN_FALSE":34,"REGEX":35,"FLAGS":36,"FIXNUM":37,"FLOAT":38,"BASENUM":39,"STRING":40,"keyword":41,"KEYWORD":42,"IDENTIFIER":43,"$accept":0,"$end":1},
+symbols_: {"error":2,"program":3,"s_expression_list":4,"EOF":5,"s_expression":6,"special_form":7,"list":8,"symbol":9,"literal":10,"callable_list":11,"array":12,"object":13,"(":14,"element_list":15,")":16,"[":17,"]":18,"OBJECT":19,"kvpair_list":20,"OBJECT_END":21,"kvpair":22,"element":23,"QUOTE":24,"QUASIQUOTE":25,"UNQUOTE":26,"UNQUOTE_SPLICING":27,"FUNCTION":28,"string":29,"regex":30,"number":31,"atom":32,"BOOLEAN_TRUE":33,"BOOLEAN_FALSE":34,"REGEX":35,"FLAGS":36,"FIXNUM":37,"FLOAT":38,"BASENUM":39,"STRING":40,"keyword":41,"KEYWORD":42,"IDENTIFIER":43,"$accept":0,"$end":1},
 terminals_: {2:"error",5:"EOF",14:"(",16:")",17:"[",18:"]",19:"OBJECT",21:"OBJECT_END",24:"QUOTE",25:"QUASIQUOTE",26:"UNQUOTE",27:"UNQUOTE_SPLICING",28:"FUNCTION",33:"BOOLEAN_TRUE",34:"BOOLEAN_FALSE",35:"REGEX",36:"FLAGS",37:"FIXNUM",38:"FLOAT",39:"BASENUM",40:"STRING",42:"KEYWORD",43:"IDENTIFIER"},
 productions_: [0,[3,2],[3,1],[4,2],[4,1],[6,1],[6,1],[6,1],[6,1],[8,1],[8,1],[8,1],[11,3],[12,3],[12,2],[13,3],[13,2],[20,1],[20,2],[22,2],[15,1],[15,2],[23,1],[7,2],[7,2],[7,2],[7,2],[7,3],[10,1],[10,1],[10,1],[10,1],[32,2],[32,1],[32,1],[30,2],[31,1],[31,1],[31,1],[29,1],[29,1],[41,2],[9,1]],
 performAction: function anonymous(yytext,yyleng,yylineno,yy,yystate,$$,_$) {
@@ -10,13 +10,11 @@ performAction: function anonymous(yytext,yyleng,yylineno,yy,yystate,$$,_$) {
 var $0 = $$.length - 1;
 switch (yystate) {
 case 1:
-      return new C.Call({
-        fn: sym("do", yy),
-        args: $$[$0-1]
-      }, yy);
+      var lambda = new C.Lambda({body: $$[$0-1]}, yy);
+      return new C.List([lambda], yy);
     
 break;
-case 2: return new types.Nil(yy); 
+case 2: return new C.Null(yy); 
 break;
 case 3: this.$ = $$[$0-1]; this.$.push($$[$0]); 
 break;
@@ -24,23 +22,9 @@ case 4: this.$ = [$$[$0]];
 break;
 case 12: this.$ = new C.List($$[$0-1], yy); 
 break;
-case 13:
-      var i = 0;
-      var len = $$[$0-1].length;
-      for (; i < len; i++) {
-        var item = $$[$0-1][i];
-        if (!(item instanceof types.UnquoteSpliced))
-        $$[$0-1][i] = new types.Unquoted(item, yy);
-      }
-      
-      var list = new types.List($$[$0-1], yy);
-      this.$ = new types.Quasiquoted(list, yy);
-    
+case 13: this.$ = new C.Array($$[$0-1], yy); 
 break;
-case 14:
-      var list = new types.List([], yy);
-      this.$ = new types.Quoted(list, yy);
-    
+case 14: this.$ = new C.Array([], yy); 
 break;
 case 15: this.$ = new C.Object($$[$0-1], yy); 
 break;
@@ -56,13 +40,13 @@ case 20: this.$ = [$$[$0]];
 break;
 case 21: this.$ = $$[$0-1]; this.$.push($$[$0]); 
 break;
-case 23: this.$ = new types.Quoted($$[$0], yy); 
+case 23: this.$ = $$[$0]; this.$.quoted = true; 
 break;
-case 24: this.$ = new types.Quasiquoted($$[$0], yy); 
+case 24: this.$ = $$[$0-1]; this.$.quasiquoted = true; 
 break;
-case 25: this.$ = new types.Unquoted($$[$0], yy); 
+case 25: this.$ = $$[$0]; this.$.unquoted = true; 
 break;
-case 26: this.$ = new types.UnquoteSpliced($$[$0], yy); 
+case 26: this.$ = $$[$0]; this.$.unquote_spliced = true; 
 break;
 case 27: this.$ = new C.Lambda({body: $$[$0-1], arity: Infinity}, yy); 
 break;
