@@ -6,7 +6,9 @@ class C.Macro extends C.Construct
     scope.set_var @name, this
     super null, yy
     
-  compile_unquoted: -> "null"
+  compile: ->
+
+    "null"
     
   invoke: ->
     

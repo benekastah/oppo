@@ -14,49 +14,89 @@ define = (o) ->
   var_stmt = scope.var_stmt()
   "#{var_stmt}#{result._compile()};"
 
+compare_op = (sym) ->
+  """
+  function () {
+    var last = arguments[0];
+    for (var i=1, len=arguments.length; i<len; i++) {
+      var current = arguments[i];
+      var result = last #{sym} current;
+      if (!result) return result;
+      last = current;
+    }
+    return true;
+  }
+  """
+
+binary_op = (sym, _not=false) ->
+  """
+  function () {
+    var last = arguments[0];
+    for (var i=1, len=arguments.length; i<len; i++) {
+      if (#{if _not then '!' else ''}last) return last;
+      last = last #{sym} arguments[i];
+    }
+    return last;
+  }
+  """
+
+math_op = (sym, explicit_convert=false) ->
+  """
+  function () {
+    var x = arguments[0];
+    for (var i=1, len=arguments.length; i<len; i++) {
+      x #{sym}= #{if explicit_convert then '+' else ''}arguments[i];
+    }
+    return x;
+  }
+  """
+
 compile_runtime = ->
   define
-    '+': `function () {
-      var x = arguments[0];
-      for (var i=1, len=arguments.length; i<len; i++) {
-        x += +arguments[i];
-      }
-      return x;
-    }`
 
-    '-': `function () {
-      var x = arguments[0];
-      for (var i=1, len=arguments.length; i<len; i++) {
-        x -= arguments[i];
-      }
-      return x;
-    }`
 
-    '*': `function () {
-      var x = arguments[0];
-      for (var i=1, len=arguments.length; i<len; i++) {
-        x *= arguments[i];
-      }
-      return x;
-    }`
+    ## Math
+    '+': (math_op '+', true)
 
-    '/': `function () {
-      var x = arguments[0];
-      for (var i=1, len=arguments.length; i<len; i++) {
-        x /= arguments[i];
-      }
-      return x;
-    }`
+    '-': math_op '-'
+
+    '*': math_op '*'
+
+    '/': math_op '/'
+
+    mod: (a, b) -> a % b
 
     '**': "Math.pow"
 
-    "first": (a) -> a[0]
 
-    "second": (a) -> a[1]
+    ## Comparisons
+    '=': compare_op '==='
 
-    "last": (a) -> a[a.length - 1]
+    'not=': compare_op '!=='
 
-    "nth": (a, n) ->
+    '<': compare_op '<'
+
+    '>': compare_op '>'
+
+    '<=': compare_op '<='
+
+    '>=': compare_op '>='
+
+
+    ## Binary operations
+    or: binary_op '||'
+
+    and: (binary_op '&&', true)
+
+
+    ## Array functions
+    first: (a) -> a[0]
+
+    second: (a) -> a[1]
+
+    last: (a) -> a[a.length - 1]
+
+    nth: (a, n) ->
       if n < 0
         n += a.length
       else if n is 0

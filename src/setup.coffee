@@ -116,6 +116,12 @@ do ->
 
   C.Construct::compile_unquote_spliced = C.Construct::compile
 
+  C.Number::compile_quoted = C.Number::compile
+
+  C.String::compile_quoted = C.String::compile
+
+  C.Array::compile_quoted = C.Array::compile
+
 #-----------------------------------------------------------------------------#
 
 read = oppo.read = oppo.compiler.read = ->
