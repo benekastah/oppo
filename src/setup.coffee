@@ -122,6 +122,11 @@ do ->
 
   C.Array::compile_quoted = C.Array::compile
 
+  C.If::transform = ->
+    @then = C.Macro.transform @then
+    @_else = C.Macro.transform @_else if @_else?
+    this
+
 #-----------------------------------------------------------------------------#
 
 read = oppo.read = oppo.compiler.read = ->

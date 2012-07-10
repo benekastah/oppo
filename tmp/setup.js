@@ -155,7 +155,17 @@
     };
     C.Construct.prototype.compile_quasiquoted = C.Construct.prototype.compile;
     C.Construct.prototype.compile_unquoted = C.Construct.prototype.compile;
-    return C.Construct.prototype.compile_unquote_spliced = C.Construct.prototype.compile;
+    C.Construct.prototype.compile_unquote_spliced = C.Construct.prototype.compile;
+    C.Number.prototype.compile_quoted = C.Number.prototype.compile;
+    C.String.prototype.compile_quoted = C.String.prototype.compile;
+    C.Array.prototype.compile_quoted = C.Array.prototype.compile;
+    return C.If.prototype.transform = function() {
+      this.then = C.Macro.transform(this.then);
+      if (this._else != null) {
+        this._else = C.Macro.transform(this._else);
+      }
+      return this;
+    };
   })();
 
   read = oppo.read = oppo.compiler.read = function() {

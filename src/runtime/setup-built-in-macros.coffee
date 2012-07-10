@@ -2,17 +2,29 @@
 HELPERS
 ###
 
-defmacro = (name, fn) ->
+defmacro = (name, fn, builtin=true) ->
   s_name = new C.Symbol name
-  m = new C.Macro name: s_name, invoke: fn
-  m.builtin = true
+  macro_args = name: s_name
+  if builtin
+    macro_args.invoke = fn
+  else
+    macro_args.transform = fn
+  m = new C.Macro macro_args
+  m.builtin = builtin
   m._compile()
   m
   
 call_macro = (name, args...) ->
   to_call = C.get_var_val (new C.Symbol name)
-  to_call.invoke args...
+  if to_call.invoke?
+    to_call.invoke args...
+  else
+    ret = to_call.transform args...
+    ret.compile()
 
+call_macro_transform = (name, args...) ->
+  to_call = C.get_var_val (new C.Symbol name)
+  to_call.transform args...
 
 
 setup_built_in_macros = ->
@@ -31,24 +43,24 @@ setup_built_in_macros = ->
       "window.eval(#{js_code._compile()})"
 
   defmacro "if", (cond, tbranch, fbranch) ->
-    result = """
-    (/* IF */ #{cond._compile()} ?
-    /* THEN */ #{tbranch._compile()} :
-    /* ELSE */ #{fbranch?.compile() ? "null"})
-    """
-    indent_down()
-    result
+    _if = new C.If {
+      condition: cond
+      then: tbranch
+      _else: fbranch
+    }
+  , false
 
   defmacro "lambda", (args, body...) ->
     fn = new C.Lambda {args: args.value, body}
-    fn._compile()
+  , false
 
   defmacro "js-for", (a, b, c, body...) ->
     _for = new C.ForLoop condition: [a, b, c], body: body
-    _for._compile()
+  , false
 
   defmacro "foreach", (coll, body...) ->
     foreach = new C.ForEachLoop collection: coll, body: body
+  , false
 
   operator_macro = (name, className) ->
     macro_fn = (args...) ->
@@ -127,9 +139,12 @@ setup_built_in_macros = ->
     if callable instanceof C.Symbol
       item = C.get_var_val callable
       if item instanceof C.Macro
-        return item.invoke args...
+        if item.invoke?
+          return new C.Raw item.invoke args...
+        else
+          return item.transform()
     fcall = new C.FunctionCall {fn: callable, args}, callable.yy
-    fcall._compile()
+  , false
 
   macro_let = defmacro "let", (bindings, body...) ->
     def_sym = new C.Symbol 'def'
@@ -209,8 +224,8 @@ setup_built_in_macros = ->
     
     """
     (function () {
-    #{indent_up()}throw new oppo.Error(#{c_namespace}, #{c_error});
-    #{indent_down()}})()
+      throw new oppo.Error(#{c_namespace}, #{c_error});
+    })()
     """
 
   defmacro "assert", (sexp) ->

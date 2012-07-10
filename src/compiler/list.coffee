@@ -26,3 +26,7 @@ class C.List extends C.Array
       ""
 
     "#{prefix}(#{s_value.join ' '})"
+
+  transform: ->
+    if not (@quoted or @quasiquoted or @unquote_spliced)
+      call_macro_transform "call", @value...
