@@ -6,11 +6,25 @@ class C.List extends C.Array
   compile_quoted: ->
     sym_js_eval = new C.Symbol "js-eval"
     items = for item in @items
-      item.quoted = true unless item.unquoted
+      item.quoted = true unless (@quasiquoted and item.unquoted)
       new C.List [sym_js_eval, new C.String item._compile()]
-    (new C.Array items).compile()
+    
+    ret = new C.Array items
+    ret.compile()
 
-  toString: ->
+  compile_quasiquoted: ->
+    value = @compile_quoted arguments...
+    ls = "new lemur.Compiler.List(#{value}, #{@line_number})"
+    ls = new C.Raw ls, @yy
+    sym_ls = C.Var.gensym "ls"
+    grp = new C.CommaGroup [
+      (new C.Var.Set _var: sym_ls, value: ls)
+      new C.Raw "#{sym_ls.compile()}.quoted = true"
+      sym_ls
+    ]
+    grp.compile()
+
+  toOppoString: ->
     s_value = for item in @value
       oppo.stringify item
       

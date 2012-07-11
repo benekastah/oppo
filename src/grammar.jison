@@ -11,7 +11,7 @@
   var slice = Array.prototype.slice;
   var call_by_name = function (sname, args, yy) {
     var s = sym(sname, yy);
-    return new C.Call([sym].concat(args), yy);
+    return new C.List([s].concat(args), yy);
   };
 %}
 
@@ -68,8 +68,10 @@
 program
   : s_expression_list EOF
     {
+      $1.unshift(new C.Raw("var eval = " + sym("oppo-eval").compile()));
       var lambda = new C.Lambda({body: $1}, yy);
-      return new C.List([lambda], yy);
+      //return new C.List([lambda], yy);
+      return lambda;
     }
   | EOF
     { return new C.Null(yy); }
@@ -102,9 +104,9 @@ callable_list
 
 array
   : '[' element_list ']'
-    { $$ = new C.Array($2, yy); }
+    { $$ = call_by_name("array", $2, yy); }
   | '[' ']'
-    { $$ = new C.Array([], yy); }
+    { $$ = call_by_name("array", [], yy); }
   ;
   
 object
@@ -141,7 +143,7 @@ special_form
   : QUOTE s_expression
     { $$ = $2; $$.quoted = true; }
   | QUASIQUOTE s_expression
-    { $$ = $1; $$.quasiquoted = true; }
+    { $$ = $2; $$.quasiquoted = true; }
   | UNQUOTE s_expression
     { $$ = $2; $$.unquoted = true; }
   | UNQUOTE_SPLICING s_expression
@@ -168,7 +170,7 @@ atom
 
 regex
   : REGEX FLAGS
-    { $$ = new C.Regex({pattern: $1, flags: $2.substr(1)}, yy); }
+    { $$ = new C.Regex({pattern: $1, modifiers: $2.substr(1)}, yy); }
   ;
   
 number

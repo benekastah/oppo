@@ -40,10 +40,10 @@ oppo.stringify = (o) ->
   type = type_of o
   switch type
     when "array"
-      C.List::toString.call {value: o}
+      C.List::toOppoString.call {value: o}
     when "object"
       if o instanceof C.Construct
-        o.toString()
+        o.toOppoString?() ? o.toString()
       else
         items = for key, value of o
           "#{oppo.stringify key} #{oppo.stringify value}"
@@ -95,14 +95,14 @@ trim = String::trim or -> @.replace(/^\s+/, '').replace /\s+$/, ''
 
 do ->
   C.Construct::_compile = ->
-    compile_fn = if @quoted
-      @compile_quoted
-    else if @quasiquoted
+    compile_fn = if @quasiquoted
       @compile_quasiquoted
     else if @unquoted
       @compile_unquoted
     else if @unquote_spliced
       @compile_unquote_spliced
+    else if @quoted
+      @compile_quoted
     else
       @compile
     compile_fn.apply this, arguments
@@ -110,17 +110,21 @@ do ->
   C.Construct::compile_quoted = ->
     "new lemur.Compiler.#{@constructor.name}('#{@value}')"
 
-  C.Construct::compile_quasiquoted = C.Construct::compile
+  normal_compile = -> @compile arguments...
+  C.Construct::compile_quasiquoted = normal_compile
 
-  C.Construct::compile_unquoted = C.Construct::compile
+  C.Construct::compile_unquoted = normal_compile
 
-  C.Construct::compile_unquote_spliced = C.Construct::compile
+  C.Construct::compile_unquote_spliced = normal_compile
 
-  C.Number::compile_quoted = C.Number::compile
+  C.Number::valueOf = -> +@compile()
 
-  C.String::compile_quoted = C.String::compile
+  C.Number::toString = C.Number::compile
 
-  C.Array::compile_quoted = C.Array::compile
+  C.String::toString = ->
+    eval @compile()
+
+  C.String::valueOf = C.String::toString
 
   C.If::transform = ->
     @then = C.Macro.transform @then
@@ -135,13 +139,31 @@ read = oppo.read = oppo.compiler.read = ->
 #-----------------------------------------------------------------------------#
 
 compile = oppo.compile = oppo.compiler.compile = (sexp) ->
+  if (type_of sexp) is "array"
+    sexp = new C.List sexp
+    sexp = new C.Lambda body: [sexp]
+
   new lemur.Compiler().compile ->
     setup_built_in_macros()
     r = compile_runtime()
+    sym_prog = C.Var.gensym "program"
+    c_sym_prog = sym_prog.compile()
     prog = sexp._compile()
     """
+    // Your program
+    var #{c_sym_prog} = #{prog};
+
+    // Oppo runtime
     #{r}
-    #{prog}
+    
+    // Run the oppo program
+    if (lemur.core.to_type(#{c_sym_prog}) === 'function')
+      #{c_sym_prog}();
+    else
+      #{c_sym_prog};
     """
+
+oppo_eval = oppo.eval = (sexp) ->
+  root.eval compile sexp
 
 #-----------------------------------------------------------------------------#

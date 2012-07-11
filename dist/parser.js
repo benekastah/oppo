@@ -10,8 +10,10 @@ performAction: function anonymous(yytext,yyleng,yylineno,yy,yystate,$$,_$) {
 var $0 = $$.length - 1;
 switch (yystate) {
 case 1:
+      $$[$0-1].unshift(new C.Raw("var eval = " + sym("oppo-eval").compile()));
       var lambda = new C.Lambda({body: $$[$0-1]}, yy);
-      return new C.List([lambda], yy);
+      //return new C.List([lambda], yy);
+      return lambda;
     
 break;
 case 2: return new C.Null(yy); 
@@ -22,9 +24,9 @@ case 4: this.$ = [$$[$0]];
 break;
 case 12: this.$ = new C.List($$[$0-1], yy); 
 break;
-case 13: this.$ = new C.Array($$[$0-1], yy); 
+case 13: this.$ = call_by_name("array", $$[$0-1], yy); 
 break;
-case 14: this.$ = new C.Array([], yy); 
+case 14: this.$ = call_by_name("array", [], yy); 
 break;
 case 15: this.$ = new C.Object($$[$0-1], yy); 
 break;
@@ -42,7 +44,7 @@ case 21: this.$ = $$[$0-1]; this.$.push($$[$0]);
 break;
 case 23: this.$ = $$[$0]; this.$.quoted = true; 
 break;
-case 24: this.$ = $$[$0-1]; this.$.quasiquoted = true; 
+case 24: this.$ = $$[$0]; this.$.quasiquoted = true; 
 break;
 case 25: this.$ = $$[$0]; this.$.unquoted = true; 
 break;
@@ -56,7 +58,7 @@ case 33: this.$ = new C.True(yy);
 break;
 case 34: this.$ = new C.False(yy); 
 break;
-case 35: this.$ = new C.Regex({pattern: $$[$0-1], flags: $$[$0].substr(1)}, yy); 
+case 35: this.$ = new C.Regex({pattern: $$[$0-1], modifiers: $$[$0].substr(1)}, yy); 
 break;
 case 36: this.$ = new C.Number($$[$0], yy); 
 break;
@@ -204,7 +206,7 @@ parse: function parse(input) {
   var slice = Array.prototype.slice;
   var call_by_name = function (sname, args, yy) {
     var s = sym(sname, yy);
-    return new C.Call([sym].concat(args), yy);
+    return new C.List([s].concat(args), yy);
   };
 
   var types = {}; // oppo.compiler.types;

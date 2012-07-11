@@ -54,6 +54,10 @@ setup_built_in_macros = ->
     fn = new C.Lambda {args: args.value, body}
   , false
 
+  defmacro "array", (items...) ->
+    ary = new C.Array items
+  , false
+
   defmacro "js-for", (a, b, c, body...) ->
     _for = new C.ForLoop condition: [a, b, c], body: body
   , false
@@ -133,7 +137,7 @@ setup_built_in_macros = ->
     
     name = new C.Var name
     set_ = new C.Var.Set {_var: name, value}
-    set_._compile()
+  , false
     
   defmacro "call", (callable, args...) ->
     if callable instanceof C.Symbol
@@ -142,8 +146,14 @@ setup_built_in_macros = ->
         if item.invoke?
           return new C.Raw item.invoke args...
         else
-          return item.transform()
+          return item.transform args...
     fcall = new C.FunctionCall {fn: callable, args}, callable.yy
+  , false
+
+  defmacro "defmacro", (argnames, template...) ->
+    name = argnames.items.shift()
+    mac = new C.Macro {name, argnames, template}
+    new C.Raw mac.compile()
   , false
 
   macro_let = defmacro "let", (bindings, body...) ->
@@ -162,7 +172,7 @@ setup_built_in_macros = ->
     (new types.List [new types.Lambda body: new_body]).compile()
 
   macro_do = defmacro "do", ->
-    c_items = compile_list arguments, null, true
+    c_items = for arg in arguments then arg._compile()
     "(#{c_items.join ',\n'})"
     
 
@@ -173,39 +183,23 @@ setup_built_in_macros = ->
     
   defmacro "quote", (x) ->
     x.quoted = true
-    x._compile()
-    
+    x
+  , false
+
   defmacro "quasiquote", (x) ->
-    scope = last scope_stack
-    current_group = []
-    compiled = []
-    push_group = ->
-      if current_group.length
-        compiled.push "[#{current_group.join ', '}]"
-      current_group = []
-      
-    for item in x.value
-      if item instanceof types.UnquoteSpliced
-        c_item = "Array.prototype.slice.call(#{item._compile()})"
-        push_group()
-        compiled.push c_item
-      else if item instanceof types.Unquoted
-        current_group.push item._compile()
-      else
-        current_group.push (item._compile true)
-        
-    push_group()
-    first = compiled.shift()
-    if compiled.length
-      "#{first}.concat(#{compiled.join ', '})"
-    else
-      first
+    x.quasiquoted = true
+    x
+  , false
     
   defmacro "unquote", (x) ->
-    x._compile false
+    x.unquoted = true
+    x
+  , false
     
   defmacro "unquote-splicing", (x) ->
-    x._compile false
+    x.unquote_spliced = true
+    x
+  , false
     
 
 

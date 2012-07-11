@@ -1,6 +1,6 @@
 
 class C.Macro extends C.Construct
-  constructor: ({name, @argnames, @template, transform, @invoke, @oppo_fn}, yy) ->
+  constructor: ({name, @argnames, @template, transform, @invoke}, yy) ->
     @name = new C.Var name
     scope = C.current_scope()
     scope.set_var @name, this
@@ -11,9 +11,27 @@ class C.Macro extends C.Construct
   compile: ->
     "null"
     
-  invoke: ->
+  invoke: (args...) ->
+    x = @transform args...
+    x.compile()
     
-  transform: ->
+  transform: (args...) ->
+    fn = new C.Lambda {
+      body: @template
+      args: @argnames
+    }, @yy
+
+    args = for arg in args
+      arg = arg.clone()
+      arg.quoted = yes
+      arg
+
+    ls = new C.List [fn, args...], @yy
+    c_template = ls.compile()
+    transformed = eval c_template
+    transformed.quoted = false if transformed instanceof C.List
+    transformed
+
 
   @can_transform: (item) -> item? and item.transform? and !item.builtin
 
@@ -23,14 +41,14 @@ class C.Macro extends C.Construct
     if code instanceof C.ReturnedConstruct
       code = code.value
 
-    if code instanceof C.List
+    if code instanceof C.List and not (code.quoted or code.quasiquoted)
       callable = code.items[0]
       if callable instanceof C.Symbol
         item = C.get_var_val callable
         if @can_transform item
           transformed = item.transform code.items[1..]...
 
-    if not transformed and @can_transform code
+    if not transformed and (code not instanceof C.Macro) and (@can_transform code)
       transformed = code.transform()
     
     if transformed? and transformed isnt code
