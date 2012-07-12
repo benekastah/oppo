@@ -121,6 +121,14 @@ do ->
 
   C.Number::toString = C.Number::compile
 
+  sym_compile = C.Symbol::compile
+  C.Symbol::compile = ->
+    name = @name
+    @name = name.replace /\-/g, '_'
+    c_sym = sym_compile.call this
+    @name = name
+    c_sym
+
   C.String::toString = ->
     eval @compile()
 
@@ -138,22 +146,31 @@ read = oppo.read = oppo.compiler.read = ->
 
 #-----------------------------------------------------------------------------#
 
-compile = oppo.compile = oppo.compiler.compile = (sexp) ->
+compile = oppo.compile = oppo.compiler.compile = (sexp, comp_runtime = true) ->
   if (type_of sexp) is "array"
     sexp = new C.List sexp
     sexp = new C.Lambda body: [sexp]
 
   new lemur.Compiler().compile ->
     setup_built_in_macros()
-    r = compile_runtime()
+    if comp_runtime
+      r = compile_runtime()
+
+    if r?
+      r = """
+
+      // Oppo runtime
+      #{r}
+      """
+    else
+      r = ""
+
     sym_prog = C.Var.gensym "program"
     c_sym_prog = sym_prog.compile()
     prog = sexp._compile()
     """
     // Your program
     var #{c_sym_prog} = #{prog};
-
-    // Oppo runtime
     #{r}
     
     // Run the oppo program
@@ -162,6 +179,10 @@ compile = oppo.compile = oppo.compiler.compile = (sexp) ->
     else
       #{c_sym_prog};
     """
+
+oppo.compile_runtime = ->
+  sexp = new C.Null 1
+  compile sexp
 
 oppo_eval = oppo.eval = (sexp) ->
   root.eval compile sexp

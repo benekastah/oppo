@@ -146,7 +146,7 @@
   };
 
   (function() {
-    var normal_compile;
+    var normal_compile, sym_compile;
     C.Construct.prototype._compile = function() {
       var compile_fn;
       compile_fn = this.quasiquoted ? this.compile_quasiquoted : this.unquoted ? this.compile_unquoted : this.unquote_spliced ? this.compile_unquote_spliced : this.quoted ? this.compile_quoted : this.compile;
@@ -165,6 +165,15 @@
       return +this.compile();
     };
     C.Number.prototype.toString = C.Number.prototype.compile;
+    sym_compile = C.Symbol.prototype.compile;
+    C.Symbol.prototype.compile = function() {
+      var c_sym, name;
+      name = this.name;
+      this.name = name.replace(/\-/g, '_');
+      c_sym = sym_compile.call(this);
+      this.name = name;
+      return c_sym;
+    };
     C.String.prototype.toString = function() {
       return eval(this.compile());
     };
@@ -182,7 +191,10 @@
     return parser.parse.apply(parser, arguments);
   };
 
-  compile = oppo.compile = oppo.compiler.compile = function(sexp) {
+  compile = oppo.compile = oppo.compiler.compile = function(sexp, comp_runtime) {
+    if (comp_runtime == null) {
+      comp_runtime = true;
+    }
     if ((type_of(sexp)) === "array") {
       sexp = new C.List(sexp);
       sexp = new C.Lambda({
@@ -192,12 +204,25 @@
     return new lemur.Compiler().compile(function() {
       var c_sym_prog, prog, r, sym_prog;
       setup_built_in_macros();
-      r = compile_runtime();
+      if (comp_runtime) {
+        r = compile_runtime();
+      }
+      if (r != null) {
+        r = "\n// Oppo runtime\n" + r;
+      } else {
+        r = "";
+      }
       sym_prog = C.Var.gensym("program");
       c_sym_prog = sym_prog.compile();
       prog = sexp._compile();
-      return "// Your program\nvar " + c_sym_prog + " = " + prog + ";\n\n// Oppo runtime\n" + r + "\n\n// Run the oppo program\nif (lemur.core.to_type(" + c_sym_prog + ") === 'function')\n  " + c_sym_prog + "();\nelse\n  " + c_sym_prog + ";";
+      return "// Your program\nvar " + c_sym_prog + " = " + prog + ";\n" + r + "\n\n// Run the oppo program\nif (lemur.core.to_type(" + c_sym_prog + ") === 'function')\n  " + c_sym_prog + "();\nelse\n  " + c_sym_prog + ";";
     });
+  };
+
+  oppo.compile_runtime = function() {
+    var sexp;
+    sexp = new C.Null(1);
+    return compile(sexp);
   };
 
   oppo_eval = oppo["eval"] = function(sexp) {
@@ -463,7 +488,7 @@
         'mod', function(a, b) {
           return a % b;
         }
-      ], ['**', "Math.pow"], ['=', compare_op('===')], ['not=', compare_op('!==')], ['<', compare_op('<')], ['>', compare_op('>')], ['<=', compare_op('<=')], ['>=', compare_op('>=')], ['or', binary_op('||')], ['and', binary_op('&&', true)], ['oppo-eval', 'oppo.eval'], ['__typeof__', 'lemur.core.to_type'], ['typeof', '__typeof__'], ['__slice__', 'Array.prototype.slice'], [
+      ], ['**', "Math.pow"], ['=', compare_op('===')], ['not=', compare_op('!==')], ['<', compare_op('<')], ['>', compare_op('>')], ['<=', compare_op('<=')], ['>=', compare_op('>=')], ['or', binary_op('||')], ['and', binary_op('&&', true)], ['oppo-eval', 'oppo.eval'], ['__typeof__', 'lemur.core.to_type'], ['typeof', '__typeof__'], ['println', 'console.log.bind(console)'], ['prn', 'println'], ['__slice__', 'Array.prototype.slice'], [
         'first', function(a) {
           return a[0];
         }

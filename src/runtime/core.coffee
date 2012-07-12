@@ -109,6 +109,8 @@ compile_runtime = ->
     ['oppo-eval', 'oppo.eval']
     ['__typeof__', 'lemur.core.to_type']
     ['typeof', '__typeof__']
+    ['println', 'console.log.bind(console)']
+    ['prn', 'println']
 
 
     ## Array functions

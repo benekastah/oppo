@@ -7,11 +7,12 @@ argv = optimist
 .alias('w', 'watch')
 .alias('r', 'repl')
 .alias('o', 'output')
+.alias('b', 'beautify')
 .argv
 
 if argv.compile
   files = argv._
-  {output, watch} = argv
-  (require "./compile") output, files, watch
+  {output, watch, beautify} = argv
+  (require "./compile") output, files, watch, beautify
 else
   (require "./repl") argv.compile

@@ -1,6 +1,7 @@
 path = require 'path'
 fs = require 'fs'
 oppo = require '../'
+child_process = require 'child_process'
 cwd = process.cwd()
 
 # console.log "oppo", oppo
@@ -24,7 +25,7 @@ getFiles = (file_and_dir_list) ->
       files.push full_item
   files
 
-module.exports = compile = (output, source_files, watch) ->
+module.exports = compile = (output, source_files, watch, beautify) ->
   files = getFiles source_files
   if /\.js$/.test output
     output_fname = path.basename output
@@ -32,7 +33,7 @@ module.exports = compile = (output, source_files, watch) ->
   else
     output_dir = output
   
-  for file in files
+  c_files = for file in files
     dir = path.dirname file
     fname = path.basename file
     
@@ -44,11 +45,15 @@ module.exports = compile = (output, source_files, watch) ->
     jsfile = fname.replace /\.oppo$/, '.js'
     jsfile = path.join output_dir ? dir, output_fname ? jsfile
     
-    fs.readFile file, 'utf8', (err, code) ->
-      throw err if err
-      
-      read_code = oppo.read code
-      compiled_code = oppo.compile read_code
-      
-      fs.writeFile jsfile, compiled_code
-      console.log "Compiled #{jsfile}"
+    code = fs.readFileSync file, 'utf8'
+    read_code = oppo.read code
+    compiled_code = oppo.compile read_code, false
+    console.log "Compiled #{fname}"
+
+    compiled_code
+    
+  c_files.unshift (fs.readFileSync "dist/oppo.js", 'utf8'), oppo.compile_runtime()
+
+  fs.writeFileSync jsfile, c_files.join ';'
+  child_process.exec "uglifyjs --overwrite #{if beautify then '--beautify' else ''} --lift-vars #{jsfile}"
+  console.log "Wrote #{jsfile}"

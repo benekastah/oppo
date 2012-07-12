@@ -1,0 +1,10 @@
+
+(def (rec-fact n accum)
+  (if (< n 2)
+    accum
+    (rec-fact (- n 1) (* accum n))))
+
+(def (fact n)
+  (rec-fact n 1))
+
+(prn (= (fact 5) 120))
