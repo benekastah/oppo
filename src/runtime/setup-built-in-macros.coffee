@@ -40,7 +40,7 @@ setup_built_in_macros = ->
     else if (js_code instanceof C.Symbol) and js_code.quoted
       js_code.name
     else
-      "window.eval(#{js_code._compile()})"
+      "oppo.root.eval(#{js_code._compile()})"
 
   defmacro "if", (cond, tbranch, fbranch) ->
     _if = new C.If {
@@ -138,7 +138,20 @@ setup_built_in_macros = ->
     name = new C.Var name
     set_ = new C.Var.Set {_var: name, value}
   , false
-    
+  
+  defmacro "apply", (callable, args...) ->
+    if args.length > 1
+      c_args = for arg in args then arg._compile()
+      c_args = "[].concat(#{c_args.join ', '})"
+      args = [new C.Raw c_args]
+
+    args.unshift new C.Null()
+    args = for arg in args then arg._compile()
+    c_callable = callable._compile()
+    if not callable instanceof C.Symbol
+      c_callable = "(c_callable)"
+    "#{c_callable}.apply(#{args.join ', '})"
+
   defmacro "call", (callable, args...) ->
     if callable instanceof C.Symbol
       item = C.get_var_val callable
@@ -166,10 +179,10 @@ setup_built_in_macros = ->
       else
         if not item?
           bindings.error "Must have even number of bindings."
-        new_bindings.push new types.List [def_sym, sym, item]
+        new_bindings.push new C.List [def_sym, sym, item]
         
     new_body = [new_bindings..., body...]
-    (new types.List [new types.Lambda body: new_body]).compile()
+    (new C.List [new C.Lambda body: new_body]).compile()
 
   macro_do = defmacro "do", ->
     c_items = for arg in arguments then arg._compile()
@@ -215,18 +228,57 @@ setup_built_in_macros = ->
       c_namespace = namespace._compile()
       
     c_error = error._compile()
+    throw_stmt = "throw new oppo.Error(#{c_namespace}, #{c_error});".replace /("|\\")/g, "\\\""
     
     """
-    (function () {
-      throw new oppo.Error(#{c_namespace}, #{c_error});
-    })()
+    oppo.root.eval("#{throw_stmt}")
     """
+
+  defmacro "try", (sexp...) ->
+    _finally = sexp.pop()
+    if _finally not instanceof C.List or _finally.items[0]?.name isnt "finally"
+      sexp.push _finally
+      _finally = new C.List []
+
+    _catch = sexp.pop()
+    if _catch not instanceof C.List or _catch.items[0]?.name isnt "catch"
+      sexp.push _catch
+      _catch = new C.List []
+
+    body = sexp
+    c_body = for item in body then item._compile()
+
+    [__, catch_err, catch_body...] = _catch.items
+    [__, finally_body...] = _finally.items
+
+    catch_err ?= C.Symbol.gensym "err"
+    c_catch_err = catch_err._compile()
+    c_catch_body = for item in catch_body then item._compile()
+    c_finally_body = for item in finally_body then item._compile()
+
+    c = """
+    try {
+      #{c_body.join ';\n'};
+    } catch (#{c_catch_err}) {
+      #{c_catch_body.join ';\n'};
+    }
+    """
+
+    if finally_body.length
+      c += """
+       finally {
+        #{finally_body.join ";\n"};
+      }
+      """
+
+    new C.Raw c
+  , false
 
   defmacro "assert", (sexp) ->
     c_sexp = sexp._compile()
     
-    error_namespace = new types.String "Assertion-Error"
-    error = new types.String sexp.toString()
+    error_namespace = new C.String "Assertion-Error"
+    error = new C.String (oppo.stringify sexp)
     raise_call = call_macro "raise", error_namespace, error
     """
     (#{c_sexp} || #{raise_call})

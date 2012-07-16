@@ -73,35 +73,28 @@ compile_runtime = ->
   define [
     ## Math
     ['+', (math_op '+', true)]
-
     ['-', math_op '-']
-
     ['*', math_op '*']
-
     ['/', math_op '/']
-
     ['mod', (a, b) -> a % b]
-
     ['**', "Math.pow"]
+    ['min', 'Math.min']
+    ['max', 'Math.max']
+    ['inc', (x) -> ++x]
+    ['dec', (x) -> --x]
 
 
     ## Comparisons
     ['=', compare_op '===']
-
     ['not=', compare_op '!==']
-
     ['<', compare_op '<']
-
     ['>', compare_op '>']
-
     ['<=', compare_op '<=']
-
     ['>=', compare_op '>=']
 
 
     ## Binary operations
     ['or', binary_op '||']
-
     ['and', (binary_op '&&', true)]
 
 
@@ -111,19 +104,15 @@ compile_runtime = ->
     ['typeof', '__typeof__']
     ['println', 'console.log.bind(console)']
     ['prn', 'println']
+    ['str', (x) -> String x]
 
 
     ## Array functions
     ['__slice__', 'Array.prototype.slice']
-
     ['first', (a) -> a[0]]
-
     ['second', (a) -> a[1]]
-
     ['last', (a) -> a[a.length - 1]]
-
     ['init', (a) -> a.slice 0, a.length - 1]
-
     ['rest', (a) -> a.slice 1]
 
     ['nth', (a, n) ->

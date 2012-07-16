@@ -9,6 +9,8 @@ root.oppo =
     types: {}
     scope_stack: [{}]
     
+oppo.root = root
+
 if module?.exports?
   module.exports = oppo
     

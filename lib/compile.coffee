@@ -25,7 +25,7 @@ getFiles = (file_and_dir_list) ->
       files.push full_item
   files
 
-module.exports = compile = (output, source_files, watch, beautify) ->
+@compile = (output, source_files, watch, beautify) ->
   files = getFiles source_files
   if /\.js$/.test output
     output_fname = path.basename output
@@ -57,3 +57,9 @@ module.exports = compile = (output, source_files, watch, beautify) ->
   fs.writeFileSync jsfile, c_files.join ';'
   child_process.exec "uglifyjs --overwrite #{if beautify then '--beautify' else ''} --lift-vars #{jsfile}"
   console.log "Wrote #{jsfile}"
+
+@runfile = (file) ->
+  code = fs.readFileSync file, 'utf8'
+  read_code = oppo.read code
+  compiled_code = oppo.compile read_code
+  console.log (eval compiled_code)
