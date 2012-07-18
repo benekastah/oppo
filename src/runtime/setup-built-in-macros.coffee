@@ -31,7 +31,9 @@ setup_built_in_macros = ->
   ###
   JAVASCRIPT BUILTINS
   ###
-    
+  defmacro "regex", (pattern, modifiers) ->
+    new C.Regex {pattern: pattern.value, modifiers: modifiers.value}, pattern.yy
+
   defmacro "js-eval", (js_code) ->
     if js_code instanceof C.String
       js_code.value
@@ -118,6 +120,11 @@ setup_built_in_macros = ->
   ###
   OPPO BUILTINS
   ###
+  defmacro "keyword", (keyword) ->
+    if keyword instanceof C.Symbol
+      k = keyword.value
+    else if keyword instanceof C.String
+      k = keyword
 
   defmacro "def", (to_define, rest...) ->
     if not rest.length
@@ -228,11 +235,7 @@ setup_built_in_macros = ->
       c_namespace = namespace._compile()
       
     c_error = error._compile()
-    throw_stmt = "throw new oppo.Error(#{c_namespace}, #{c_error});".replace /("|\\")/g, "\\\""
-    
-    """
-    oppo.root.eval("#{throw_stmt}")
-    """
+    "new oppo.Error(#{c_namespace}, #{c_error}).raise()"
 
   defmacro "try", (sexp...) ->
     _finally = sexp.pop()
@@ -246,32 +249,10 @@ setup_built_in_macros = ->
       _catch = new C.List []
 
     body = sexp
-    c_body = for item in body then item._compile()
-
     [__, catch_err, catch_body...] = _catch.items
     [__, finally_body...] = _finally.items
 
-    catch_err ?= C.Symbol.gensym "err"
-    c_catch_err = catch_err._compile()
-    c_catch_body = for item in catch_body then item._compile()
-    c_finally_body = for item in finally_body then item._compile()
-
-    c = """
-    try {
-      #{c_body.join ';\n'};
-    } catch (#{c_catch_err}) {
-      #{c_catch_body.join ';\n'};
-    }
-    """
-
-    if finally_body.length
-      c += """
-       finally {
-        #{finally_body.join ";\n"};
-      }
-      """
-
-    new C.Raw c
+    new C.TryCatch _try: body, err_name: catch_err, _catch: catch_body, _finally: finally_body
   , false
 
   defmacro "assert", (sexp) ->

@@ -48,6 +48,7 @@
 "'"                                     { return 'QUOTE'; }
 "`"                                     { return 'QUASIQUOTE'; }
 ",@"                                    { return 'UNQUOTE_SPLICING'; }
+"."                                     { return 'REST'; }
 "#("                                    { return 'FUNCTION'; }
 
 ":"                                     { return 'KEYWORD'; }
@@ -129,9 +130,17 @@ kvpair
   ;
 
 element_list
+  : base_element_list
+  | base_element_list REST element
+    { $$ = $1; $$.push(new C.Rest($3, yy)); }
+  | REST element
+    { $$ = [new C.Rest($3, yy)]; }
+  ;
+
+base_element_list
   : element
     { $$ = [$1]; }
-  | element_list element
+  | base_element_list element
     { $$ = $1; $$.push($2); }
   ;
 
@@ -141,15 +150,15 @@ element
 
 special_form
   : QUOTE s_expression
-    { $$ = $2; $$.quoted = true; }
+    { $$ = call_by_name("quote", $2); }
   | QUASIQUOTE s_expression
-    { $$ = $2; $$.quasiquoted = true; }
+    { $$ = call_by_name("quasiquote", $2); }
   | UNQUOTE s_expression
-    { $$ = $2; $$.unquoted = true; }
+    { $$ = call_by_name("unquote", $2); }
   | UNQUOTE_SPLICING s_expression
-    { $$ = $2; $$.unquote_spliced = true; }
+    { $$ = call_by_name("unquote-splicing", $2); }
   | FUNCTION element_list ')'
-    { $$ = new C.Lambda({body: $element_list, arity: Infinity}, yy); }
+    { $$ = call_by_name("lambda", $2); }
   ;
 
 literal
@@ -170,7 +179,7 @@ atom
 
 regex
   : REGEX FLAGS
-    { $$ = new C.Regex({pattern: $1, modifiers: $2.substr(1)}, yy); }
+    { $$ = call_by_name("regex", $1, $2.substr(1)); }
   ;
   
 number
@@ -193,7 +202,7 @@ string
   
 keyword
   : KEYWORD symbol
-    { $$ = new C.Keyword($symbol.value, yy); }
+    { $$ = call_by_name("keyword", $2, yy); }
   ;
 
 symbol

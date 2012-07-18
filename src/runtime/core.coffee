@@ -85,12 +85,23 @@ compile_runtime = ->
 
 
     ## Comparisons
-    ['=', compare_op '===']
-    ['not=', compare_op '!==']
     ['<', compare_op '<']
     ['>', compare_op '>']
     ['<=', compare_op '<=']
     ['>=', compare_op '>=']
+
+    ['eq', ->
+      for b in arguments
+        if not a?
+          a = b
+          continue;
+        if not __lodash__.isEqual a, b
+          return false
+        a = b
+      true
+    ]
+    ['=', 'eq']
+    ['not=', -> !(eq arguments...)]
 
 
     ## Binary operations
@@ -104,7 +115,6 @@ compile_runtime = ->
     ['typeof', '__typeof__']
     ['println', 'console.log.bind(console)']
     ['prn', 'println']
-    ['str', (x) -> String x]
 
 
     ## Array functions

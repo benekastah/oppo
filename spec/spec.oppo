@@ -34,8 +34,14 @@
 
     (assert (= (** 3 2) 9))
 
-    (assert (= (mod 5 2) 1))
-    ))
+    (assert (= (mod 5 2) 1))))
+
+  ; (it "can test equality between objects" (lambda []
+  ;   (assert (= {:a 1} {:a 1}))
+  ;   (assert (not= {:a 1} {:a 1} {:b 1}))
+  ;   (assert (= [1 2 3] '(1 2 3) [1 2 3]))
+  ;   (assert (= "asdf" "asdf" "asdf"))
+  ;   (assert (not= 0 -0))))
 
   (it "can eval itself" (lambda []
     (assert (= (eval '(+ 1 2)) 3))
@@ -45,22 +51,27 @@
       (assert (= (eval `(* 2 ,n)) 10)))
     ))
   
-  (it "can define and run functions" (lambda []
-    (def (add5 n) (+ n 5))
+  ; (it "can define and run functions" (lambda []
+  ;   (def (add5 n) (+ n 5))
 
-    (assert (= (typeof add5) :function))
-    (assert (= (add5 5) 10))))
+  ;   (assert (= (typeof add5) :function))
+  ;   (assert (= (add5 5) 10))
+
+  ;   (def (-list . args) args)
+
+  ;   (assert (= (-list 1 2 3) [1 2 3]))))
 
   (it "can define and run macros" (lambda []
     (defmacro (defn nm args . body)
-      `(def (,nm ,@args)
-        ,@body))
+      ;`(def (,nm ,@args)
+      ;  ,@body)
+      `()
+      )
 
     (defn test (a b c)
       (def d (* a b c))
       d)
 
     (assert (= (typeof test) :function))
-    (assert (= (test 1 2 3) 6))))))
-
-
+    (assert (= (test 1 2 3) 6))))
+  ))

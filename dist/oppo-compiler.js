@@ -39,6 +39,10 @@
       return "" + this.name + ": " + this.message;
     };
 
+    Error.prototype.raise = function() {
+      throw this;
+    };
+
     return Error;
 
   })(Error);
@@ -217,7 +221,7 @@
       sym_prog = C.Var.gensym("program");
       c_sym_prog = sym_prog.compile();
       prog = sexp._compile();
-      return "// Your program\nvar " + c_sym_prog + " = " + prog + ";\n" + r + "\n\n// Run the oppo program\nif (lemur.core.to_type(" + c_sym_prog + ") === 'function')\n  " + c_sym_prog + "();\nelse\n  " + c_sym_prog + ";";
+      return "// Your program\nvar " + c_sym_prog + " = " + prog + ";\n\nif (typeof __lodash__ === \"undefined\" && _ && _.noConflict){\n  window.__lodash__ = _.noConflict();\n  _ = null;\n}\n" + r + "\n\n// Run the oppo program\nif (lemur.core.to_type(" + c_sym_prog + ") === 'function')\n  " + c_sym_prog + "();\nelse\n  " + c_sym_prog + ";";
     });
   };
 
@@ -498,7 +502,27 @@
         'dec', function(x) {
           return --x;
         }
-      ], ['=', compare_op('===')], ['not=', compare_op('!==')], ['<', compare_op('<')], ['>', compare_op('>')], ['<=', compare_op('<=')], ['>=', compare_op('>=')], ['or', binary_op('||')], ['and', binary_op('&&', true)], ['oppo-eval', 'oppo.eval'], ['__typeof__', 'lemur.core.to_type'], ['typeof', '__typeof__'], ['println', 'console.log.bind(console)'], ['prn', 'println'], ['__slice__', 'Array.prototype.slice'], [
+      ], ['<', compare_op('<')], ['>', compare_op('>')], ['<=', compare_op('<=')], ['>=', compare_op('>=')], [
+        'eq', function() {
+          var a, b, _i, _len;
+          for (_i = 0, _len = arguments.length; _i < _len; _i++) {
+            b = arguments[_i];
+            if (!(typeof a !== "undefined" && a !== null)) {
+              a = b;
+              continue;
+            }
+            if (!__lodash__.isEqual(a, b)) {
+              return false;
+            }
+            a = b;
+          }
+          return true;
+        }
+      ], ['=', 'eq'], [
+        'not=', function() {
+          return !(eq.apply(null, arguments));
+        }
+      ], ['or', binary_op('||')], ['and', binary_op('&&', true)], ['oppo-eval', 'oppo.eval'], ['__typeof__', 'lemur.core.to_type'], ['typeof', '__typeof__'], ['println', 'console.log.bind(console)'], ['prn', 'println'], ['__slice__', 'Array.prototype.slice'], [
         'first', function(a) {
           return a[0];
         }
@@ -779,6 +803,12 @@
     */
 
     var macro_do, macro_let, operator_macro;
+    defmacro("regex", function(pattern, modifiers) {
+      return new C.Regex({
+        pattern: pattern.value,
+        modifiers: modifiers.value
+      }, pattern.yy);
+    });
     defmacro("js-eval", function(js_code) {
       if (js_code instanceof C.String) {
         return js_code.value;
@@ -876,6 +906,14 @@
       OPPO BUILTINS
     */
 
+    defmacro("keyword", function(keyword) {
+      var k;
+      if (keyword instanceof C.Symbol) {
+        return k = keyword.value;
+      } else if (keyword instanceof C.String) {
+        return k = keyword;
+      }
+    });
     defmacro("def", function() {
       var args, body, name, rest, scope, set_, to_define, value;
       to_define = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
@@ -1028,7 +1066,7 @@
     */
 
     defmacro("raise", function(namespace, error) {
-      var c_error, c_namespace, throw_stmt;
+      var c_error, c_namespace;
       if (arguments.length === 1) {
         error = namespace;
         c_namespace = "\"Error\"";
@@ -1036,11 +1074,10 @@
         c_namespace = namespace._compile();
       }
       c_error = error._compile();
-      throw_stmt = ("throw new oppo.Error(" + c_namespace + ", " + c_error + ");").replace(/("|\\")/g, "\\\"");
-      return "oppo.root.eval(\"" + throw_stmt + "\")";
+      return "new oppo.Error(" + c_namespace + ", " + c_error + ").raise()";
     });
     defmacro("try", function() {
-      var body, c, c_body, c_catch_body, c_catch_err, c_finally_body, catch_body, catch_err, finally_body, item, sexp, __, _catch, _finally, _ref3, _ref4, _ref5, _ref6;
+      var body, catch_body, catch_err, finally_body, sexp, __, _catch, _finally, _ref3, _ref4, _ref5, _ref6;
       sexp = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       _finally = sexp.pop();
       if (!(_finally instanceof C.List) || ((_ref3 = _finally.items[0]) != null ? _ref3.name : void 0) !== "finally") {
@@ -1053,44 +1090,14 @@
         _catch = new C.List([]);
       }
       body = sexp;
-      c_body = (function() {
-        var _i, _len, _results;
-        _results = [];
-        for (_i = 0, _len = body.length; _i < _len; _i++) {
-          item = body[_i];
-          _results.push(item._compile());
-        }
-        return _results;
-      })();
       _ref5 = _catch.items, __ = _ref5[0], catch_err = _ref5[1], catch_body = 3 <= _ref5.length ? __slice.call(_ref5, 2) : [];
       _ref6 = _finally.items, __ = _ref6[0], finally_body = 2 <= _ref6.length ? __slice.call(_ref6, 1) : [];
-      if (catch_err == null) {
-        catch_err = C.Symbol.gensym("err");
-      }
-      c_catch_err = catch_err._compile();
-      c_catch_body = (function() {
-        var _i, _len, _results;
-        _results = [];
-        for (_i = 0, _len = catch_body.length; _i < _len; _i++) {
-          item = catch_body[_i];
-          _results.push(item._compile());
-        }
-        return _results;
-      })();
-      c_finally_body = (function() {
-        var _i, _len, _results;
-        _results = [];
-        for (_i = 0, _len = finally_body.length; _i < _len; _i++) {
-          item = finally_body[_i];
-          _results.push(item._compile());
-        }
-        return _results;
-      })();
-      c = "try {\n  " + (c_body.join(';\n')) + ";\n} catch (" + c_catch_err + ") {\n  " + (c_catch_body.join(';\n')) + ";\n}";
-      if (finally_body.length) {
-        c += " finally {\n  " + (finally_body.join(";\n")) + ";\n}";
-      }
-      return new C.Raw(c);
+      return new C.TryCatch({
+        _try: body,
+        err_name: catch_err,
+        _catch: catch_body,
+        _finally: finally_body
+      });
     }, false);
     return defmacro("assert", function(sexp) {
       var c_sexp, error, error_namespace, raise_call;
