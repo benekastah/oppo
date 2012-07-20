@@ -12,6 +12,7 @@ root.oppo =
 oppo.root = root
 
 if module?.exports?
+  oppo.lodash = module.exports
   module.exports = oppo
     
 {scope_stack, types} = oppo.compiler
@@ -175,10 +176,6 @@ compile = oppo.compile = oppo.compiler.compile = (sexp, comp_runtime = true) ->
     // Your program
     var #{c_sym_prog} = #{prog};
     
-    if (typeof __lodash__ === "undefined" && _ && _.noConflict){
-      window.__lodash__ = _.noConflict();
-      _ = null;
-    }
     #{r}
     
     // Run the oppo program

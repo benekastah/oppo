@@ -26,13 +26,6 @@ system "#{dirname}/node_modules/lemur/bin/build"
 
 lodash = "#{dist}/lodash.custom.js"
 puts "Building oppo..."
-if !File.exist?(lodash)
-  system "cd #{dist}; lodash include=isEqual legacy; cd .."
-end
 system "jison #{src}/grammar.jison -o #{dist}/parser.js"
 system "coffee -j #{dist}/oppo-compiler.js -c #{src}/setup #{compiler_scripts} #{runtime_scripts}"
-
-until File.exist? lodash
-  sleep 1
-end
-system "cat #{dirname}/node_modules/lemur/build/lemur.js #{dist}/parser.js #{lodash} #{dist}/oppo-compiler.js > #{dist}/oppo.js"
+system "cat #{dirname}/node_modules/lemur/build/lemur.js #{dist}/parser.js #{dist}/oppo-compiler.js > #{dist}/oppo.js"

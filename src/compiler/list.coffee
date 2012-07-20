@@ -33,9 +33,9 @@ class C.List extends C.Array
     else if @quasiquoted
       "`"
     else if @unquoted
-      "~"
+      ","
     else if @unquote_spliced
-      "..."
+      ",@"
     else
       ""
 

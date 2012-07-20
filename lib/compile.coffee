@@ -42,8 +42,10 @@ getFiles = (file_and_dir_list) ->
     
     if not /\.oppo$/.test fname
       fname = "#{file}.oppo"
-    jsfile = fname.replace /\.oppo$/, '.js'
-    jsfile = path.join output_dir ? dir, output_fname ? jsfile
+    jsfile = output_fname ? fname.replace /\.oppo$/, '.js'
+    tmp_jsfile = jsfile.replace /\.js$/, '-TEMP.js'
+    jsfile = path.join output_dir ? dir, jsfile
+    tmp_jsfile = path.join output_dir ? dir, tmp_jsfile
     
     code = fs.readFileSync file, 'utf8'
     read_code = oppo.read code
@@ -54,9 +56,12 @@ getFiles = (file_and_dir_list) ->
     
   c_files.unshift (fs.readFileSync "dist/oppo.js", 'utf8'), oppo.compile_runtime()
 
-  fs.writeFileSync jsfile, c_files.join ';'
-  child_process.exec "uglifyjs --overwrite #{if beautify then '--beautify' else ''} --lift-vars #{jsfile}"
-  console.log "Wrote #{jsfile}"
+  fs.writeFileSync tmp_jsfile, c_files.join ';'
+  #child_process.exec "uglifyjs --overwrite #{if beautify then '--beautify' else ''} --lift-vars #{jsfile}"
+  child_process.exec "closure-compiler --compilation_level ADVANCED_OPTIMIZATIONS " +
+    "#{if beautify then "--formatting=pretty_print" else ""} " +
+    "--js_output_file #{jsfile} --js #{tmp_jsfile}; " +
+    "rm #{tmp_jsfile}; echo \"Wrote #{jsfile}\""
 
 @runfile = (file) ->
   code = fs.readFileSync file, 'utf8'

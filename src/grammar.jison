@@ -69,7 +69,7 @@
 program
   : s_expression_list EOF
     {
-      $1.unshift(new C.Raw("var eval = " + sym("oppo-eval").compile()));
+      $1.unshift(new C.Raw("var eval = " + sym("__oppo_eval__").compile()));
       var lambda = new C.Lambda({body: $1}, yy);
       //return new C.List([lambda], yy);
       return lambda;
@@ -150,15 +150,15 @@ element
 
 special_form
   : QUOTE s_expression
-    { $$ = call_by_name("quote", $2); }
+    { $$ = call_by_name("quote", [$2]); }
   | QUASIQUOTE s_expression
-    { $$ = call_by_name("quasiquote", $2); }
+    { $$ = call_by_name("quasiquote", [$2]); }
   | UNQUOTE s_expression
-    { $$ = call_by_name("unquote", $2); }
+    { $$ = call_by_name("unquote", [$2]); }
   | UNQUOTE_SPLICING s_expression
-    { $$ = call_by_name("unquote-splicing", $2); }
+    { $$ = call_by_name("unquote-splicing", [$2]); }
   | FUNCTION element_list ')'
-    { $$ = call_by_name("lambda", $2); }
+    { $$ = call_by_name("lambda", [$2]); }
   ;
 
 literal
@@ -179,7 +179,7 @@ atom
 
 regex
   : REGEX FLAGS
-    { $$ = call_by_name("regex", $1, $2.substr(1)); }
+    { $$ = call_by_name("regex", [new C.String($1, yy), new C.String($2.substr(1), yy)], yy); }
   ;
   
 number
@@ -202,7 +202,7 @@ string
   
 keyword
   : KEYWORD symbol
-    { $$ = call_by_name("keyword", $2, yy); }
+    { $$ = call_by_name("keyword", [$2], yy); }
   ;
 
 symbol

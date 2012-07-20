@@ -33,6 +33,7 @@ setup_built_in_macros = ->
   ###
   defmacro "regex", (pattern, modifiers) ->
     new C.Regex {pattern: pattern.value, modifiers: modifiers.value}, pattern.yy
+  , false
 
   defmacro "js-eval", (js_code) ->
     if js_code instanceof C.String
@@ -122,9 +123,11 @@ setup_built_in_macros = ->
   ###
   defmacro "keyword", (keyword) ->
     if keyword instanceof C.Symbol
-      k = keyword.value
+      new C.String keyword.value, keyword.yy
     else if keyword instanceof C.String
-      k = keyword
+      k
+  , false
+
 
   defmacro "def", (to_define, rest...) ->
     if not rest.length

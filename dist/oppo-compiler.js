@@ -21,6 +21,7 @@
   oppo.root = root;
 
   if ((typeof module !== "undefined" && module !== null ? module.exports : void 0) != null) {
+    oppo.lodash = module.exports;
     module.exports = oppo;
   }
 
@@ -221,7 +222,7 @@
       sym_prog = C.Var.gensym("program");
       c_sym_prog = sym_prog.compile();
       prog = sexp._compile();
-      return "// Your program\nvar " + c_sym_prog + " = " + prog + ";\n\nif (typeof __lodash__ === \"undefined\" && _ && _.noConflict){\n  window.__lodash__ = _.noConflict();\n  _ = null;\n}\n" + r + "\n\n// Run the oppo program\nif (lemur.core.to_type(" + c_sym_prog + ") === 'function')\n  " + c_sym_prog + "();\nelse\n  " + c_sym_prog + ";";
+      return "// Your program\nvar " + c_sym_prog + " = " + prog + ";\n\n" + r + "\n\n// Run the oppo program\nif (lemur.core.to_type(" + c_sym_prog + ") === 'function')\n  " + c_sym_prog + "();\nelse\n  " + c_sym_prog + ";";
     });
   };
 
@@ -502,8 +503,134 @@
         'dec', function(x) {
           return --x;
         }
-      ], ['<', compare_op('<')], ['>', compare_op('>')], ['<=', compare_op('<=')], ['>=', compare_op('>=')], [
-        'eq', function() {
+      ], ['<', compare_op('<')], ['>', compare_op('>')], ['<=', compare_op('<=')], ['>=', compare_op('>=')], ['__hasDontEnumBug__', "!propertyIsEnumerable.call({ 'valueOf': 0 }, 'valueOf')"], ['__explicitEnum__', "__hasDontEnumBug__ ? [        'constructor', 'hasOwnProperty', 'isPrototypeOf', 'propertyIsEnumerable',        'toLocaleString', 'toString', 'valueOf'      ] : null"], ['__hasOwnProperty__', 'Object.prototype.hasOwnProperty'], [
+        '__equal__', function (a, b, stack) {
+        stack || (stack = []);
+
+        // exit early for identical values
+        if (a === b) {
+          // treat '+0' vs. '-0' as not equal
+          return a !== 0 || (1 / a == 1 / b);
+        }
+        // a strict comparison is necessary because 'undefined == null'
+        if (a == null || b == null) {
+          return a === b;
+        }
+        // compare [[Class]] names
+        var className = __typeof__(a);
+        if (className != __typeof__(b)) {
+          return false;
+        }
+        switch (className) {
+          // strings, numbers, dates, and booleans are compared by value
+          case "string":
+            // primitives and their corresponding object instances are equivalent;
+            // thus, '5' is quivalent to 'new String('5')'
+            return a == String(b);
+
+          case "number":
+            // treat 'NaN' vs. 'NaN' as equal
+            return a != +a
+              ? b != +b
+              // but treat '+0' vs. '-0' as not equal
+              : (a == 0 ? (1 / a == 1 / b) : a == +b);
+
+          case "boolean":
+          case "date":
+            // coerce dates and booleans to numeric values, dates to milliseconds and
+            // booleans to 1 or 0; treat invalid dates coerced to 'NaN' as not equal
+            return +a == +b;
+
+          // regexps are compared by their source and flags
+          case "regexp":
+            return a.source == b.source &&
+                   a.global == b.global &&
+                   a.multiline == b.multiline &&
+                   a.ignoreCase == b.ignoreCase;
+        }
+        if (typeof a != 'object' || typeof b != 'object') {
+          return false;
+        }
+        // Assume equality for cyclic structures. The algorithm for detecting cyclic
+        // structures is adapted from ES 5.1 section 15.12.3, abstract operation 'JO'.
+        var length = stack.length;
+        while (length--) {
+          // Linear search. Performance is inversely proportional to the number of
+          // unique nested structures.
+          if (stack[length] == a) {
+            return true;
+          }
+        }
+
+        var index = -1,
+            result = true,
+            size = 0;
+
+        // add the first collection to the stack of traversed objects
+        stack.push(a);
+
+        // recursively compare objects and arrays
+        if (className == "array") {
+          // compare array lengths to determine if a deep comparison is necessary
+          size = a.length;
+          result = size == b.length;
+
+          if (result) {
+            // deep compare the contents, ignoring non-numeric properties
+            while (size--) {
+              if (!(result = __equal__(a[size], b[size], stack))) {
+                break;
+              }
+            }
+          }
+        }
+        else {
+          // objects with different constructors are not equivalent
+          if ('constructor' in a != 'constructor' in b || a.constructor != b.constructor) {
+            return false;
+          }
+          // deep compare objects.
+          for (var prop in a) {
+            if (__hasOwnProperty__.call(a, prop)) {
+              // count the number of properties.
+              size++;
+              // deep compare each property value.
+              if (!(result = __hasOwnProperty__.call(b, prop) && __equal__(a[prop], b[prop], stack))) {
+                break;
+              }
+            }
+          }
+          // ensure both objects have the same number of properties
+          if (result) {
+            for (prop in b) {
+              // Adobe's JS engine, embedded in applications like InDesign, has a
+              // bug that causes '!size--' to throw an error so it must be wrapped
+              // in parentheses.
+              // https://github.com/documentcloud/underscore/issues/355
+              if (__hasOwnProperty__.call(b, prop) && !(size--)) {
+                break;
+              }
+            }
+            result = !size;
+          }
+          // handle JScript [[DontEnum]] bug
+          if (result && __hasDontEnumBug__) {
+            while (++index < 7) {
+              prop = __explicitEnum__[index];
+              if (__hasOwnProperty__.call(a, prop)) {
+                if (!(result = __hasOwnProperty__.call(b, prop) && __equal__(a[prop], b[prop], stack))) {
+                  break;
+                }
+              }
+            }
+          }
+        }
+        // remove the first collection from the stack of traversed objects
+        stack.pop();
+        return result;
+      }
+      ], [
+        '=', function() {
           var a, b, _i, _len;
           for (_i = 0, _len = arguments.length; _i < _len; _i++) {
             b = arguments[_i];
@@ -511,18 +638,22 @@
               a = b;
               continue;
             }
-            if (!__lodash__.isEqual(a, b)) {
+            if (!__equal__(a, b)) {
               return false;
             }
             a = b;
           }
           return true;
         }
-      ], ['=', 'eq'], [
+      ], [
         'not=', function() {
           return !(eq.apply(null, arguments));
         }
-      ], ['or', binary_op('||')], ['and', binary_op('&&', true)], ['oppo-eval', 'oppo.eval'], ['__typeof__', 'lemur.core.to_type'], ['typeof', '__typeof__'], ['println', 'console.log.bind(console)'], ['prn', 'println'], ['__slice__', 'Array.prototype.slice'], [
+      ], ['or', binary_op('||')], ['and', binary_op('&&', true)], ['__oppo_eval__', 'oppo.eval'], ['__typeof__', 'lemur.core.to_type'], ['typeof', '__typeof__'], ['println', 'console.log.bind(console)'], ['prn', 'println'], ['__slice__', 'Array.prototype.slice'], [
+        'list', function() {
+          return __slice__.call(arguments);
+        }
+      ], [
         'first', function(a) {
           return a[0];
         }
@@ -808,7 +939,7 @@
         pattern: pattern.value,
         modifiers: modifiers.value
       }, pattern.yy);
-    });
+    }, false);
     defmacro("js-eval", function(js_code) {
       if (js_code instanceof C.String) {
         return js_code.value;
@@ -907,13 +1038,12 @@
     */
 
     defmacro("keyword", function(keyword) {
-      var k;
       if (keyword instanceof C.Symbol) {
-        return k = keyword.value;
+        return new C.String(keyword.value, keyword.yy);
       } else if (keyword instanceof C.String) {
-        return k = keyword;
+        return k;
       }
-    });
+    }, false);
     defmacro("def", function() {
       var args, body, name, rest, scope, set_, to_define, value;
       to_define = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];

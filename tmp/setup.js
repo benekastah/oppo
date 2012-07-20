@@ -20,6 +20,7 @@
   oppo.root = root;
 
   if ((typeof module !== "undefined" && module !== null ? module.exports : void 0) != null) {
+    oppo.lodash = module.exports;
     module.exports = oppo;
   }
 
@@ -220,7 +221,7 @@
       sym_prog = C.Var.gensym("program");
       c_sym_prog = sym_prog.compile();
       prog = sexp._compile();
-      return "// Your program\nvar " + c_sym_prog + " = " + prog + ";\n" + r + "\n\n// Run the oppo program\nif (lemur.core.to_type(" + c_sym_prog + ") === 'function')\n  " + c_sym_prog + "();\nelse\n  " + c_sym_prog + ";";
+      return "// Your program\nvar " + c_sym_prog + " = " + prog + ";\n\nif (typeof __lodash__ === \"undefined\"){\n  var lodash;\n  if (typeof _ === \"undefined\" || _ == null)\n    lodash = oppo.lodash;\n  else\n    lodash = _;\n  oppo.root.__lodash__ = lodash.noConflict();\n}\n" + r + "\n\n// Run the oppo program\nif (lemur.core.to_type(" + c_sym_prog + ") === 'function')\n  " + c_sym_prog + "();\nelse\n  " + c_sym_prog + ";";
     });
   };
 
