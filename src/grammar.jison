@@ -44,15 +44,15 @@
 "{"                                     { return 'OBJECT'; }
 "}"                                     { return 'OBJECT_END'; }
 
+",@"                                    { return 'UNQUOTE_SPLICING'; }
 ","                                     { return 'UNQUOTE'; }
 "'"                                     { return 'QUOTE'; }
 "`"                                     { return 'QUASIQUOTE'; }
-",@"                                    { return 'UNQUOTE_SPLICING'; }
 "."                                     { return 'REST'; }
 "#("                                    { return 'FUNCTION'; }
 
 ":"                                     { return 'KEYWORD'; }
-[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+   { return 'IDENTIFIER'; } //'
+[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+    { return 'IDENTIFIER'; } //'
 
 <<EOF>>                                 { return 'EOF'; }
 .                                       { return 'INVALID'; }

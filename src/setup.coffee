@@ -114,9 +114,9 @@ do ->
   C.Construct::compile_quoted = ->
     "new lemur.Compiler.#{@constructor.name}('#{@value}')"
 
-  normal_compile = -> @compile arguments...
-  C.Construct::compile_quasiquoted = normal_compile
+  C.Construct::compile_quasiquoted = -> @compile_quoted arguments...
 
+  normal_compile = -> @compile arguments...
   C.Construct::compile_unquoted = normal_compile
 
   C.Construct::compile_unquote_spliced = normal_compile
@@ -145,15 +145,37 @@ do ->
 
 #-----------------------------------------------------------------------------#
 
+oppoize = (exprs...) ->
+  for expr in exprs
+    type = type_of expr
+    if expr instanceof C.Construct
+      expr
+    else if type is "array"
+      new C.List oppoize expr...
+    else if type is "number"
+      new C.Number expr
+    else if type is "string"
+      new C.String expr
+    else if type is "regexp"
+      new C.RegExp
+        pattern: expr.source
+        modifiers: "#{if expr.multiline then 'm' else ''}#{if expr.global then 'g' else ''}#{if expr.ignoreCase then 'i' else ''}"
+    else if expr is true
+      new C.True()
+    else if expr is false
+      new C.False()
+    else if not expr?
+      new C.Null()
+
+#-----------------------------------------------------------------------------#
+
 read = oppo.read = oppo.compiler.read = ->
   parser.parse arguments...
 
 #-----------------------------------------------------------------------------#
 
 compile = oppo.compile = oppo.compiler.compile = (sexp, comp_runtime = true) ->
-  if (type_of sexp) is "array"
-    sexp = new C.List sexp
-    sexp = new C.Lambda body: [sexp]
+  [sexp] = oppoize sexp
 
   new lemur.Compiler().compile ->
     setup_built_in_macros()

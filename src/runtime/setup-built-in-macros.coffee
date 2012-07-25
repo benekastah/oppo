@@ -2,25 +2,18 @@
 HELPERS
 ###
 
-defmacro = (name, fn, builtin=true) ->
+defmacro = (name, fn) ->
   s_name = new C.Symbol name
   macro_args = name: s_name
-  if builtin
-    macro_args.invoke = fn
-  else
-    macro_args.transform = fn
+  macro_args.transform = fn
   m = new C.Macro macro_args
-  m.builtin = builtin
   m._compile()
   m
   
 call_macro = (name, args...) ->
   to_call = C.get_var_val (new C.Symbol name)
-  if to_call.invoke?
-    to_call.invoke args...
-  else
-    ret = to_call.transform args...
-    ret.compile()
+  ret = to_call.transform args...
+  ret._compile()
 
 call_macro_transform = (name, args...) ->
   to_call = C.get_var_val (new C.Symbol name)
@@ -33,7 +26,6 @@ setup_built_in_macros = ->
   ###
   defmacro "regex", (pattern, modifiers) ->
     new C.Regex {pattern: pattern.value, modifiers: modifiers.value}, pattern.yy
-  , false
 
   defmacro "js-eval", (js_code) ->
     if js_code instanceof C.String
@@ -43,31 +35,26 @@ setup_built_in_macros = ->
     else if (js_code instanceof C.Symbol) and js_code.quoted
       js_code.name
     else
-      "oppo.root.eval(#{js_code._compile()})"
+      new C.Raw "oppo.root.eval(#{js_code._compile()})"
 
   defmacro "if", (cond, tbranch, fbranch) ->
-    _if = new C.If {
+    _if = new C.IfTernary {
       condition: cond
       then: tbranch
       _else: fbranch
     }
-  , false
 
   defmacro "lambda", (args, body...) ->
     fn = new C.Lambda {args: args.value, body}
-  , false
 
   defmacro "array", (items...) ->
     ary = new C.Array items
-  , false
 
   defmacro "js-for", (a, b, c, body...) ->
     _for = new C.ForLoop condition: [a, b, c], body: body
-  , false
 
   defmacro "foreach", (coll, body...) ->
     foreach = new C.ForEachLoop collection: coll, body: body
-  , false
 
   operator_macro = (name, className) ->
     macro_fn = (args...) ->
@@ -83,7 +70,7 @@ setup_built_in_macros = ->
           new Cls [x, y], x.yy
         ).compile()
 
-      results.join ' '
+      new C.Raw results.join ' '
       
     defmacro name, macro_fn
 
@@ -126,7 +113,6 @@ setup_built_in_macros = ->
       new C.String keyword.value, keyword.yy
     else if keyword instanceof C.String
       k
-  , false
 
 
   defmacro "def", (to_define, rest...) ->
@@ -147,7 +133,6 @@ setup_built_in_macros = ->
     
     name = new C.Var name
     set_ = new C.Var.Set {_var: name, value}
-  , false
   
   defmacro "apply", (callable, args...) ->
     if args.length > 1
@@ -160,7 +145,7 @@ setup_built_in_macros = ->
     c_callable = callable._compile()
     if not callable instanceof C.Symbol
       c_callable = "(c_callable)"
-    "#{c_callable}.apply(#{args.join ', '})"
+    new C.Raw "#{c_callable}.apply(#{args.join ', '})"
 
   defmacro "call", (callable, args...) ->
     if callable instanceof C.Symbol
@@ -171,15 +156,13 @@ setup_built_in_macros = ->
         else
           return item.transform args...
     fcall = new C.FunctionCall {fn: callable, args}, callable.yy
-  , false
 
   defmacro "defmacro", (argnames, template...) ->
     name = argnames.items.shift()
     mac = new C.Macro {name, argnames, template}
     new C.Raw mac.compile()
-  , false
 
-  macro_let = defmacro "let", (bindings, body...) ->
+  defmacro "let", (bindings, body...) ->
     def_sym = new C.Symbol 'def'
     sym = null
     new_bindings = []
@@ -192,11 +175,10 @@ setup_built_in_macros = ->
         new_bindings.push new C.List [def_sym, sym, item]
         
     new_body = [new_bindings..., body...]
-    (new C.List [new C.Lambda body: new_body]).compile()
+    new C.List [new C.Lambda body: new_body]
 
-  macro_do = defmacro "do", ->
-    c_items = for arg in arguments then arg._compile()
-    "(#{c_items.join ',\n'})"
+  macro_do = defmacro "do", (items...) ->
+    new C.CommaGroup items, items[0].yy
     
 
 
@@ -207,22 +189,18 @@ setup_built_in_macros = ->
   defmacro "quote", (x) ->
     x.quoted = true
     x
-  , false
 
   defmacro "quasiquote", (x) ->
     x.quasiquoted = true
     x
-  , false
     
   defmacro "unquote", (x) ->
     x.unquoted = true
     x
-  , false
     
   defmacro "unquote-splicing", (x) ->
     x.unquote_spliced = true
     x
-  , false
     
 
 
@@ -238,7 +216,7 @@ setup_built_in_macros = ->
       c_namespace = namespace._compile()
       
     c_error = error._compile()
-    "new oppo.Error(#{c_namespace}, #{c_error}).raise()"
+    new C.Raw "new oppo.Error(#{c_namespace}, #{c_error}).raise()"
 
   defmacro "try", (sexp...) ->
     _finally = sexp.pop()
@@ -256,7 +234,6 @@ setup_built_in_macros = ->
     [__, finally_body...] = _finally.items
 
     new C.TryCatch _try: body, err_name: catch_err, _catch: catch_body, _finally: finally_body
-  , false
 
   defmacro "assert", (sexp) ->
     c_sexp = sexp._compile()
@@ -264,6 +241,6 @@ setup_built_in_macros = ->
     error_namespace = new C.String "Assertion-Error"
     error = new C.String (oppo.stringify sexp)
     raise_call = call_macro "raise", error_namespace, error
-    """
+    new C.Raw """
     (#{c_sexp} || #{raise_call})
     """

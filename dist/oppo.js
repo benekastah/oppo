@@ -315,6 +315,19 @@
       return this.compile.apply(this, arguments);
     };
 
+    Construct.prototype.toString = function() {
+      var _ref1;
+      if (((_ref1 = this.value) != null ? _ref1.toString : void 0) != null) {
+        return this.value.toString();
+      } else {
+        return "" + this.value;
+      }
+    };
+
+    Construct.prototype.valueOf = function() {
+      return this.value;
+    };
+
     Construct.prototype.error = function(message) {
       var filename, location, type;
       filename = C.current_filename;
@@ -763,7 +776,7 @@
       c_body = "" + (c_body.join(';\n  ')) + ";";
       c_body = add_to_body != null ? "" + (add_to_body._compile()) + ";\n  " + c_body : c_body;
       var_stmt = scope.var_stmt();
-      return "function " + c_name + "(" + (c_args.join(", ")) + ") {\n  " + var_stmt + c_body + ";\n}";
+      return "function " + c_name + "(" + (c_args.join(", ")) + ") {\n  " + var_stmt + c_body + "\n}";
     };
 
     Function.prototype.will_autoreturn = function() {
@@ -869,11 +882,11 @@
 
     If.prototype.compile = function() {
       var c_cond, c_else, c_then, ret;
-      c_cond = this.condition.compile();
-      c_then = this.then.compile();
+      c_cond = this.condition._compile();
+      c_then = this.then._compile();
       ret = "if (" + c_cond + ") {\n  " + c_then + "\n}";
       if (this._else) {
-        c_else = this._else.compile();
+        c_else = this._else._compile();
         ret = "" + ret + " else {\n  " + c_else + "\n}";
       }
       return ret;
@@ -899,6 +912,31 @@
     return If;
 
   })(C.Construct);
+
+  C.IfTernary = (function(_super) {
+
+    __extends(IfTernary, _super);
+
+    function IfTernary(_arg, yy) {
+      var _ref1;
+      this._else = _arg._else;
+      IfTernary.__super__.constructor.apply(this, arguments);
+      if ((_ref1 = this._else) == null) {
+        this._else = new C.Null(yy);
+      }
+    }
+
+    IfTernary.prototype.compile = function() {
+      var c_cond, c_else, c_then;
+      c_cond = this.condition._compile();
+      c_then = this.then._compile();
+      c_else = this._else._compile();
+      return "(" + c_cond + " ? " + c_then + " : " + c_else + ")";
+    };
+
+    return IfTernary;
+
+  })(C.If);
 
   C.Loop = (function(_super) {
 
@@ -1579,11 +1617,18 @@
     __extends(Var, _super);
 
     function Var() {
-      var scope;
       Var.__super__.constructor.apply(this, arguments);
-      scope = C.current_scope();
-      scope.def_var(this);
     }
+
+    Var.prototype.compile = function() {
+      var scope;
+      if (!(this.defined != null)) {
+        scope = C.current_scope();
+        scope.def_var(this);
+        this.defined = true;
+      }
+      return Var.__super__.compile.apply(this, arguments);
+    };
 
     return Var;
 
@@ -1594,13 +1639,19 @@
     __extends(Set, _super);
 
     function Set(_arg, yy) {
-      var scope, value, _ref1;
+      var value, _ref1;
       this._var = _arg._var, value = _arg.value, this.must_exist = _arg.must_exist;
       Set.__super__.constructor.apply(this, arguments);
       this.value = value;
       if ((_ref1 = this.must_exist) == null) {
         this.must_exist = true;
       }
+    }
+
+    Set.prototype.compile = function() {
+      var c_val, c_var, scope;
+      c_var = this._var._compile();
+      c_val = this.value._compile();
       scope = C.find_scope_with_var(this._var);
       if (this.must_exist && !scope) {
         this._var.error_cant_set();
@@ -1608,12 +1659,6 @@
       if (scope != null) {
         scope.set_var(this._var, this.value);
       }
-    }
-
-    Set.prototype.compile = function() {
-      var c_val, c_var;
-      c_var = this._var._compile();
-      c_val = this.value._compile();
       return "" + c_var + " = " + c_val;
     };
 
@@ -2142,13 +2187,13 @@ case 17: return 19;
 break;
 case 18: return 21; 
 break;
-case 19: return 28; 
+case 19: return 29; 
 break;
-case 20: return 26; 
+case 20: return 28; 
 break;
-case 21: return 27; 
+case 21: return 26; 
 break;
-case 22: return 29; 
+case 22: return 27; 
 break;
 case 23: return 25; 
 break;
@@ -2164,7 +2209,7 @@ case 28: return 'INVALID';
 break;
 }
 };
-lexer.rules = [/^(?:;.*)/,/^(?:\s+)/,/^(?:")/,/^(?:")/,/^(?:(\\"|[^"])*)/,/^(?:#\/)/,/^(?:\/[a-zA-Z]*)/,/^(?:(\\\/|[^\/])*)/,/^(?:[\+\-]?\d*\.\d+)/,/^(?:\d{1,2}#[\+\-]?\w+)/,/^(?:[\+\-]?\d+)/,/^(?:#[tT]{1})/,/^(?:#[fF]{1})/,/^(?:\()/,/^(?:\))/,/^(?:\[)/,/^(?:\])/,/^(?:\{)/,/^(?:\})/,/^(?:,)/,/^(?:')/,/^(?:`)/,/^(?:,@)/,/^(?:\.)/,/^(?:#\()/,/^(?::)/,/^(?:[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+)/,/^(?:$)/,/^(?:.)/];
+lexer.rules = [/^(?:;.*)/,/^(?:\s+)/,/^(?:")/,/^(?:")/,/^(?:(\\"|[^"])*)/,/^(?:#\/)/,/^(?:\/[a-zA-Z]*)/,/^(?:(\\\/|[^\/])*)/,/^(?:[\+\-]?\d*\.\d+)/,/^(?:\d{1,2}#[\+\-]?\w+)/,/^(?:[\+\-]?\d+)/,/^(?:#[tT]{1})/,/^(?:#[fF]{1})/,/^(?:\()/,/^(?:\))/,/^(?:\[)/,/^(?:\])/,/^(?:\{)/,/^(?:\})/,/^(?:,@)/,/^(?:,)/,/^(?:')/,/^(?:`)/,/^(?:\.)/,/^(?:#\()/,/^(?::)/,/^(?:[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+)/,/^(?:$)/,/^(?:.)/];
 lexer.conditions = {"string":{"rules":[3,4],"inclusive":false},"regex":{"rules":[6,7],"inclusive":false},"INITIAL":{"rules":[0,1,2,5,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28],"inclusive":true}};
 return lexer;})()
 parser.lexer = lexer;function Parser () { this.yy = {}; }Parser.prototype = parser;parser.Parser = Parser;
@@ -2190,10 +2235,11 @@ if (typeof module !== 'undefined' && require.main === module) {
 }
 }// Generated by CoffeeScript 1.3.3
 (function() {
-  var C, L, binary_op, call_macro, call_macro_transform, clone, compare_op, compile, compile_list, compile_runtime, define, defmacro, keys, last, map, math_op, oppo_eval, pop_shift_op, push_unshift_op, read, root, scope_stack, setup_built_in_macros, trim, type_of, types, _ref, _ref1, _ref2,
+  var C, L, binary_op, call_macro, call_macro_transform, clone, compare_op, compile, compile_list, compile_runtime, define, defmacro, keys, last, map, math_op, oppo_eval, oppoize, pop_shift_op, push_unshift_op, read, root, scope_stack, setup_built_in_macros, trim, type_of, types, _ref, _ref1, _ref2,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
-    __slice = [].slice;
+    __slice = [].slice,
+    __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
   root = typeof global !== "undefined" && global !== null ? global : window;
 
@@ -2352,10 +2398,12 @@ if (typeof module !== 'undefined' && require.main === module) {
     C.Construct.prototype.compile_quoted = function() {
       return "new lemur.Compiler." + this.constructor.name + "('" + this.value + "')";
     };
+    C.Construct.prototype.compile_quasiquoted = function() {
+      return this.compile_quoted.apply(this, arguments);
+    };
     normal_compile = function() {
       return this.compile.apply(this, arguments);
     };
-    C.Construct.prototype.compile_quasiquoted = normal_compile;
     C.Construct.prototype.compile_unquoted = normal_compile;
     C.Construct.prototype.compile_unquote_spliced = normal_compile;
     C.Number.prototype.valueOf = function() {
@@ -2384,6 +2432,39 @@ if (typeof module !== 'undefined' && require.main === module) {
     };
   })();
 
+  oppoize = function() {
+    var expr, exprs, type, _i, _len, _results;
+    exprs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+    _results = [];
+    for (_i = 0, _len = exprs.length; _i < _len; _i++) {
+      expr = exprs[_i];
+      type = type_of(expr);
+      if (expr instanceof C.Construct) {
+        _results.push(expr);
+      } else if (type === "array") {
+        _results.push(new C.List(oppoize.apply(null, expr)));
+      } else if (type === "number") {
+        _results.push(new C.Number(expr));
+      } else if (type === "string") {
+        _results.push(new C.String(expr));
+      } else if (type === "regexp") {
+        _results.push(new C.RegExp({
+          pattern: expr.source,
+          modifiers: "" + (expr.multiline ? 'm' : '') + (expr.global ? 'g' : '') + (expr.ignoreCase ? 'i' : '')
+        }));
+      } else if (expr === true) {
+        _results.push(new C.True());
+      } else if (expr === false) {
+        _results.push(new C.False());
+      } else if (!(expr != null)) {
+        _results.push(new C.Null());
+      } else {
+        _results.push(void 0);
+      }
+    }
+    return _results;
+  };
+
   read = oppo.read = oppo.compiler.read = function() {
     return parser.parse.apply(parser, arguments);
   };
@@ -2392,12 +2473,7 @@ if (typeof module !== 'undefined' && require.main === module) {
     if (comp_runtime == null) {
       comp_runtime = true;
     }
-    if ((type_of(sexp)) === "array") {
-      sexp = new C.List(sexp);
-      sexp = new C.Lambda({
-        body: [sexp]
-      });
-    }
+    sexp = oppoize(sexp)[0];
     return new lemur.Compiler().compile(function() {
       var c_sym_prog, prog, r, sym_prog;
       setup_built_in_macros();
@@ -2485,39 +2561,95 @@ if (typeof module !== 'undefined' && require.main === module) {
       return call_macro.apply(null, ["call"].concat(__slice.call(this.value)));
     };
 
-    List.prototype.compile_quoted = function() {
-      var item, items, ret, sym_js_eval;
-      sym_js_eval = new C.Symbol("js-eval");
-      items = (function() {
-        var _i, _len, _ref3, _results;
-        _ref3 = this.items;
-        _results = [];
-        for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
-          item = _ref3[_i];
-          if (!(this.quasiquoted && item.unquoted)) {
-            item.quoted = true;
+    List.prototype.to_transform = ["quote", "quasiquote", "unquote", "unquote-splicing"];
+
+    List.prototype.transform_child = function(child) {
+      var fst, _ref3;
+      if (child instanceof C.List && !(child.quoted || child.quasiquoted)) {
+        fst = child.items[0];
+        if (fst instanceof C.Symbol && !(child.quoted || child.quasiquoted)) {
+          if (_ref3 = fst.name, __indexOf.call(this.to_transform, _ref3) >= 0) {
+            return C.Macro.transform(child, 1);
           }
-          _results.push(new C.List([sym_js_eval, new C.String(item._compile())]));
         }
-        return _results;
-      }).call(this);
-      ret = new C.Array(items);
+      }
+      return child;
+    };
+
+    List.prototype.should_quote_child = function(child) {
+      return child instanceof C.List || (!(child instanceof C.Atom) && !(child instanceof C.String) && !(child instanceof C.Number) && !(child instanceof C.Regex) && !(child instanceof C.Array));
+    };
+
+    List.prototype.should_quasiquote_child = function(child) {
+      return this.quasiquoted && !(child.unquoted || child.unquote_spliced) && (this.is_macro_template || this.should_quote_child(child));
+    };
+
+    List.prototype.compile_quoted = function() {
+      var arg, args, array, array_has_length, arrays, current_group, item, last_result, result, ret, spliced, _i, _len, _ref3;
+      current_group = [];
+      arrays = [];
+      spliced = [];
+      _ref3 = this.items;
+      for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
+        item = _ref3[_i];
+        item = this.transform_child(item);
+        if (this.quasiquoted) {
+          item.quasiquoted = this.should_quasiquote_child(item);
+        } else {
+          item.quoted = this.should_quote_child(item);
+        }
+        if (item.unquote_spliced) {
+          arrays.push(new C.Array(current_group));
+          spliced.push(item);
+          current_group = [];
+        } else {
+          current_group.push(item);
+        }
+      }
+      if (current_group && arrays.length) {
+        arrays.push(new C.Array(current_group));
+        spliced.push(null);
+        current_group = [];
+      }
+      if (!arrays.length) {
+        ret = new C.Array(current_group);
+      } else {
+        while (arrays.length) {
+          array = arrays.pop();
+          arg = spliced.pop();
+          args = [];
+          if (arg != null) {
+            args.push(arg);
+          }
+          if (typeof last_result !== "undefined" && last_result !== null) {
+            args.push(last_result);
+          }
+          if (array instanceof C.Array && !array.items.length && args.length) {
+            arg = args.shift();
+            array = arg;
+          }
+          args = (function() {
+            var _j, _len1, _results;
+            _results = [];
+            for (_j = 0, _len1 = args.length; _j < _len1; _j++) {
+              arg = args[_j];
+              _results.push(arg._compile());
+            }
+            return _results;
+          })();
+          array_has_length = !(array instanceof C.Array) || array.items.length;
+          result = array_has_length && args.length ? "" + (array._compile()) + ".concat(" + (args.join(', ')) + ")" : array_has_length ? array._compile() : void 0;
+          if (result) {
+            last_result = new C.Raw(result);
+          }
+        }
+        ret = last_result != null ? last_result : new C.Array([]);
+      }
       return ret.compile();
     };
 
     List.prototype.compile_quasiquoted = function() {
-      var grp, ls, sym_ls, value;
-      value = this.compile_quoted.apply(this, arguments);
-      ls = "new lemur.Compiler.List(" + value + ", " + this.line_number + ")";
-      ls = new C.Raw(ls, this.yy);
-      sym_ls = C.Var.gensym("ls");
-      grp = new C.CommaGroup([
-        new C.Var.Set({
-          _var: sym_ls,
-          value: ls
-        }), new C.Raw("" + (sym_ls.compile()) + ".quoted = true"), sym_ls
-      ]);
-      return grp.compile();
+      return this.compile_quoted();
     };
 
     List.prototype.toOppoString = function() {
@@ -2532,7 +2664,7 @@ if (typeof module !== 'undefined' && require.main === module) {
         }
         return _results;
       }).call(this);
-      prefix = this.quoted ? "'" : this.quasiquoted ? "`" : this.unquoted ? "~" : this.unquote_spliced ? "..." : "";
+      prefix = this.quoted ? "'" : this.quasiquoted ? "`" : this.unquoted ? "," : this.unquote_spliced ? ",@" : "";
       return "" + prefix + "(" + (s_value.join(' ')) + ")";
     };
 
@@ -2554,7 +2686,9 @@ if (typeof module !== 'undefined' && require.main === module) {
       var name, scope, transform;
       name = _arg.name, this.argnames = _arg.argnames, this.template = _arg.template, transform = _arg.transform, this.invoke = _arg.invoke;
       this.name = new C.Var(name);
+      this.template;
       scope = C.current_scope();
+      this.name._compile();
       scope.set_var(this.name, this);
       if (transform != null) {
         this.transform = transform;
@@ -2574,10 +2708,34 @@ if (typeof module !== 'undefined' && require.main === module) {
     };
 
     Macro.prototype.transform = function() {
-      var arg, args, c_template, fn, ls, transformed;
+      var arg, args, c_template, fn, frst, grp, ls, sym_ls, t, transformed;
       args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      ls = this.template.pop();
+      if (ls instanceof C.List && (ls.quasiquoted || ((frst = ls.items[0]) instanceof C.Symbol && frst.name === "quasiquote"))) {
+        ls = C.Macro.transform(ls);
+        ls.is_macro_template = true;
+        ls = new C.Raw("new lemur.Compiler.List(" + (ls._compile()) + ")", this.yy);
+      }
+      this.template.push(ls);
+      c_template = (function() {
+        var _i, _len, _ref3, _results;
+        _ref3 = this.template;
+        _results = [];
+        for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
+          t = _ref3[_i];
+          _results.push(new C.Raw(t._compile()));
+        }
+        return _results;
+      }).call(this);
+      grp = new C.CommaGroup(c_template, this.yy);
+      sym_ls = C.Var.gensym("ls");
       fn = new C.Lambda({
-        body: this.template,
+        body: [
+          new C.Var.Set({
+            _var: sym_ls,
+            value: grp
+          }), new C.Raw("" + (sym_ls._compile()) + ".quoted = true"), sym_ls
+        ],
         args: this.argnames
       }, this.yy);
       args = (function() {
@@ -2601,28 +2759,36 @@ if (typeof module !== 'undefined' && require.main === module) {
     };
 
     Macro.can_transform = function(item) {
-      return (item != null) && (item.transform != null) && !item.builtin;
+      return (item != null) && (item.transform != null);
     };
 
-    Macro.transform = function(code) {
+    Macro.transform = function(code, levels) {
       var callable, item, transformed;
-      if (code instanceof C.ReturnedConstruct) {
-        code = code.value;
+      if (levels == null) {
+        levels = Infinity;
       }
-      if (code instanceof C.List && !(code.quoted || code.quasiquoted)) {
-        callable = code.items[0];
-        if (callable instanceof C.Symbol) {
-          item = C.get_var_val(callable);
-          if (this.can_transform(item)) {
-            transformed = item.transform.apply(item, code.items.slice(1));
+      if (levels > 0) {
+        if (code instanceof C.ReturnedConstruct) {
+          code = code.value;
+        }
+        if (code instanceof C.List && !(code.quoted || code.quasiquoted)) {
+          callable = code.items[0];
+          if (callable instanceof C.Symbol) {
+            item = C.get_var_val(callable);
+            if (this.can_transform(item)) {
+              transformed = item.transform.apply(item, code.items.slice(1));
+              levels -= 1;
+            }
           }
         }
-      }
-      if (!transformed && (!(code instanceof C.Macro)) && (this.can_transform(code))) {
-        transformed = code.transform();
-      }
-      if ((transformed != null) && transformed !== code) {
-        return this.transform(transformed);
+        if (!transformed && (!(code instanceof C.Macro)) && (this.can_transform(code))) {
+          transformed = code.transform();
+        }
+        if ((transformed != null) && transformed !== code) {
+          return this.transform(transformed, levels);
+        } else {
+          return code;
+        }
       } else {
         return code;
       }
@@ -2839,7 +3005,7 @@ if (typeof module !== 'undefined' && require.main === module) {
         'not=', function() {
           return !(eq.apply(null, arguments));
         }
-      ], ['or', binary_op('||')], ['and', binary_op('&&', true)], ['__oppo_eval__', 'oppo.eval'], ['__typeof__', 'lemur.core.to_type'], ['typeof', '__typeof__'], ['println', 'console.log.bind(console)'], ['prn', 'println'], ['__slice__', 'Array.prototype.slice'], [
+      ], ['or', binary_op('||')], ['and', binary_op('&&', true)], ['__oppo_eval__', 'oppo.eval'], ['__typeof__', 'lemur.core.to_type'], ['typeof', '__typeof__'], ['puts', 'console.log.bind(console)'], ['__slice__', 'Array.prototype.slice'], [
         'list', function() {
           return __slice__.call(arguments);
         }
@@ -3079,22 +3245,14 @@ if (typeof module !== 'undefined' && require.main === module) {
   */
 
 
-  defmacro = function(name, fn, builtin) {
+  defmacro = function(name, fn) {
     var m, macro_args, s_name;
-    if (builtin == null) {
-      builtin = true;
-    }
     s_name = new C.Symbol(name);
     macro_args = {
       name: s_name
     };
-    if (builtin) {
-      macro_args.invoke = fn;
-    } else {
-      macro_args.transform = fn;
-    }
+    macro_args.transform = fn;
     m = new C.Macro(macro_args);
-    m.builtin = builtin;
     m._compile();
     return m;
   };
@@ -3103,12 +3261,8 @@ if (typeof module !== 'undefined' && require.main === module) {
     var args, name, ret, to_call;
     name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     to_call = C.get_var_val(new C.Symbol(name));
-    if (to_call.invoke != null) {
-      return to_call.invoke.apply(to_call, args);
-    } else {
-      ret = to_call.transform.apply(to_call, args);
-      return ret.compile();
-    }
+    ret = to_call.transform.apply(to_call, args);
+    return ret._compile();
   };
 
   call_macro_transform = function() {
@@ -3123,13 +3277,13 @@ if (typeof module !== 'undefined' && require.main === module) {
       JAVASCRIPT BUILTINS
     */
 
-    var macro_do, macro_let, operator_macro;
+    var macro_do, operator_macro;
     defmacro("regex", function(pattern, modifiers) {
       return new C.Regex({
         pattern: pattern.value,
         modifiers: modifiers.value
       }, pattern.yy);
-    }, false);
+    });
     defmacro("js-eval", function(js_code) {
       if (js_code instanceof C.String) {
         return js_code.value;
@@ -3138,17 +3292,17 @@ if (typeof module !== 'undefined' && require.main === module) {
       } else if ((js_code instanceof C.Symbol) && js_code.quoted) {
         return js_code.name;
       } else {
-        return "oppo.root.eval(" + (js_code._compile()) + ")";
+        return new C.Raw("oppo.root.eval(" + (js_code._compile()) + ")");
       }
     });
     defmacro("if", function(cond, tbranch, fbranch) {
       var _if;
-      return _if = new C.If({
+      return _if = new C.IfTernary({
         condition: cond,
         then: tbranch,
         _else: fbranch
       });
-    }, false);
+    });
     defmacro("lambda", function() {
       var args, body, fn;
       args = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
@@ -3156,12 +3310,12 @@ if (typeof module !== 'undefined' && require.main === module) {
         args: args.value,
         body: body
       });
-    }, false);
+    });
     defmacro("array", function() {
       var ary, items;
       items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       return ary = new C.Array(items);
-    }, false);
+    });
     defmacro("js-for", function() {
       var a, b, body, c, _for;
       a = arguments[0], b = arguments[1], c = arguments[2], body = 4 <= arguments.length ? __slice.call(arguments, 3) : [];
@@ -3169,7 +3323,7 @@ if (typeof module !== 'undefined' && require.main === module) {
         condition: [a, b, c],
         body: body
       });
-    }, false);
+    });
     defmacro("foreach", function() {
       var body, coll, foreach;
       coll = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
@@ -3177,7 +3331,7 @@ if (typeof module !== 'undefined' && require.main === module) {
         collection: coll,
         body: body
       });
-    }, false);
+    });
     operator_macro = function(name, className) {
       var macro_fn;
       macro_fn = function() {
@@ -3195,7 +3349,7 @@ if (typeof module !== 'undefined' && require.main === module) {
           }
           return _results;
         })();
-        return results.join(' ');
+        return new C.Raw(results.join(' '));
       };
       return defmacro(name, macro_fn);
     };
@@ -3233,7 +3387,7 @@ if (typeof module !== 'undefined' && require.main === module) {
       } else if (keyword instanceof C.String) {
         return k;
       }
-    }, false);
+    });
     defmacro("def", function() {
       var args, body, name, rest, scope, set_, to_define, value;
       to_define = arguments[0], rest = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
@@ -3261,7 +3415,7 @@ if (typeof module !== 'undefined' && require.main === module) {
         _var: name,
         value: value
       });
-    }, false);
+    });
     defmacro("apply", function() {
       var arg, args, c_args, c_callable, callable;
       callable = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
@@ -3292,7 +3446,7 @@ if (typeof module !== 'undefined' && require.main === module) {
       if (!callable instanceof C.Symbol) {
         c_callable = "(c_callable)";
       }
-      return "" + c_callable + ".apply(" + (args.join(', ')) + ")";
+      return new C.Raw("" + c_callable + ".apply(" + (args.join(', ')) + ")");
     });
     defmacro("call", function() {
       var args, callable, fcall, item;
@@ -3311,7 +3465,7 @@ if (typeof module !== 'undefined' && require.main === module) {
         fn: callable,
         args: args
       }, callable.yy);
-    }, false);
+    });
     defmacro("defmacro", function() {
       var argnames, mac, name, template;
       argnames = arguments[0], template = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
@@ -3322,8 +3476,8 @@ if (typeof module !== 'undefined' && require.main === module) {
         template: template
       });
       return new C.Raw(mac.compile());
-    }, false);
-    macro_let = defmacro("let", function() {
+    });
+    defmacro("let", function() {
       var bindings, body, def_sym, i, item, new_bindings, new_body, sym, _i, _len, _ref3;
       bindings = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       def_sym = new C.Symbol('def');
@@ -3342,24 +3496,16 @@ if (typeof module !== 'undefined' && require.main === module) {
         }
       }
       new_body = __slice.call(new_bindings).concat(__slice.call(body));
-      return (new C.List([
+      return new C.List([
         new C.Lambda({
           body: new_body
         })
-      ])).compile();
+      ]);
     });
     macro_do = defmacro("do", function() {
-      var arg, c_items;
-      c_items = (function() {
-        var _i, _len, _results;
-        _results = [];
-        for (_i = 0, _len = arguments.length; _i < _len; _i++) {
-          arg = arguments[_i];
-          _results.push(arg._compile());
-        }
-        return _results;
-      }).apply(this, arguments);
-      return "(" + (c_items.join(',\n')) + ")";
+      var items;
+      items = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      return new C.CommaGroup(items, items[0].yy);
     });
     /*
       QUOTING
@@ -3368,19 +3514,19 @@ if (typeof module !== 'undefined' && require.main === module) {
     defmacro("quote", function(x) {
       x.quoted = true;
       return x;
-    }, false);
+    });
     defmacro("quasiquote", function(x) {
       x.quasiquoted = true;
       return x;
-    }, false);
+    });
     defmacro("unquote", function(x) {
       x.unquoted = true;
       return x;
-    }, false);
+    });
     defmacro("unquote-splicing", function(x) {
       x.unquote_spliced = true;
       return x;
-    }, false);
+    });
     /*
       ERRORS & VALIDATIONS
     */
@@ -3394,7 +3540,7 @@ if (typeof module !== 'undefined' && require.main === module) {
         c_namespace = namespace._compile();
       }
       c_error = error._compile();
-      return "new oppo.Error(" + c_namespace + ", " + c_error + ").raise()";
+      return new C.Raw("new oppo.Error(" + c_namespace + ", " + c_error + ").raise()");
     });
     defmacro("try", function() {
       var body, catch_body, catch_err, finally_body, sexp, __, _catch, _finally, _ref3, _ref4, _ref5, _ref6;
@@ -3418,14 +3564,14 @@ if (typeof module !== 'undefined' && require.main === module) {
         _catch: catch_body,
         _finally: finally_body
       });
-    }, false);
+    });
     return defmacro("assert", function(sexp) {
       var c_sexp, error, error_namespace, raise_call;
       c_sexp = sexp._compile();
       error_namespace = new C.String("Assertion-Error");
       error = new C.String(oppo.stringify(sexp));
       raise_call = call_macro("raise", error_namespace, error);
-      return "(" + c_sexp + " || " + raise_call + ")";
+      return new C.Raw("(" + c_sexp + " || " + raise_call + ")");
     });
   };
 

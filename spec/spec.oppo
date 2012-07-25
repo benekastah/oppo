@@ -1,23 +1,22 @@
 
 (def (describe title func)
-  (prn)
-  (prn title)
+  (puts)
+  (puts title)
   (try
     (if (func)
-      (prn "Passed all tests.")
-      (prn "Failed some tests."))
+      (puts "Passed all tests.")
+      (puts "Failed some tests."))
   (catch e
-    (prn "Error:" e)))
-  (prn))
+    (puts "Error:" e)))
+  (puts))
 
 (def (it property func)
-  (prn "    it" property)
+  (puts "    it" property)
   (try
     (func)
-    (prn "        Passed!")
+    (puts "        Passed!")
   (catch e
-    (prn "********Error:" (str e))))
-  nil)
+    (puts "********Error:" (str e)))))
 
 
 (describe "Oppo" (lambda []
