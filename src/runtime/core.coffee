@@ -68,9 +68,35 @@ pop_shift_op = (method) ->
   }
   """
 
+equality_op = (_not = false) ->
+  """
+  function () {
+    var a, b;
+    var i = 0;
+    var len = arguments.length;
+    for (; i < len; i++) {
+      b = arguments[i]
+      if (typeof a === "undefined") {
+        a = b;
+        continue;
+      }
+
+      if (!__equal__(a, b))
+        return #{_not};
+
+      a = b;
+    }
+    return #{!_not};
+  }
+  """
+
+
 compile_runtime = ->
 
   define [
+    ['__oppo_runtime_defined__', true]
+    ['identity', (x) -> x]
+
     ## Math
     ['+', (math_op '+', true)]
     ['-', math_op '-']
@@ -223,19 +249,8 @@ compile_runtime = ->
         return result;
       }`
     ]
-    ['=', ->
-      for b in arguments
-        if not a?
-          a = b
-          continue
-
-        if not __equal__ a, b
-          return false
-
-        a = b
-      true
-    ]
-    ['not=', -> !(eq arguments...)]
+    ['=', equality_op()]
+    ['not=', equality_op(true)]
 
 
     ## Binary operations
@@ -290,7 +305,7 @@ compile_runtime = ->
       return x.concat.apply(x, args);
     }`]
 
-    ['sort', (a, f) ->
+    ['sort', (f, a) ->
       new_a = a.slice()
       if f? then new_a.sort f
       else new_a.sort()
@@ -299,10 +314,8 @@ compile_runtime = ->
     ## Collections
     ['map', (f, o) ->
       t = __typeof__ o
-      if o.map?
-        o.map (x) -> f x
-      else if t is "array" or o instanceof Array
-        for x in o then f x
+      if t is "array" or o instanceof Array
+        (f x) for x in o
       else if t is "object" or o instanceof Object
         result = {}
         for k, v of o
@@ -313,9 +326,7 @@ compile_runtime = ->
 
     ['reduce', (f, o) ->
       t = __typeof__ o
-      if o.reduce?
-        return o.reduce (a, b) -> f a, b
-      else if t is "array" or o instanceof Array
+      if t is "array" or o instanceof Array
         for x in o
           if not result?
             result = x
@@ -333,9 +344,7 @@ compile_runtime = ->
 
     ['reduce-right', (f, o) ->
       t = __typeof__ o
-      if o.reduceRight?
-        o.reduceRight (a, b) -> f a, b
-      else if t is "array" or o instanceof Array
+      if t is "array" or o instanceof Array
         for x in o.slice().reverse()
           if not result?
             result = x
@@ -349,9 +358,7 @@ compile_runtime = ->
 
     ['filter', (f, o) ->
       t = __typeof__ o
-      if o.filter?
-        return o.filter (x) -> f x
-      else if t is "array" or o instanceof Array
+      if t is "array" or o instanceof Array
         result = []
         for x in o
           if f x
@@ -367,7 +374,7 @@ compile_runtime = ->
 
     ['keys', "Object.keys || " + (o) ->
       for k of o
-        if  not o.hasOwnProperty k then continue
+        continue if not o.hasOwnProperty k
         k
     ]
 

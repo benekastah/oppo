@@ -48,11 +48,13 @@
 ","                                     { return 'UNQUOTE'; }
 "'"                                     { return 'QUOTE'; }
 "`"                                     { return 'QUASIQUOTE'; }
-"."                                     { return 'REST'; }
+"..."                                   { return 'REST'; }
 "#("                                    { return 'FUNCTION'; }
+"@"                                     { return 'PROPERTY_ACCESS'; }
+"."                                     { return 'FUNCTION_ACCESS'; }
 
 ":"                                     { return 'KEYWORD'; }
-[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+    { return 'IDENTIFIER'; } //'
+[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+   { return 'IDENTIFIER'; } //'
 
 <<EOF>>                                 { return 'EOF'; }
 .                                       { return 'INVALID'; }
@@ -112,9 +114,9 @@ array
   
 object
   : OBJECT kvpair_list OBJECT_END
-    { $$ = new C.Object($2, yy); }
+    { $$ = call_by_name("object", $2, yy); }
   | OBJECT OBJECT_END
-    { $$ = new C.Object([], yy); }
+    { $$ = call_by_name("object", null, yy); }
   ;
 
 kvpair_list
@@ -126,22 +128,24 @@ kvpair_list
 
 kvpair
   : element element
-    { $$ = [$1, $2]; }
+    { $$ = new C.List([$1, $2]); $$.quoted = true; }
   ;
 
 element_list
-  : base_element_list
-  | base_element_list REST element
-    { $$ = $1; $$.push(new C.Rest($3, yy)); }
-  | REST element
-    { $$ = [new C.Rest($3, yy)]; }
+  : element_list_element
+    { $$ = [$1]; }
+  | element_list element_list_element
+    { $$ = $1; $$.push($2); }
   ;
 
-base_element_list
+element_list_element
   : element
-    { $$ = [$1]; }
-  | base_element_list element
-    { $$ = $1; $$.push($2); }
+  | rest_element
+  ;
+
+rest_element
+  : REST element
+    { $$ = new C.Rest($2, yy); }
   ;
 
 element
@@ -202,7 +206,7 @@ string
   
 keyword
   : KEYWORD symbol
-    { $$ = call_by_name("keyword", [$2], yy); }
+    { $2.quoted = true; $$ = call_by_name("symbol->keyword", [$2], yy); }
   ;
 
 symbol
@@ -217,6 +221,10 @@ symbol
       else
         $$ = new C.Symbol($1, yy);
     }
+  | PROPERTY_ACCESS
+    { $$ = new C.Symbol("get-prop", yy); }
+  | FUNCTION_ACCESS
+    { $$ = new C.Symbol("get-fn", yy); }
   ;
   
 %%

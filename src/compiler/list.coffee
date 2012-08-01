@@ -32,9 +32,9 @@ class C.List extends C.Array
     for item in @items
       item = @transform_child item
       if @quasiquoted
-        item.quasiquoted = @should_quasiquote_child item
+        item.quasiquoted ?= @should_quasiquote_child item
       else
-        item.quoted = @should_quote_child item
+        item.quoted ?= @should_quote_child item
       
       if item.unquote_spliced
         arrays.push new C.Array current_group

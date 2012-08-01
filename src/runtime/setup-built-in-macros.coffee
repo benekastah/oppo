@@ -25,15 +25,18 @@ setup_built_in_macros = ->
   JAVASCRIPT BUILTINS
   ###
   defmacro "regex", (pattern, modifiers) ->
-    new C.Regex {pattern: pattern.value, modifiers: modifiers.value}, pattern.yy
+    pattern = C.Macro.transform pattern
+    modifiers = C.Macro.transform modifiers
+    new C.Regex {pattern: pattern, modifiers: modifiers}, pattern.yy
 
   defmacro "js-eval", (js_code) ->
+    js_code = C.Macro.transform js_code
     if js_code instanceof C.String
-      js_code.value
+      new C.Raw js_code.value
     else if js_code instanceof C.Number
-      js_code._compile()
+      new C.Raw js_code._compile()
     else if (js_code instanceof C.Symbol) and js_code.quoted
-      js_code.name
+      new C.Raw js_code.name
     else
       new C.Raw "oppo.root.eval(#{js_code._compile()})"
 
@@ -49,6 +52,34 @@ setup_built_in_macros = ->
 
   defmacro "array", (items...) ->
     ary = new C.Array items
+
+  defmacro "object", (kvpairs...) ->
+    obj = new C.OppoObject kvpairs
+
+  defmacro "get-prop", (o, ps...) ->
+    c_o = o._compile()
+    c = "#{c_o}"
+    for p in ps
+      p = C.Macro.transform p
+      sym = p instanceof C.Symbol and (p.quoted or p.quasiquoted)
+      if sym
+        p.quoted = p.quasiquoted = no
+      c_p = p._compile()
+      if sym
+        c = "#{c}.#{c_p}"
+      else
+        c = "#{c}[#{c_p}]"
+    new C.Raw c
+
+  defmacro "get-fn", (p, o, args...) ->
+    s_get_prop = new C.Symbol "get-prop"
+    s_quote = new C.Symbol "quote"
+    q_p = new C.List [s_quote, p]
+    fn = new C.List [s_get_prop, o, q_p]
+    new C.List [fn, args...]
+
+  defmacro "new", (cls, args...) ->
+    new C.FunctionCall fn: cls, args: args, instantiate: true
 
   defmacro "js-for", (a, b, c, body...) ->
     _for = new C.ForLoop condition: [a, b, c], body: body
@@ -109,11 +140,27 @@ setup_built_in_macros = ->
   OPPO BUILTINS
   ###
   defmacro "keyword", (keyword) ->
-    if keyword instanceof C.Symbol
+    if keyword instanceof C.Symbol and (keyword.quoted or keyword.quasiquoted)
       new C.String keyword.value, keyword.yy
     else if keyword instanceof C.String
-      k
+      keyword
+    else
+      new C.Raw "String(#{keyword._compile()})"
 
+  defmacro "symbol->keyword", (s) ->
+    new C.String s.value, s.yy
+
+  defmacro "symbol", (sym) ->
+    if sym instanceof C.Symbol and (sym.quoted or sym.quasiquoted)
+      sym.quoted = true
+      sym
+    else if sym instanceof C.String
+      new_sym = new C.Symbol sym.value, sym.yy
+      new_sym.quoted = true
+      new_sym
+    else
+      c_sym = sym._compile()
+      new C.Raw "new lemur.Compiler.Symbol(#{c_sym}, #{sym.line_number})"
 
   defmacro "def", (to_define, rest...) ->
     if not rest.length
@@ -137,7 +184,8 @@ setup_built_in_macros = ->
   defmacro "apply", (callable, args...) ->
     if args.length > 1
       c_args = for arg in args then arg._compile()
-      c_args = "[].concat(#{c_args.join ', '})"
+      last_arg = c_args.pop()
+      c_args = "[#{c_args.join ', '}].concat(#{last_arg})"
       args = [new C.Raw c_args]
 
     args.unshift new C.Null()
@@ -175,7 +223,7 @@ setup_built_in_macros = ->
         new_bindings.push new C.List [def_sym, sym, item]
         
     new_body = [new_bindings..., body...]
-    new C.List [new C.Lambda body: new_body]
+    new C.FunctionCall fn:(new C.Lambda body: new_body), scope: new C.Raw "this"
 
   macro_do = defmacro "do", (items...) ->
     new C.CommaGroup items, items[0].yy
@@ -233,7 +281,7 @@ setup_built_in_macros = ->
     [__, catch_err, catch_body...] = _catch.items
     [__, finally_body...] = _finally.items
 
-    new C.TryCatch _try: body, err_name: catch_err, _catch: catch_body, _finally: finally_body
+    new C.TryCatchExpression _try: body, err_name: catch_err, _catch: catch_body, _finally: finally_body
 
   defmacro "assert", (sexp) ->
     c_sexp = sexp._compile()

@@ -143,9 +143,11 @@ do ->
     @_else = C.Macro.transform @_else if @_else?
     this
 
+  C.Function.ArgsList::slice_fn = "__slice__.call"
+
 #-----------------------------------------------------------------------------#
 
-oppoize = (exprs...) ->
+oppoize = oppo.oppoize = (exprs...) ->
   for expr in exprs
     type = type_of expr
     if expr instanceof C.Construct
@@ -166,6 +168,10 @@ oppoize = (exprs...) ->
       new C.False()
     else if not expr?
       new C.Null()
+    else if type is "object"
+      pairs = for own prop, val of expr
+        [(oppoize prop), (oppoize expr)]
+      new C.Object pairs
 
 #-----------------------------------------------------------------------------#
 
@@ -181,6 +187,8 @@ compile = oppo.compile = oppo.compiler.compile = (sexp, comp_runtime = true) ->
     setup_built_in_macros()
     if comp_runtime
       r = compile_runtime()
+      # Eval the runtime here so that macros will have access to it when expanding
+      eval r
 
     if r?
       r = """

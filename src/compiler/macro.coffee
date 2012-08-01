@@ -18,12 +18,6 @@ class C.Macro extends C.Construct
     x.compile()
     
   transform: (args...) ->
-    ls = @template.pop()
-    if ls instanceof C.List and (ls.quasiquoted or ((frst = ls.items[0]) instanceof C.Symbol and frst.name is "quasiquote"))
-      ls = C.Macro.transform ls
-      ls.is_macro_template = true
-      ls = new C.Raw "new lemur.Compiler.List(#{ls._compile()})", @yy
-    @template.push ls
     c_template = for t in @template then new C.Raw t._compile()
     grp = new C.CommaGroup c_template, @yy
     sym_ls = C.Var.gensym "ls"
@@ -45,7 +39,11 @@ class C.Macro extends C.Construct
     ls = new C.List [fn, args...], @yy
     c_template = ls.compile()
 
+    if not __oppo_runtime_defined__? or not __oppo_runtime_defined__
+      c_template = "#{compile_runtime()};#{c_template}"
+
     transformed = eval c_template
+    [transformed] = oppoize transformed
     transformed.quoted = false if transformed instanceof C.List
     transformed
 
