@@ -131,7 +131,7 @@ Here is a simple error handling function (for a browser):
       (let (msg (or message "An unknown error has occurred"))
         (alert msg)))
         
-If you have a thirst for fibonacci numbers. _**NOTE**: I should probably make this tail-recursive..._:
+If you have a thirst for fibonacci numbers. _**NOTE**: I should probably make this tail-recursive_:
 
     (def (fib x ls)
       (let (-ls (or ls [1 1])
