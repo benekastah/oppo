@@ -1,0 +1,7 @@
+(def (rec-fact n accum)
+  (if (< n 2)
+    accum
+    (rec-fact (decr n) (* accum n))))
+
+(def (fact n)
+  (rec-fact n 1))

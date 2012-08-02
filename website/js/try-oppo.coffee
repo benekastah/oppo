@@ -1,3 +1,4 @@
+_ = require "underscore"
 
 $.domReady ->
   $oppo = $ '#oppo'
@@ -10,12 +11,7 @@ $.domReady ->
     js = $js.val()
     try
       evald = eval js
-      try
-        result = JSON.stringify evald
-        if typeof result isnt "string"
-          throw ""
-      catch e
-        result = evald
+      result = oppo.stringify_html evald
     catch e then result = e
     
     if typeof result is 'undefined'
@@ -28,12 +24,15 @@ $.domReady ->
   compile = ->
     code = oppo_code = $oppo.val()
     cache.set oppo_code_cache_key, code
+    err = null
     try
       ast = oppo.read code
       js = oppo.compile ast
     catch e
       js = "/* #{e} */"
+      err = e
     $js.val js
+    throw err if err
   
   compile_and_compute_result = _.compose compute_result, compile
   

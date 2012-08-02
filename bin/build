@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+
+def get_files(dir, prepend = [])
+  d = Dir.new dir
+  prepend = prepend.map { |item| item.sub /(\.coffee)?$/, ".coffee" }
+  files = prepend.concat d.map { |item|
+    if File.file?("#{dir}/#{item}") && /\.coffee$/ =~ item
+      item
+    else
+      nil
+    end
+  }.find_all { |x| !x.nil? }
+  files = files.uniq
+  files.map { |f| "#{dir}/#{f}" }.join " "
+end
+
+dirname = "#{File.dirname(__FILE__)}/.."
+src = "#{dirname}/src"
+dist = "#{dirname}/dist"
+compiler_scripts = get_files "#{src}/compiler"
+runtime_scripts = get_files "#{src}/runtime", ["core"]
+
+system "mkdir -p #{dist}"
+
+system "#{dirname}/node_modules/lemur/bin/build"
+
+lodash = "#{dist}/lodash.custom.js"
+puts "Building oppo..."
+system "jison #{src}/grammar.jison -o #{dist}/parser.js"
+system "coffee -j #{dist}/oppo-compiler.js -c #{src}/setup #{compiler_scripts} #{runtime_scripts}"
+system "cat #{dirname}/node_modules/lemur/build/lemur.js #{dist}/parser.js #{dist}/oppo-compiler.js > #{dist}/oppo.js"

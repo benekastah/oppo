@@ -29,12 +29,11 @@ task "build", "Build all", (options) ->
   # Confusingly, the order of the commands should be read from the bottom up
   options.success = ->
     options.success = ->
-      options.success = ->
-        options.success = null
-        invoke "closure:compile"
-      invoke "build:runtime"
-    invoke "build:compiler"
-  invoke "build:parser"
+      options.success = null
+      invoke "closure:compile"
+    invoke "build:runtime"
+    
+  invoke "build:compiler"
 
 task "clean", "Clean files from old builds", (options) ->
   dir = options.output ?= "dist"
@@ -47,19 +46,35 @@ task "clean", "Clean files from old builds", (options) ->
 
 task "build:parser", "Generate the Jison parser", (options) ->
   dir = options.output ?= "dist"
-  command = "jison src/grammar.jison -o #{dir}/parser.js"
+  command = "jison src/compiler/grammar.jison -o #{dir}/parser.js"
   console.log "Generate jison parser: #{command}"
   exec command, post_exec options
     
 task "build:compiler", "Build the oppo compiler", (options) ->
-  dir = options.output ?= "dist"
-
-  scripts = "src/compiler"
-
-  command = "coffee -j #{dir}/oppo-compiler.js -c #{scripts}"
-  console.log "Building oppo compiler: #{command}"
-  
-  exec command, post_exec options
+  success = options.success
+  options.success = ->
+    options.success = success
+    dir = options.output ?= "dist"
+    
+    lib_scripts = [
+      "node_modules/text-to-js-identifier/index.coffee"
+    ]
+    
+    local_scripts = [
+      "setup"
+      "setup-types"
+      "setup-built-in-macros"
+      "compiler"
+    ].map (file) -> "src/compiler/#{file}"
+    
+    scripts = lib_scripts.concat local_scripts
+    
+    command = "coffee -j #{dir}/oppo-compiler.js -c #{scripts.join ' '}"
+    console.log "Building oppo compiler: #{command}"
+    
+    exec command, post_exec options
+    
+  invoke "build:parser"
   
 task "closure:compile", "Compile existing build files into single oppo.js file", (options) ->
   dir = options.output ?= "dist"
@@ -78,9 +93,10 @@ task "closure:compile", "Compile existing build files into single oppo.js file",
   
   command = """
   java -jar google-closure-compiler/compiler.jar
-    --js 
-      #{dir}/parser.js 
+    --js
+      node_modules/lemur/build/lemur.js
       #{dir}/oppo-compiler.js 
+      #{dir}/parser.js 
       #{runtime}
     --js_output_file
       #{dir}/oppo.js

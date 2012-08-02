@@ -2,7 +2,7 @@
     "name": "oppo"
   , "description": "A lisp for javascript"
   , "keywords": ["lisp", "functional programming", "fp", "parser", "compiler", "jison"]
-  , "version": "0.0.1"
+  , "version": "0.0.2"
   , "main": "dist/oppo.js"
   , "author": "Paul Harper <benekastah@gmail.com>"
   , "repository": {
@@ -12,6 +12,7 @@
   , "dependencies": {
       "underscore": "1.x.x"
     , "optimist": "0.2.x"
+    , "text-to-js-identifier": ">=0.0.1"
   }
   , "devDependencies": {
       "coffee-script": "1.x.x"

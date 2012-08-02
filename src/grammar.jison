@@ -1,5 +1,20 @@
 /* Oppo - the awesome/experimental lisp on the JSVM */
 
+%{
+  var L = typeof lemur === "undefined" ? require('lemur') : lemur;
+  var C = L.Compiler;
+
+  var sym = function (s, yy) {
+    return new C.Symbol(s, yy)
+  };
+
+  var slice = Array.prototype.slice;
+  var call_by_name = function (sname, args, yy) {
+    var s = sym(sname, yy);
+    return new C.List([s].concat(args), yy);
+  };
+%}
+
 %lex
 %x string regex
 %%
@@ -15,46 +30,56 @@
 <regex>"/"[a-zA-Z]*                     { this.popState(); return 'FLAGS'; }
 <regex>(\\\/|[^\/])*                    { return 'REGEX'; }
 
-[+-]?[0-9]+("."[0-9]+)?\b               { return 'DECIMAL_NUMBER'; }
-[+-]?"#0"[0-9]+\b                       { return 'OCTAL_NUMBER'; }
-[+-]?"#x"[0-9a-fA-F]+\b                 { return 'HEXIDECIMAL_NUMBER'; }
-[+-]?"#b"[0-9]+\b                       { return 'BINARY_NUMBER'; }
+[\+\-]?\d*"."\d+                        { return 'FLOAT'; }
+\d{1,2}"#"[\+\-]?\w+                    { return 'BASENUM'; }
+[\+\-]?\d+                              { return 'FIXNUM'; }
 
-"#"("n"|"N")                            { return 'NIL'; }
-"#"("t"|"T")                            { return 'BOOLEAN_TRUE'; }
-"#"("f"|"F")                            { return 'BOOLEAN_FALSE'; }
+"#"[tT]{1}                              { return 'BOOLEAN_TRUE'; }
+"#"[fF]{1}                              { return 'BOOLEAN_FALSE'; }
 
 "("                                     { return '('; }
 ")"                                     { return ')'; }
 "["                                     { return '['; }
 "]"                                     { return ']'; }
-"#{"                                    { return 'HASH_MAP_START'; }
-"{"                                     { return 'JS_MAP_START'; }
-"}"                                     { return 'MAP_END'; }
+"{"                                     { return 'OBJECT'; }
+"}"                                     { return 'OBJECT_END'; }
 
-"~"                                     { return 'UNQUOTE'; }
+",@"                                    { return 'UNQUOTE_SPLICING'; }
+","                                     { return 'UNQUOTE'; }
 "'"                                     { return 'QUOTE'; }
-"`"                                     { return 'SYNTAX_QUOTE'; }
-"..."                                   { return 'SPLAT'; }
+"`"                                     { return 'QUASIQUOTE'; }
+"..."                                   { return 'REST'; }
 "#("                                    { return 'FUNCTION'; }
-"%"\d+                                  { return 'ARGUMENTS_ACCESSOR'; }
+"@"                                     { return 'PROPERTY_ACCESS'; }
+"."                                     { return 'FUNCTION_ACCESS'; }
 
 ":"                                     { return 'KEYWORD'; }
-[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>,]+   { return 'IDENTIFIER'; } //'
+[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+   { return 'IDENTIFIER'; } //'
 
 <<EOF>>                                 { return 'EOF'; }
 .                                       { return 'INVALID'; }
 
 /lex
 
+%{
+  var types = {}; // oppo.compiler.types;
+%}
+
 %start program
 %%
 
 program
   : s_expression_list EOF
-    { return [["symbol", "do"]].concat($1); }
+    {
+      var var_eval = new C.Var("eval");
+      var oppo_eval = new C.Symbol("__oppo_eval__");
+      var set_eval = new C.Var.Set({_var: var_eval, value: oppo_eval});
+      var lambda = new C.Lambda({body: [set_eval].concat($1)}, yy);
+      lambda.s_expression_list = $1
+      return lambda;
+    }
   | EOF
-    { return null; }
+    { return new C.Null(yy); }
   ;
 
 s_expression_list
@@ -68,43 +93,61 @@ s_expression
   : special_form
   | list
   | symbol
-  | keyword
   | literal
-  | atom
   ;
 
 list
   : callable_list
-  | quoted_list
-  | js_map
+  | array
+  | object
   ;
 
 callable_list
   : '(' element_list ')'
-    { $$ = $2; }
-  | '(' ')'
-    { $$ = null; }
+    { $$ = new C.List($2, yy); }
   ;
 
-quoted_list
+array
   : '[' element_list ']'
-    { $$ = [["symbol", "list"]].concat($2); }
+    { $$ = call_by_name("array", $2, yy); }
   | '[' ']'
-    { $$ = [["symbol", "list"]]; }
+    { $$ = call_by_name("array", [], yy); }
   ;
   
-js_map
-  : JS_MAP_START element_list MAP_END
-    { $$ = [["symbol", "js-map"]].concat($2); }
-  | JS_MAP_START MAP_END
-    { $$ = [["symbol", "js-map"]]; }
+object
+  : OBJECT kvpair_list OBJECT_END
+    { $$ = call_by_name("object", $2, yy); }
+  | OBJECT OBJECT_END
+    { $$ = call_by_name("object", null, yy); }
+  ;
+
+kvpair_list
+  : kvpair
+    { $$ = [$1]; }
+  | kvpair_list kvpair
+    { $$ = $1; $$.push($2); }
+  ;
+
+kvpair
+  : element element
+    { $$ = new C.List([$1, $2]); $$.quoted = true; }
   ;
 
 element_list
-  : element
+  : element_list_element
     { $$ = [$1]; }
-  | element_list element
+  | element_list element_list_element
     { $$ = $1; $$.push($2); }
+  ;
+
+element_list_element
+  : element
+  | rest_element
+  ;
+
+rest_element
+  : REST element
+    { $$ = new C.Rest($2, yy); }
   ;
 
 element
@@ -113,83 +156,77 @@ element
 
 special_form
   : QUOTE s_expression
-    { $$ = [["symbol", "quote"], $2]; }
-  | SYNTAX_QUOTE s_expression
-    { $$ = [["symbol", "syntax-quote"], $2]; }
+    { $$ = call_by_name("quote", [$2]); }
+  | QUASIQUOTE s_expression
+    { $$ = call_by_name("quasiquote", [$2]); }
   | UNQUOTE s_expression
-    { $$ = [["symbol", "unquote"], $2]; }
-  | SPLAT s_expression
-    { $$ = [["symbol", "splat"], $2]; }
+    { $$ = call_by_name("unquote", [$2]); }
+  | UNQUOTE_SPLICING s_expression
+    { $$ = call_by_name("unquote-splicing", [$2]); }
   | FUNCTION element_list ')'
-    { $$ = [["symbol", "lambda"], [], $2]; }
-  | ARGUMENTS_ACCESSOR
-    { $$ = [["symbol", "js-eval"], "arguments[" + ($1.substring(1) - 1) + "]"]; }
-  ;
-
-atom
-  : NIL
-    { $$ = null; }
-  | BOOLEAN_TRUE
-    { $$ = true; }
-  | BOOLEAN_FALSE
-    { $$ = false; }
+    { $$ = call_by_name("lambda", [$2]); }
   ;
 
 literal
-  : STRING
-    { $$ = $1; }
+  : string
   | regex
   | number
+  | atom
   ;
   
+atom
+  : '(' ')'
+    { $$ = new C.Null(yy); }
+  | BOOLEAN_TRUE
+    { $$ = new C.True(yy); }
+  | BOOLEAN_FALSE
+    { $$ = new C.False(yy); }
+  ;
+
 regex
   : REGEX FLAGS
-    { $$ = [["symbol", "regex"], $1, $2.substr(1)]; }
+    { $$ = call_by_name("regex", [new C.String($1, yy), new C.String($2.substr(1), yy)], yy); }
   ;
   
 number
-  : DECIMAL_NUMBER
-    { $$ = parseFloat(yytext, 10); }
-  | OCTAL_NUMBER
+  : FIXNUM
+    { $$ = new C.Number($1, yy); }
+  | FLOAT
+    { $$ = new C.Number($1, yy); }
+  | BASENUM
     {
-      if (/[8-9]/.test(yytext))
-        $$ = NaN;
-      else
-        $$ = parseInt(yytext.replace(/^#0/, ''), 8);
+      var basenum = $1.split('#');
+      $$ = new C.Number({value: basenum[1], base: basenum[0]}, yy);
     }
-  | HEXIDECIMAL_NUMBER
-    { $$ = parseInt(yytext.replace(/^#x/, ''), 16); }
-  | BINARY_NUMBER
-    {
-      if (/[2-9]/.test(yytext))
-        $$ = NaN;
-      else
-        $$ = parseInt(yytext.replace(/^#b/, ''), 2);
-    }
+  ;
+  
+string
+  : STRING
+    { $$ = new C.String($1, yy); }
+  | keyword
   ;
   
 keyword
   : KEYWORD symbol
-    { $$ = [["symbol", "keyword"], [["symbol", "quote"], $2]]; }
+    { $2.quoted = true; $$ = call_by_name("symbol->keyword", [$2], yy); }
   ;
-  
+
 symbol
   : IDENTIFIER
     {
-      var _this = [["symbol", "js-eval"], "this"],
-          yytext1_ = yytext.substr(1),
-          yytext0 = yytext.charAt(0),
-          yytextLower = yytext.toLowerCase();
-          
-      /*if (yytext === "@")
-        $$ = _this;
-      else if (yytext0 === "@")
-        $$ = [["symbol", "."], _this, [["symbol", "quote"], ["symbol", yytext1_]]];
-      else */if (yytextLower === "nil")
-        $$ = null;
+      if (/^nil$/i.test($1))
+        $$ = new C.Null(yy);
+      else if (/^true$/i.test($1))
+        $$ = new C.True(yy);
+      else if (/^false$/i.test($1))
+        $$ = new C.False(yy);
       else
-        $$ = ["symbol", yytext];
+        $$ = new C.Symbol($1, yy);
     }
+  | PROPERTY_ACCESS
+    { $$ = new C.Symbol("get-prop", yy); }
+  | FUNCTION_ACCESS
+    { $$ = new C.Symbol("get-fn", yy); }
   ;
   
 %%
