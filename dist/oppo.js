@@ -2904,7 +2904,7 @@ if (typeof module !== 'undefined' && require.main === module) {
         'mod', function(a, b) {
           return a % b;
         }
-      ], ['**', "Math.pow"], ['min', 'Math.min'], ['max', 'Math.max'], [
+      ], ['pow', "Math.pow"], ['min', 'Math.min'], ['max', 'Math.max'], [
         'incr', function(x) {
           return ++x;
         }

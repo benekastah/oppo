@@ -94,7 +94,7 @@ compile_runtime = ->
     ['*', math_op '*']
     ['/', math_op '/']
     ['mod', (a, b) -> a % b]
-    ['**', "Math.pow"]
+    ['pow', "Math.pow"]
     ['min', 'Math.min']
     ['max', 'Math.max']
     ['incr', (x) -> ++x]
