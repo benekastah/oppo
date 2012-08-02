@@ -62,7 +62,7 @@ We can also make arrays:
 
     (def ls [1 2 3 4 5]) ;; ls = [1, 2, 3, 4, 5]
     
-Accessing members of arrays is simple. **Note**: nth treats arrays as if they are 1-based instead of 0-based:
+Accessing members of arrays is simple. _**NOTE**: nth treats arrays as if they are 1-based instead of 0-based_:
 
     (def arr [1 2 3 4 5])
     (nth arr 3)      ;; 3
