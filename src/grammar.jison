@@ -71,9 +71,11 @@
 program
   : s_expression_list EOF
     {
-      $1.unshift(new C.Raw("var eval = " + sym("__oppo_eval__").compile()));
-      var lambda = new C.Lambda({body: $1}, yy);
-      //return new C.List([lambda], yy);
+      var var_eval = new C.Var("eval");
+      var oppo_eval = new C.Symbol("__oppo_eval__");
+      var set_eval = new C.Var.Set({_var: var_eval, value: oppo_eval});
+      var lambda = new C.Lambda({body: [set_eval].concat($1)}, yy);
+      lambda.s_expression_list = $1
       return lambda;
     }
   | EOF

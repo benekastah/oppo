@@ -37,6 +37,10 @@ getFiles = (file_and_dir_list, base_dir = '') ->
   c_files = for file in files
     dir = path.dirname file
     fname = path.basename file
+
+    # Ignore private files
+    if /^\./.test fname
+      continue
     
     if watch
       fs.watch file, compile.bind output_dir, file
@@ -51,7 +55,7 @@ getFiles = (file_and_dir_list, base_dir = '') ->
     code = fs.readFileSync file, 'utf8'
     try
       read_code = oppo.read code
-      compiled_code = oppo.compile read_code, false
+      compiled_code = oppo.compile read_code, false, dir
       console.log "Compiled #{fname}"
     catch e
       console.warn "Error compiling #{fname}", e
@@ -71,14 +75,15 @@ getFiles = (file_and_dir_list, base_dir = '') ->
 
   fs.writeFileSync jsfile, c_files.join ';'
   # fs.writeFileSync tmp_jsfile, c_files.join ';'
-  child_process.exec "uglifyjs --overwrite #{if beautify then '--beautify' else ''} --lift-vars #{jsfile}; rm #{tmp_jsfile}; echo \"Wrote #{jsfile}\""
+  # child_process.exec "uglifyjs --overwrite #{if beautify then '--beautify' else ''} --lift-vars #{jsfile}; rm #{tmp_jsfile}; echo \"Wrote #{jsfile}\""
   # child_process.exec "closure-compiler --compilation_level ADVANCED_OPTIMIZATIONS " +
   #   "#{if beautify then "--formatting=pretty_print" else ""} " +
   #   "--js_output_file #{jsfile} --js #{tmp_jsfile}; " +
   #   "rm #{tmp_jsfile}; echo \"Wrote #{jsfile}\""
 
 @runfile = (file) ->
+  dir = path.dirname file
   code = fs.readFileSync file, 'utf8'
   read_code = oppo.read code
-  compiled_code = oppo.compile read_code
+  compiled_code = oppo.compile read_code, null, dir
   console.log (eval compiled_code)

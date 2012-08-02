@@ -10,9 +10,11 @@ performAction: function anonymous(yytext,yyleng,yylineno,yy,yystate,$$,_$) {
 var $0 = $$.length - 1;
 switch (yystate) {
 case 1:
-      $$[$0-1].unshift(new C.Raw("var eval = " + sym("__oppo_eval__").compile()));
-      var lambda = new C.Lambda({body: $$[$0-1]}, yy);
-      //return new C.List([lambda], yy);
+      var var_eval = new C.Var("eval");
+      var oppo_eval = new C.Symbol("__oppo_eval__");
+      var set_eval = new C.Var.Set({_var: var_eval, value: oppo_eval});
+      var lambda = new C.Lambda({body: [set_eval].concat($$[$0-1])}, yy);
+      lambda.s_expression_list = $$[$0-1]
       return lambda;
     
 break;

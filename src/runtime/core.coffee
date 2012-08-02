@@ -59,15 +59,6 @@ push_unshift_op = (method) ->
   }
   """
 
-pop_shift_op = (method) ->
-  """
-  function (a) {
-    var new_a = a.slice();
-    new_a.#{method}();
-    return new_a;
-  }
-  """
-
 equality_op = (_not = false) ->
   """
   function () {
@@ -106,8 +97,8 @@ compile_runtime = ->
     ['**', "Math.pow"]
     ['min', 'Math.min']
     ['max', 'Math.max']
-    ['inc', (x) -> ++x]
-    ['dec', (x) -> --x]
+    ['incr', (x) -> ++x]
+    ['decr', (x) -> --x]
 
 
     ## Comparisons
@@ -271,8 +262,6 @@ compile_runtime = ->
     ['first', (a) -> a[0]]
     ['second', (a) -> a[1]]
     ['last', (a) -> a[a.length - 1]]
-    ['init', (a) -> a.slice 0, a.length - 1]
-    ['rest', (a) -> a.slice 1]
 
     ['nth', (a, n) ->
       if n < 0
@@ -293,12 +282,8 @@ compile_runtime = ->
     ['push-left', push_unshift_op "unshift"]
     ['push-l', (new C.Symbol 'push-left').compile()]
 
-    ['pop', pop_shift_op "pop"]
-    ['pop-right', 'pop']
-    ['pop-r', 'pop']
-
-    ['pop-left', pop_shift_op "shift"]
-    ['pop-l', (new C.Symbol 'pop-left').compile()]
+    ['rest', (a) -> a[1..]]
+    ['init', (a) -> a[0...(a.length - 1)]]
 
     ['concat', `function (x) {
       var args = __slice__.call(arguments, 1);
@@ -372,6 +357,17 @@ compile_runtime = ->
       result
     ]
 
+    ['clone', """
+      Object.create ? function (o) {
+        return Object.create(o)
+      } : function (o) {
+        function Noop() {}
+        Noop.prototype = o;
+        return new Noop();
+      }
+      """
+    ]
+
     ['keys', "Object.keys || " + (o) ->
       for k of o
         continue if not o.hasOwnProperty k
@@ -384,6 +380,21 @@ compile_runtime = ->
         o.slice()
       else if t is "object" or o instanceof Object
         for k in (keys o) then o[k]
+    ]
+
+    ['merge', ->
+      first = arguments[0]
+      t = __typeof__ first
+      if t is "array"
+        base = []
+      else if t is "object"
+        base = {}
+
+      for o in arguments
+        for k, v of o
+          continue unless o.hasOwnProperty k
+          base[k] = v
+      base
     ]
 
 

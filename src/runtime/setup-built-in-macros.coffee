@@ -150,6 +150,34 @@ setup_built_in_macros = ->
   defmacro "symbol->keyword", (s) ->
     new C.String s.value, s.yy
 
+  defmacro "include", (files...) ->
+    if process?.title isnt 'node'
+      throw new Error "Cannot include file when compiling without file system access."
+    fs = require 'fs'
+    path = require 'path'
+
+    {include_directory} = C.current_context
+    expressions = []
+    for f in files
+      fname = String (eval f._compile())
+      # Test for absolute path
+      if C.current_context.include_directory? and not /^(\/|[a-z]:\\)/i.test fname
+        fname = path.join C.current_context.include_directory, fname
+
+      if C.current_context.cached_includes[fname]
+        continue
+      else
+        C.current_context.cached_includes[fname] = true
+
+      C.current_context.include_directory = path.dirname fname
+      text = fs.readFileSync fname, "utf8"
+      code = oppo.read text
+      fragment = new C.CodeFragment code.s_expression_list
+      expressions.push fragment._compile()
+      C.current_context.include_directory = include_directory
+
+    new C.Raw expressions.join ';\n'
+
   defmacro "symbol", (sym) ->
     if sym instanceof C.Symbol and (sym.quoted or sym.quasiquoted)
       sym.quoted = true
@@ -171,7 +199,7 @@ setup_built_in_macros = ->
       name = to_define.value[0]
       args = to_define.value.slice 1
       body = rest
-      value = new C.Lambda {name, args, body}
+      value = new C.Lambda {args, body}
     else if to_define instanceof C.Symbol
       name = to_define
       value = rest[0]
