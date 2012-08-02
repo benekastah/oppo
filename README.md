@@ -31,7 +31,7 @@ Almost anything can be an identifier:
     *       ;; becomes _$asterisk_
     YO%man  ;; becomes YO_$percent_man
     
-Oppo has keywords and strings. Keywords are similar to the idea behind clojure's keywords and ruby's symbols. Since the basic idea is to have a unique identifier, and since javascript doesn't have a keyword concept, I just chose to make keywords translate into string literals:
+Oppo has keywords and strings. Keywords are similar to the idea behind clojure's keywords and ruby's symbols. Since the basic idea is to have a unique symbolic object, and since javascript doesn't have a keyword concept, I just chose to make keywords translate into string literals:
 
     (= :hey-man! "hey-man!") ;; returns true, because the two expressions are equal
     
