@@ -6,7 +6,7 @@
 
 ## Objectives
 
-  * Oppo should not reinvent the wheel. Sane design choices from other languages were preferred over other ideas. The languages that have influenced oppo the most were javascript, scheme, clojure and coffeescript (in no particular order). Effort was made to keep javascript ideas intact in oppo where it made sense to do so.
+  * It should be javascripty. Don't reinvent valid javascript concepts. The languages that have influenced oppo the most were javascript, scheme, clojure and coffeescript.
   * Oppo should be a very programmer-friendly language. It should allow the programmer to modify his or her environment. Functions and macros are preferred over rigid operators and keywords. Oppo should smooth over the not-so-sane design choices made in javascript. Any system macro or function should be redefinable.
   * Oppo should have strong support for compiler macros. Reader macros should also be possible. (Status: currently, reader macros are not possible with oppo. They won't be until oppo is self-compiling.)
   * Oppo should have a strong functional runtime.
