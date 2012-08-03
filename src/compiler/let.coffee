@@ -17,7 +17,7 @@ class C.Let extends C.FunctionCall
         
     body = [new_bindings..., @body...]
     @cached_body = body
-    @fn = new C.Lambda body: body
+    @fn = new C.Lambda body: body, scope: new C.Raw "this"
     super
 
   should_return: ->
