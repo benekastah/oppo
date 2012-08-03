@@ -537,7 +537,7 @@
 
     function Function(_arg, yy) {
       var _ref1, _ref2, _ref3;
-      this.name = _arg.name, this.args = _arg.args, this.body = _arg.body, this.autoreturn = _arg.autoreturn;
+      this.name = _arg.name, this.quiet_name = _arg.quiet_name, this.args = _arg.args, this.body = _arg.body, this.autoreturn = _arg.autoreturn;
       if ((_ref1 = this.name) == null) {
         this.name = '';
       }
@@ -557,7 +557,7 @@
     }
 
     Function.prototype.compile = function() {
-      var add_to_body, arg, arg_redefs, args, body, c_args, c_body, c_name, fake_arg, fake_arg_defs, fake_args, fake_fn_call, fn, i, last_arg, rest, result, ret, scope, set_continue, stmt, sym_continue, sym_fn, sym_result, tail_recursive, to_return, to_return_context, var_stmt, _continuef, _continuet, _i, _len, _ref1, _ref2, _ref3, _while;
+      var add_to_body, arg, arg_redefs, args, body, c_args, c_body, c_name, fake_arg, fake_arg_defs, fake_args, fake_fn_call, fn, i, last_arg, rest, result, ret, scope, set_continue, stmt, sym_continue, sym_fn, sym_result, tail_recursive, to_return, to_return_context, var_stmt, _continuef, _continuet, _i, _len, _ref1, _ref2, _ref3, _ref4, _while;
       scope = new C.Scope();
       _ref1 = this.will_autoreturn(), to_return = _ref1.to_return, to_return_context = _ref1.to_return_context;
       tail_recursive = this.autoreturn && to_return.value instanceof C.FunctionCall && to_return.value.fn instanceof C.Symbol && to_return.value.fn.name === this.name.name;
@@ -602,7 +602,9 @@
         body.unshift(_continuef);
         to_return.return_disabled = true;
         to_return_context.tail_node(fake_fn_call);
-        fake_fn_call.returnedConstruct.disabled = true;
+        if ((_ref4 = fake_fn_call.returnedConstruct) != null) {
+          _ref4.disabled = true;
+        }
         sym_result = C.Var.gensym("result");
         sym_fn = C.Var.gensym("fn");
         fn = new C.Var.Set({
@@ -628,7 +630,11 @@
         });
         body = [set_continue, fn, _while];
       }
-      c_name = L.core.to_type(this.name) === "string" ? this.name : this.name._compile();
+      if (!this.quiet_name) {
+        c_name = L.core.to_type(this.name) === "string" ? this.name : this.name._compile();
+      } else {
+        c_name = "";
+      }
       c_args = (function() {
         var _j, _len1, _results;
         _results = [];
@@ -2518,6 +2524,60 @@ if (typeof module !== 'undefined' && require.main === module) {
 
   })(C.Function);
 
+  C.Let = (function(_super) {
+
+    __extends(Let, _super);
+
+    function Let(_arg) {
+      this.bindings = _arg.bindings, this.body = _arg.body;
+      Let.__super__.constructor.apply(this, arguments);
+    }
+
+    Let.prototype.compile = function() {
+      var body, def_sym, i, item, new_bindings, sym, _i, _len, _ref3;
+      def_sym = new C.Symbol('def');
+      sym = null;
+      new_bindings = [];
+      _ref3 = this.bindings.value;
+      for (i = _i = 0, _len = _ref3.length; _i < _len; i = ++_i) {
+        item = _ref3[i];
+        if (i % 2 === 0) {
+          sym = item;
+        } else {
+          if (!(item != null)) {
+            this.bindings.error("Must have even number of bindings.");
+          }
+          new_bindings.push(new C.List([def_sym, sym, item]));
+        }
+      }
+      body = __slice.call(new_bindings).concat(__slice.call(this.body));
+      this.cached_body = body;
+      this.fn = new C.Lambda({
+        body: body
+      });
+      return Let.__super__.compile.apply(this, arguments);
+    };
+
+    Let.prototype.should_return = function() {
+      var body, me, ret, _ref3;
+      me = new C.ReturnedConstruct(this);
+      body = (_ref3 = this.cached_body) != null ? _ref3 : this.body;
+      ret = C.Macro.transform(body[body.length - 1]);
+      ret = ret.should_return();
+      me.tail_node = function(x) {
+        if (!x) {
+          return ret;
+        } else {
+          return body[body.length - 1] = C.Macro.transform(x);
+        }
+      };
+      return me;
+    };
+
+    return Let;
+
+  })(C.FunctionCall);
+
   C.List = (function(_super) {
 
     __extends(List, _super);
@@ -3536,7 +3596,9 @@ if (typeof module !== 'undefined' && require.main === module) {
         body = rest;
         value = new C.Lambda({
           args: args,
-          body: body
+          body: body,
+          name: name,
+          quiet_name: true
         });
       } else if (to_define instanceof C.Symbol) {
         name = to_define;
@@ -3613,29 +3675,11 @@ if (typeof module !== 'undefined' && require.main === module) {
       return new C.Raw(mac.compile());
     });
     defmacro("let", function() {
-      var bindings, body, def_sym, i, item, new_bindings, new_body, sym, _i, _len, _ref3;
+      var bindings, body;
       bindings = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      def_sym = new C.Symbol('def');
-      sym = null;
-      new_bindings = [];
-      _ref3 = bindings.value;
-      for (i = _i = 0, _len = _ref3.length; _i < _len; i = ++_i) {
-        item = _ref3[i];
-        if (i % 2 === 0) {
-          sym = item;
-        } else {
-          if (!(item != null)) {
-            bindings.error("Must have even number of bindings.");
-          }
-          new_bindings.push(new C.List([def_sym, sym, item]));
-        }
-      }
-      new_body = __slice.call(new_bindings).concat(__slice.call(body));
-      return new C.FunctionCall({
-        fn: new C.Lambda({
-          body: new_body
-        }),
-        scope: new C.Raw("this")
+      return new C.Let({
+        bindings: bindings,
+        body: body
       });
     });
     macro_do = defmacro("do", function() {

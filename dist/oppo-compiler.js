@@ -330,6 +330,60 @@
 
   })(C.Function);
 
+  C.Let = (function(_super) {
+
+    __extends(Let, _super);
+
+    function Let(_arg) {
+      this.bindings = _arg.bindings, this.body = _arg.body;
+      Let.__super__.constructor.apply(this, arguments);
+    }
+
+    Let.prototype.compile = function() {
+      var body, def_sym, i, item, new_bindings, sym, _i, _len, _ref3;
+      def_sym = new C.Symbol('def');
+      sym = null;
+      new_bindings = [];
+      _ref3 = this.bindings.value;
+      for (i = _i = 0, _len = _ref3.length; _i < _len; i = ++_i) {
+        item = _ref3[i];
+        if (i % 2 === 0) {
+          sym = item;
+        } else {
+          if (!(item != null)) {
+            this.bindings.error("Must have even number of bindings.");
+          }
+          new_bindings.push(new C.List([def_sym, sym, item]));
+        }
+      }
+      body = __slice.call(new_bindings).concat(__slice.call(this.body));
+      this.cached_body = body;
+      this.fn = new C.Lambda({
+        body: body
+      });
+      return Let.__super__.compile.apply(this, arguments);
+    };
+
+    Let.prototype.should_return = function() {
+      var body, me, ret, _ref3;
+      me = new C.ReturnedConstruct(this);
+      body = (_ref3 = this.cached_body) != null ? _ref3 : this.body;
+      ret = C.Macro.transform(body[body.length - 1]);
+      ret = ret.should_return();
+      me.tail_node = function(x) {
+        if (!x) {
+          return ret;
+        } else {
+          return body[body.length - 1] = C.Macro.transform(x);
+        }
+      };
+      return me;
+    };
+
+    return Let;
+
+  })(C.FunctionCall);
+
   C.List = (function(_super) {
 
     __extends(List, _super);
@@ -1348,7 +1402,9 @@
         body = rest;
         value = new C.Lambda({
           args: args,
-          body: body
+          body: body,
+          name: name,
+          quiet_name: true
         });
       } else if (to_define instanceof C.Symbol) {
         name = to_define;
@@ -1425,29 +1481,11 @@
       return new C.Raw(mac.compile());
     });
     defmacro("let", function() {
-      var bindings, body, def_sym, i, item, new_bindings, new_body, sym, _i, _len, _ref3;
+      var bindings, body;
       bindings = arguments[0], body = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      def_sym = new C.Symbol('def');
-      sym = null;
-      new_bindings = [];
-      _ref3 = bindings.value;
-      for (i = _i = 0, _len = _ref3.length; _i < _len; i = ++_i) {
-        item = _ref3[i];
-        if (i % 2 === 0) {
-          sym = item;
-        } else {
-          if (!(item != null)) {
-            bindings.error("Must have even number of bindings.");
-          }
-          new_bindings.push(new C.List([def_sym, sym, item]));
-        }
-      }
-      new_body = __slice.call(new_bindings).concat(__slice.call(body));
-      return new C.FunctionCall({
-        fn: new C.Lambda({
-          body: new_body
-        }),
-        scope: new C.Raw("this")
+      return new C.Let({
+        bindings: bindings,
+        body: body
       });
     });
     macro_do = defmacro("do", function() {

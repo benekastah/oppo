@@ -199,7 +199,7 @@ setup_built_in_macros = ->
       name = to_define.value[0]
       args = to_define.value.slice 1
       body = rest
-      value = new C.Lambda {args, body}
+      value = new C.Lambda {args, body, name, quiet_name: true}
     else if to_define instanceof C.Symbol
       name = to_define
       value = rest[0]
@@ -239,19 +239,7 @@ setup_built_in_macros = ->
     new C.Raw mac.compile()
 
   defmacro "let", (bindings, body...) ->
-    def_sym = new C.Symbol 'def'
-    sym = null
-    new_bindings = []
-    for item, i in bindings.value
-      if i % 2 is 0
-        sym = item
-      else
-        if not item?
-          bindings.error "Must have even number of bindings."
-        new_bindings.push new C.List [def_sym, sym, item]
-        
-    new_body = [new_bindings..., body...]
-    new C.FunctionCall fn:(new C.Lambda body: new_body), scope: new C.Raw "this"
+    new C.Let {bindings, body}
 
   macro_do = defmacro "do", (items...) ->
     new C.CommaGroup items, items[0].yy
