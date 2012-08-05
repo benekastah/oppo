@@ -2,7 +2,7 @@
 
 ### Oppo is a sweet little lisp for javascript.
 
-[Try oppo here](http://benekastah.github.com/oppo/). Also check out [oppo-time-tracker](https://github.com/benekastah/time-tracker), and example app build with oppo.
+[Try oppo here](http://benekastah.github.com/oppo/). Also check out [oppo-time-tracker](https://github.com/benekastah/oppo-time-tracker), and example app build with oppo.
 
 **Important**: Oppo is alpha software. It is for the adventurous, the intrepid explorers, the true hackers. It is certainly moving towards stability, but there is much yet to be done before it can be determined to be stable. One of the main things that needs doing is to get a meaningful test suite going, and some complete documentation on the macros and methods that are available to the programmer.
 
