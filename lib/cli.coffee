@@ -12,7 +12,7 @@ argv = optimist
 .alias('o', 'output')
 .argv
 
-if argv.compile
+if argv.compile and not argv.repl
   files = argv._
   {output, watch, beautify} = argv
   compiler.compile output, files, watch, beautify

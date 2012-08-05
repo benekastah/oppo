@@ -180,10 +180,11 @@ read = oppo.read = oppo.compiler.read = ->
 
 #-----------------------------------------------------------------------------#
 
-compile = oppo.compile = oppo.compiler.compile = (sexp, comp_runtime = true, include_directory) ->
+compile = oppo.compile = oppo.compiler.compile = (sexp, comp_runtime = true, include_directory, context) ->
   [sexp] = oppoize sexp
 
-  new lemur.Compiler({include_directory}).compile ->
+  context ?= new lemur.Compiler({include_directory})
+  context.compile ->
     setup_built_in_macros()
     if comp_runtime
       r = compile_runtime()

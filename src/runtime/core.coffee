@@ -26,18 +26,6 @@ compare_op = (sym) ->
   }
   """
 
-binary_op = (sym, _not=false) ->
-  """
-  function () {
-    var last = arguments[0];
-    for (var i=1, len=arguments.length; i<len; i++) {
-      if (#{if _not then '!' else ''}last) return last;
-      last = last #{sym} arguments[i];
-    }
-    return last;
-  }
-  """
-
 math_op = (sym, explicit_convert=false) ->
   """
   function () {
@@ -81,12 +69,34 @@ equality_op = (_not = false) ->
   }
   """
 
+type_check_op = (type) ->
+  """
+  function (x) {
+    return __typeof__(x) === "#{type}";
+  }
+  """
 
 compile_runtime = ->
 
   define [
     ['__oppo_runtime_defined__', true]
     ['identity', (x) -> x]
+    ['object?', type_check_op "object"]
+    ['array?', type_check_op "array"]
+    ['list?', (x) ->
+      t = __typeof__ x
+      t is "array" or t is "arguments"
+    ]
+    ['number?', type_check_op "number"]
+    ['string?', type_check_op "string"]
+    ['boolean?', type_check_op "boolean"]
+    ['bool?', new C.Symbol('boolean?')._compile()]
+    ['regex?', type_check_op "regexp"]
+    ['date?', type_check_op "date"]
+    ['nil?', (x) ->
+      t = __typeof__ x
+      t is "null" or t is "undefined"
+    ]
 
     ## Math
     ['+', (math_op '+', true)]
@@ -244,11 +254,6 @@ compile_runtime = ->
     ['not=', equality_op(true)]
 
 
-    ## Binary operations
-    ['or', binary_op '||']
-    ['and', (binary_op '&&', true)]
-
-
     ## Misc
     ['__oppo_eval__', 'oppo.eval']
     ['__typeof__', 'lemur.core.to_type']
@@ -297,6 +302,30 @@ compile_runtime = ->
     ]
 
     ## Collections
+    ['count', (c) ->
+      if (__typeof__ c) in ["array", "arguments"]
+        c.length
+      else
+        (keys c).length
+    ]
+
+    ['empty?', (c) -> (count c) is 0]
+
+    ['contains?', (c, v) ->
+      if (__typeof__ c) in ["array", "arguments"]
+        for x in c
+          if (__equal__ x, v)
+            return true
+      else
+        for k, x of c
+          continue unless c.hasOwnProperty k
+          if (__equal__ x, v)
+            return true
+      false
+    ]
+
+    ['contains-key?', (c, k) -> `k in c`]
+
     ['map', (f, o) ->
       t = __typeof__ o
       if t is "array" or o instanceof Array

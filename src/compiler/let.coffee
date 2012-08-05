@@ -2,6 +2,8 @@
 class C.Let extends C.FunctionCall
   constructor: ({@bindings, @body}) ->
     super
+    @call = true
+    @scope = new C.Raw "this"
 
   compile: ->
     def_sym = new C.Symbol 'def'
@@ -17,7 +19,7 @@ class C.Let extends C.FunctionCall
         
     body = [new_bindings..., @body...]
     @cached_body = body
-    @fn = new C.Lambda body: body, scope: new C.Raw "this"
+    @fn = new C.Lambda body: body
     super
 
   should_return: ->

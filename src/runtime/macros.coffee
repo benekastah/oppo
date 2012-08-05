@@ -47,6 +47,19 @@ setup_built_in_macros = ->
       _else: fbranch
     }
 
+  defmacro "cond", (cond, body, others...) ->
+    if others.length % 2 isnt 0
+      throw new Error "`cond` requires an even number of arguments."
+
+    if_config =
+      condition: cond
+      then: body
+
+    if others.length
+      if_config._else = new C.List [new C.Symbol("cond"), others...]
+
+    _if = new C.IfTernary if_config
+
   defmacro "lambda", (args, body...) ->
     fn = new C.Lambda {args: args.value, body}
 
@@ -119,10 +132,10 @@ setup_built_in_macros = ->
   operator_macro "lte", "LTE"
   operator_macro "not===", "NotEq3"
   operator_macro "not==", "NotEq2"
-  operator_macro "!", "Not"
+  operator_macro "not", "Not"
 
-  operator_macro "||", "Or"
-  operator_macro "&&", "And"
+  operator_macro "or", "Or"
+  operator_macro "and", "And"
 
   operator_macro "&", "BAnd"
   operator_macro "|", "BOr"

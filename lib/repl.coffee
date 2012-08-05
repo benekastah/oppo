@@ -4,6 +4,7 @@ oppo = require '../'
 prompt_prefix = "oppo > "
 prompt_continued_prefix = ".... >   "
 compile = null
+code_accum = []
 
 repl = readline.createInterface process.stdin, process.stdout
 
@@ -27,11 +28,18 @@ run = (buffer) ->
     return
   backlog = ''
   
-  oppo_data = oppo.read code
+  code_accum.push code
+  if code_accum.length > 1000
+    code_accum.shift()
+
+  oppo_data = oppo.read code_accum.join ' '
   if compile
-    result = oppo.compile oppo_data
+    result = oppo.compile oppo_data, null, __dirname
   else
-    result = oppo.eval oppo_data
+    try result = oppo.eval oppo_data
+    catch e
+      code_accum.pop()
+      throw e
     try result = JSON.stringify result
   console.log result
   
