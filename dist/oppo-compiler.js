@@ -1265,7 +1265,19 @@
     macro_args = {
       name: s_name
     };
-    macro_args.transform = fn;
+    macro_args.transform = function() {
+      var arg, args;
+      args = (function() {
+        var _i, _len, _results;
+        _results = [];
+        for (_i = 0, _len = arguments.length; _i < _len; _i++) {
+          arg = arguments[_i];
+          _results.push(C.Macro.transform(arg));
+        }
+        return _results;
+      }).apply(this, arguments);
+      return fn.apply(null, args);
+    };
     m = new C.Macro(macro_args);
     m._compile();
     return m;
@@ -1373,11 +1385,10 @@
       return new C.List([fn].concat(__slice.call(args)));
     });
     defmacro("new", function() {
-      var args, cls, t_cls;
+      var args, cls;
       cls = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      t_cls = C.Macro.transform(cls);
       return new C.FunctionCall({
-        fn: t_cls,
+        fn: cls,
         args: args,
         instantiate: true
       });
@@ -1401,7 +1412,7 @@
     operator_macro = function(name, className) {
       var macro_fn;
       macro_fn = function() {
-        var Cls, arg, args, postfix, prefix, results, x, y;
+        var Cls, args, postfix, prefix, results, x, y;
         args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
         Cls = C[className];
         prefix = Cls.prototype instanceof C.PrefixOperation;
@@ -1410,15 +1421,6 @@
           var _results;
           _results = [];
           while (args.length) {
-            args = (function() {
-              var _i, _len, _results1;
-              _results1 = [];
-              for (_i = 0, _len = args.length; _i < _len; _i++) {
-                arg = args[_i];
-                _results1.push(C.Macro.transform(arg));
-              }
-              return _results1;
-            })();
             x = args.shift();
             _results.push((prefix || postfix ? new Cls(x, x.yy) : (y = args.shift(), new Cls([x, y], x.yy))).compile());
           }
