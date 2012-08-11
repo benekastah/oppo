@@ -41,7 +41,7 @@ push_unshift_op = (method) ->
   """
   function (a) {
       var args = __slice__.call(arguments, 1);
-      var new_a = a.slice();
+      var new_a = a == null ? [] : __typeof__(a) === "array" ? a.slice() : [a].slice();
       new_a.#{method}.apply(new_a, args);
       return new_a;
   }
@@ -303,15 +303,21 @@ compile_runtime = ->
 
     ## Collections
     ['count', (c) ->
+      if not c?
+        return 0
+
       if (__typeof__ c) in ["array", "arguments"]
         c.length
-      else
+      else 
         (keys c).length
     ]
 
     ['empty?', (c) -> (count c) is 0]
 
     ['contains?', (c, v) ->
+      if not c?
+        return false
+
       if (__typeof__ c) in ["array", "arguments"]
         for x in c
           if (__equal__ x, v)
@@ -324,9 +330,16 @@ compile_runtime = ->
       false
     ]
 
-    ['contains-key?', (c, k) -> `k in c`]
+    ['contains-key?', (c, k) ->
+      if not c?
+        return false
+      `k in c`
+    ]
 
     ['map', (f, o) ->
+      if not o?
+        return []
+
       t = __typeof__ o
       if t is "array" or o instanceof Array
         (f x) for x in o
@@ -339,6 +352,9 @@ compile_runtime = ->
     ]
 
     ['reduce', (f, o) ->
+      if not o?
+        return []
+
       t = __typeof__ o
       if t is "array" or o instanceof Array
         for x in o
@@ -357,6 +373,9 @@ compile_runtime = ->
     ]
 
     ['reduce-right', (f, o) ->
+      if not o?
+        return []
+
       t = __typeof__ o
       if t is "array" or o instanceof Array
         for x in o.slice().reverse()
@@ -371,6 +390,9 @@ compile_runtime = ->
     ['reduce-r', (new C.Symbol 'reduce-right').compile()]
 
     ['filter', (f, o) ->
+      if not o?
+        return []
+
       t = __typeof__ o
       if t is "array" or o instanceof Array
         result = []
@@ -387,11 +409,11 @@ compile_runtime = ->
     ]
 
     ['clone', """
-      Object.create ? function (o) {
+      !Object.create ? function (o) {
         return Object.create(o)
       } : function (o) {
         function Noop() {}
-        Noop.prototype = o;
+        Noop.prototype = o != null ? o : null;
         return new Noop();
       }
       """

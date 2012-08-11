@@ -14,6 +14,7 @@ class C.List extends C.Array
 
   should_quote_child: (child) ->
     child instanceof C.List or
+    child instanceof C.Keyword or
     (child not instanceof C.Atom and
     child not instanceof C.String and
     child not instanceof C.Number and

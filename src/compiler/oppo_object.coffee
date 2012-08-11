@@ -28,17 +28,18 @@ class C.OppoObject extends C.Object
     set_obj = new C.Var.Set _var: sym_obj, value: new C.Raw obj
     dynamic = for [prop, val] in @dynamic_pairs
       new C.Raw "#{sym_obj._compile()}[#{prop._compile()}] = #{val._compile()}"
-    grp = new C.CommaGroup [set_obj, dynamic..., sym_obj], @yy
-
-    result = grp._compile()
+    
+    result = if dynamic.length
+      (new C.CommaGroup [set_obj, dynamic..., sym_obj], @yy)._compile()
+    else
+      obj
 
     @property_value_pairs = old_pairs
     result
 
   compile_quoted: ->
-    pairs = for pair in @property_value_pairs
-      pair.quoted = true
-      pair
+    pairs = for [prop, val] in @property_value_pairs
+      [(C.Macro.transform prop), (C.Macro.transform val)]
 
     [pairs] = oppoize pairs
     pairs.quoted = true

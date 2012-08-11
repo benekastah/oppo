@@ -75,7 +75,10 @@ case 41:
 break;
 case 42: this.$ = new C.String($$[$0], yy); 
 break;
-case 44: $$[$0].quoted = true; this.$ = call_by_name("symbol->keyword", [$$[$0]], yy); 
+case 44:
+      var s_quoted = call_by_name("quote", [$$[$0]], yy);
+      this.$ = call_by_name("keyword", [s_quoted], yy);
+    
 break;
 case 45:
       if (/^nil$/i.test($$[$0]))
@@ -441,22 +444,20 @@ case 23: return 26;
 break;
 case 24: return 31; 
 break;
-case 25: return 47; 
+case 25: return 48; 
 break;
-case 26: return 48; 
+case 26: return 45; 
 break;
-case 27: return 45; 
+case 27: return 46; 
 break;
-case 28: return 46; 
+case 28: return 5; 
 break;
-case 29: return 5; 
-break;
-case 30: return 'INVALID'; 
+case 29: return 'INVALID'; 
 break;
 }
 };
-lexer.rules = [/^(?:;.*)/,/^(?:\s+)/,/^(?:")/,/^(?:")/,/^(?:(\\"|[^"])*)/,/^(?:#\/)/,/^(?:\/[a-zA-Z]*)/,/^(?:(\\\/|[^\/])*)/,/^(?:[\+\-]?\d*\.\d+)/,/^(?:\d{1,2}#[\+\-]?\w+)/,/^(?:[\+\-]?\d+)/,/^(?:#[tT]{1})/,/^(?:#[fF]{1})/,/^(?:\()/,/^(?:\))/,/^(?:\[)/,/^(?:\])/,/^(?:\{)/,/^(?:\})/,/^(?:,@)/,/^(?:,)/,/^(?:')/,/^(?:`)/,/^(?:\.\.\.)/,/^(?:#\()/,/^(?:@)/,/^(?:\.)/,/^(?::)/,/^(?:[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+)/,/^(?:$)/,/^(?:.)/];
-lexer.conditions = {"string":{"rules":[3,4],"inclusive":false},"regex":{"rules":[6,7],"inclusive":false},"INITIAL":{"rules":[0,1,2,5,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],"inclusive":true}};
+lexer.rules = [/^(?:;.*)/,/^(?:\s+)/,/^(?:")/,/^(?:")/,/^(?:(\\"|[^"])*)/,/^(?:#\/)/,/^(?:\/[a-zA-Z]*)/,/^(?:(\\\/|[^\/])*)/,/^(?:[\+\-]?\d*\.\d+)/,/^(?:\d{1,2}#[\+\-]?\w+)/,/^(?:[\+\-]?\d+)/,/^(?:#[tT]{1})/,/^(?:#[fF]{1})/,/^(?:\()/,/^(?:\))/,/^(?:\[)/,/^(?:\])/,/^(?:\{)/,/^(?:\})/,/^(?:,@)/,/^(?:,)/,/^(?:')/,/^(?:`)/,/^(?:\.\.\.)/,/^(?:#\()/,/^(?:\.)/,/^(?::)/,/^(?:[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+)/,/^(?:$)/,/^(?:.)/];
+lexer.conditions = {"string":{"rules":[3,4],"inclusive":false},"regex":{"rules":[6,7],"inclusive":false},"INITIAL":{"rules":[0,1,2,5,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29],"inclusive":true}};
 return lexer;})()
 parser.lexer = lexer;function Parser () { this.yy = {}; }Parser.prototype = parser;parser.Parser = Parser;
 return new Parser;

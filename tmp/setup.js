@@ -187,17 +187,18 @@
       return eval(this.compile());
     };
     C.String.prototype.valueOf = C.String.prototype.toString;
-    return C.If.prototype.transform = function() {
+    C.If.prototype.transform = function() {
       this.then = C.Macro.transform(this.then);
       if (this._else != null) {
         this._else = C.Macro.transform(this._else);
       }
       return this;
     };
+    return C.Function.ArgsList.prototype.slice_fn = "__slice__.call";
   })();
 
-  oppoize = function() {
-    var expr, exprs, type, _i, _len, _results;
+  oppoize = oppo.oppoize = function() {
+    var expr, exprs, pairs, prop, type, val, _i, _len, _results;
     exprs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
     _results = [];
     for (_i = 0, _len = exprs.length; _i < _len; _i++) {
@@ -206,19 +207,34 @@
       if (expr instanceof C.Construct) {
         _results.push(expr);
       } else if (type === "array") {
-        _results.push(new C.List(js_to_oppo.apply(null, expr)));
+        _results.push(new C.List(oppoize.apply(null, expr)));
       } else if (type === "number") {
         _results.push(new C.Number(expr));
       } else if (type === "string") {
         _results.push(new C.String(expr));
       } else if (type === "regexp") {
-        _results.push(new C.RegExp(expr.source, "" + (expr.multiline ? 'm' : '') + (expr.global ? 'g' : '') + (expr.ignoreCase ? 'i' : '')));
+        _results.push(new C.RegExp({
+          pattern: expr.source,
+          modifiers: "" + (expr.multiline ? 'm' : '') + (expr.global ? 'g' : '') + (expr.ignoreCase ? 'i' : '')
+        }));
       } else if (expr === true) {
         _results.push(new C.True());
       } else if (expr === false) {
         _results.push(new C.False());
       } else if (!(expr != null)) {
         _results.push(new C.Null());
+      } else if (type === "object") {
+        pairs = (function() {
+          var _results1;
+          _results1 = [];
+          for (prop in expr) {
+            if (!__hasProp.call(expr, prop)) continue;
+            val = expr[prop];
+            _results1.push([oppoize(prop), oppoize(expr)]);
+          }
+          return _results1;
+        })();
+        _results.push(new C.Object(pairs));
       } else {
         _results.push(void 0);
       }
@@ -230,16 +246,22 @@
     return parser.parse.apply(parser, arguments);
   };
 
-  compile = oppo.compile = oppo.compiler.compile = function(sexp, comp_runtime) {
+  compile = oppo.compile = oppo.compiler.compile = function(sexp, comp_runtime, include_directory, context) {
     if (comp_runtime == null) {
       comp_runtime = true;
     }
-    sexp = oppoize(sexp);
-    return new lemur.Compiler().compile(function() {
+    sexp = oppoize(sexp)[0];
+    if (context == null) {
+      context = new lemur.Compiler({
+        include_directory: include_directory
+      });
+    }
+    return context.compile(function() {
       var c_sym_prog, prog, r, sym_prog;
       setup_built_in_macros();
       if (comp_runtime) {
         r = compile_runtime();
+        eval(r);
       }
       if (r != null) {
         r = "\n// Oppo runtime\n" + r;

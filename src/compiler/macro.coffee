@@ -18,7 +18,9 @@ class C.Macro extends C.Construct
     x.compile()
     
   transform: (args...) ->
-    c_template = for t in @template then new C.Raw t._compile()
+    c_template = for t in @template
+      tt = C.Macro.transform t
+      new C.Raw tt._compile()
     grp = new C.CommaGroup c_template, @yy
     sym_ls = C.Var.gensym "ls"
 
@@ -32,12 +34,16 @@ class C.Macro extends C.Construct
     }, @yy
 
     args = for arg in args
-      arg = arg.clone()
+      arg = C.Macro.transform arg
+      arg.was_quoted = arg.quoted
       arg.quoted = yes
       arg
 
     ls = new C.List [fn, args...], @yy
     c_template = ls.compile()
+    for arg in args
+      arg.quoted = arg.was_quoted
+      delete arg.was_quoted
 
     if not __oppo_runtime_defined__? or not __oppo_runtime_defined__
       c_template = "#{compile_runtime()};#{c_template}"
@@ -52,17 +58,21 @@ class C.Macro extends C.Construct
 
   # Transform this macro into non-macro oppo code
   @transform: (code, levels=Infinity) ->
+    [code] = (oppoize code)
     if levels > 0
       if code instanceof C.ReturnedConstruct
         code = code.value
 
       if code instanceof C.List and not (code.quoted or code.quasiquoted)
-        callable = code.items[0]
+        callable = @transform code.items[0]
         if callable instanceof C.Symbol
           item = C.get_var_val callable
           if @can_transform item
             transformed = item.transform code.items[1..]...
             levels -= 1
+        if callable instanceof C.Keyword
+          s_get_prop = new C.Symbol "get-prop"
+          transformed = new C.List [s_get_prop, code.items...]
 
       if not transformed and (code not instanceof C.Macro) and (@can_transform code)
         transformed = code.transform()

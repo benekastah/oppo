@@ -50,10 +50,9 @@
 "`"                                     { return 'QUASIQUOTE'; }
 "..."                                   { return 'REST'; }
 "#("                                    { return 'FUNCTION'; }
-"@"                                     { return 'PROPERTY_ACCESS'; }
 "."                                     { return 'FUNCTION_ACCESS'; }
-
 ":"                                     { return 'KEYWORD'; }
+
 [\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+   { return 'IDENTIFIER'; } //'
 
 <<EOF>>                                 { return 'EOF'; }
@@ -208,7 +207,10 @@ string
   
 keyword
   : KEYWORD symbol
-    { $2.quoted = true; $$ = call_by_name("symbol->keyword", [$2], yy); }
+    {
+      var s_quoted = call_by_name("quote", [$2], yy);
+      $$ = call_by_name("keyword", [s_quoted], yy);
+    }
   ;
 
 symbol

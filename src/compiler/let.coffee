@@ -4,8 +4,6 @@ class C.Let extends C.FunctionCall
     super
     @call = true
     @scope = new C.Raw "this"
-
-  compile: ->
     def_sym = new C.Symbol 'def'
     sym = null
     new_bindings = []
@@ -18,13 +16,11 @@ class C.Let extends C.FunctionCall
         new_bindings.push new C.List [def_sym, sym, item]
         
     body = [new_bindings..., @body...]
-    @cached_body = body
     @fn = new C.Lambda body: body
-    super
 
   should_return: ->
     me = new C.ReturnedConstruct this
-    body = @cached_body ? @body
+    body = @body
     ret = C.Macro.transform body[body.length - 1]
     ret = ret.should_return()
     me.tail_node = (x) ->

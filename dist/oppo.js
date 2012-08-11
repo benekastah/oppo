@@ -1785,7 +1785,10 @@ case 41:
 break;
 case 42: this.$ = new C.String($$[$0], yy); 
 break;
-case 44: $$[$0].quoted = true; this.$ = call_by_name("symbol->keyword", [$$[$0]], yy); 
+case 44:
+      var s_quoted = call_by_name("quote", [$$[$0]], yy);
+      this.$ = call_by_name("keyword", [s_quoted], yy);
+    
 break;
 case 45:
       if (/^nil$/i.test($$[$0]))
@@ -2151,22 +2154,20 @@ case 23: return 26;
 break;
 case 24: return 31; 
 break;
-case 25: return 47; 
+case 25: return 48; 
 break;
-case 26: return 48; 
+case 26: return 45; 
 break;
-case 27: return 45; 
+case 27: return 46; 
 break;
-case 28: return 46; 
+case 28: return 5; 
 break;
-case 29: return 5; 
-break;
-case 30: return 'INVALID'; 
+case 29: return 'INVALID'; 
 break;
 }
 };
-lexer.rules = [/^(?:;.*)/,/^(?:\s+)/,/^(?:")/,/^(?:")/,/^(?:(\\"|[^"])*)/,/^(?:#\/)/,/^(?:\/[a-zA-Z]*)/,/^(?:(\\\/|[^\/])*)/,/^(?:[\+\-]?\d*\.\d+)/,/^(?:\d{1,2}#[\+\-]?\w+)/,/^(?:[\+\-]?\d+)/,/^(?:#[tT]{1})/,/^(?:#[fF]{1})/,/^(?:\()/,/^(?:\))/,/^(?:\[)/,/^(?:\])/,/^(?:\{)/,/^(?:\})/,/^(?:,@)/,/^(?:,)/,/^(?:')/,/^(?:`)/,/^(?:\.\.\.)/,/^(?:#\()/,/^(?:@)/,/^(?:\.)/,/^(?::)/,/^(?:[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+)/,/^(?:$)/,/^(?:.)/];
-lexer.conditions = {"string":{"rules":[3,4],"inclusive":false},"regex":{"rules":[6,7],"inclusive":false},"INITIAL":{"rules":[0,1,2,5,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],"inclusive":true}};
+lexer.rules = [/^(?:;.*)/,/^(?:\s+)/,/^(?:")/,/^(?:")/,/^(?:(\\"|[^"])*)/,/^(?:#\/)/,/^(?:\/[a-zA-Z]*)/,/^(?:(\\\/|[^\/])*)/,/^(?:[\+\-]?\d*\.\d+)/,/^(?:\d{1,2}#[\+\-]?\w+)/,/^(?:[\+\-]?\d+)/,/^(?:#[tT]{1})/,/^(?:#[fF]{1})/,/^(?:\()/,/^(?:\))/,/^(?:\[)/,/^(?:\])/,/^(?:\{)/,/^(?:\})/,/^(?:,@)/,/^(?:,)/,/^(?:')/,/^(?:`)/,/^(?:\.\.\.)/,/^(?:#\()/,/^(?:\.)/,/^(?::)/,/^(?:[\w@#\.:!\$%\^&\*\-\+='"\?\|\/\\<>~]+)/,/^(?:$)/,/^(?:.)/];
+lexer.conditions = {"string":{"rules":[3,4],"inclusive":false},"regex":{"rules":[6,7],"inclusive":false},"INITIAL":{"rules":[0,1,2,5,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29],"inclusive":true}};
 return lexer;})()
 parser.lexer = lexer;function Parser () { this.yy = {}; }Parser.prototype = parser;parser.Parser = Parser;
 return new Parser;
@@ -2386,7 +2387,13 @@ if (typeof module !== 'undefined' && require.main === module) {
       }
       return this;
     };
-    return C.Function.ArgsList.prototype.slice_fn = "__slice__.call";
+    C.Function.ArgsList.prototype.slice_fn = "__slice__.call";
+    return C.FunctionCall.prototype.compile_quoted = function() {
+      var ls;
+      ls = new C.List([this.fn].concat(__slice.call(this.args)));
+      ls.quoted = true;
+      return ls._compile();
+    };
   })();
 
   oppoize = oppo.oppoize = function() {
@@ -2485,6 +2492,29 @@ if (typeof module !== 'undefined' && require.main === module) {
       return Keyword.__super__.constructor.apply(this, arguments);
     }
 
+    Keyword.prototype.compile = function() {
+      var old_value, result, value;
+      old_value = this.value;
+      value = C.Macro.transform(this.value);
+      if (value instanceof C.String) {
+        this.value = value.value;
+      } else if (value instanceof C.Symbol && (value.quoted || value.quasiquoted)) {
+        this.value = value.name;
+      } else {
+        return "String(" + (value._compile()) + ")";
+      }
+      result = Keyword.__super__.compile.apply(this, arguments);
+      this.value = old_value;
+      return result;
+    };
+
+    Keyword.prototype.compile_quoted = function() {
+      var c_v, t_v;
+      t_v = C.Macro.transform(this.value);
+      c_v = t_v.compile_quoted();
+      return "new lemur.Compiler.Keyword(" + c_v + ", " + (this.line_number || "null") + ")";
+    };
+
     Keyword.prototype.toOppoString = function() {
       return ":" + this.value;
     };
@@ -2529,14 +2559,11 @@ if (typeof module !== 'undefined' && require.main === module) {
     __extends(Let, _super);
 
     function Let(_arg) {
+      var def_sym, i, item, new_bindings, sym, _i, _len, _ref3;
       this.bindings = _arg.bindings, this.body = _arg.body;
       Let.__super__.constructor.apply(this, arguments);
       this.call = true;
       this.scope = new C.Raw("this");
-    }
-
-    Let.prototype.compile = function() {
-      var body, def_sym, i, item, new_bindings, sym, _i, _len, _ref3;
       def_sym = new C.Symbol('def');
       sym = null;
       new_bindings = [];
@@ -2553,17 +2580,15 @@ if (typeof module !== 'undefined' && require.main === module) {
         }
       }
       body = __slice.call(new_bindings).concat(__slice.call(this.body));
-      this.cached_body = body;
       this.fn = new C.Lambda({
         body: body
       });
-      return Let.__super__.compile.apply(this, arguments);
-    };
+    }
 
     Let.prototype.should_return = function() {
-      var body, me, ret, _ref3;
+      var body, me, ret;
       me = new C.ReturnedConstruct(this);
-      body = (_ref3 = this.cached_body) != null ? _ref3 : this.body;
+      body = this.body;
       ret = C.Macro.transform(body[body.length - 1]);
       ret = ret.should_return();
       me.tail_node = function(x) {
@@ -2608,7 +2633,7 @@ if (typeof module !== 'undefined' && require.main === module) {
     };
 
     List.prototype.should_quote_child = function(child) {
-      return child instanceof C.List || (!(child instanceof C.Atom) && !(child instanceof C.String) && !(child instanceof C.Number) && !(child instanceof C.Regex) && !(child instanceof C.Array));
+      return child instanceof C.List || child instanceof C.Keyword || (!(child instanceof C.Atom) && !(child instanceof C.String) && !(child instanceof C.Number) && !(child instanceof C.Regex) && !(child instanceof C.Array));
     };
 
     List.prototype.should_quasiquote_child = function(child) {
@@ -2743,7 +2768,7 @@ if (typeof module !== 'undefined' && require.main === module) {
     };
 
     Macro.prototype.transform = function() {
-      var arg, args, c_template, fn, grp, ls, sym_ls, t, transformed;
+      var arg, args, c_template, fn, grp, ls, sym_ls, t, transformed, tt, _i, _len;
       args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       c_template = (function() {
         var _i, _len, _ref3, _results;
@@ -2751,7 +2776,8 @@ if (typeof module !== 'undefined' && require.main === module) {
         _results = [];
         for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
           t = _ref3[_i];
-          _results.push(new C.Raw(t._compile()));
+          tt = C.Macro.transform(t);
+          _results.push(new C.Raw(tt._compile()));
         }
         return _results;
       }).call(this);
@@ -2771,7 +2797,8 @@ if (typeof module !== 'undefined' && require.main === module) {
         _results = [];
         for (_i = 0, _len = args.length; _i < _len; _i++) {
           arg = args[_i];
-          arg = arg.clone();
+          arg = C.Macro.transform(arg);
+          arg.was_quoted = arg.quoted;
           arg.quoted = true;
           _results.push(arg);
         }
@@ -2779,6 +2806,11 @@ if (typeof module !== 'undefined' && require.main === module) {
       })();
       ls = new C.List([fn].concat(__slice.call(args)), this.yy);
       c_template = ls.compile();
+      for (_i = 0, _len = args.length; _i < _len; _i++) {
+        arg = args[_i];
+        arg.quoted = arg.was_quoted;
+        delete arg.was_quoted;
+      }
       if (!(typeof __oppo_runtime_defined__ !== "undefined" && __oppo_runtime_defined__ !== null) || !__oppo_runtime_defined__) {
         c_template = "" + (compile_runtime()) + ";" + c_template;
       }
@@ -2795,22 +2827,27 @@ if (typeof module !== 'undefined' && require.main === module) {
     };
 
     Macro.transform = function(code, levels) {
-      var callable, item, transformed;
+      var callable, item, s_get_prop, transformed;
       if (levels == null) {
         levels = Infinity;
       }
+      code = (oppoize(code))[0];
       if (levels > 0) {
         if (code instanceof C.ReturnedConstruct) {
           code = code.value;
         }
         if (code instanceof C.List && !(code.quoted || code.quasiquoted)) {
-          callable = code.items[0];
+          callable = this.transform(code.items[0]);
           if (callable instanceof C.Symbol) {
             item = C.get_var_val(callable);
             if (this.can_transform(item)) {
               transformed = item.transform.apply(item, code.items.slice(1));
               levels -= 1;
             }
+          }
+          if (callable instanceof C.Keyword) {
+            s_get_prop = new C.Symbol("get-prop");
+            transformed = new C.List([s_get_prop].concat(__slice.call(code.items)));
           }
         }
         if (!transformed && (!(code instanceof C.Macro)) && (this.can_transform(code))) {
@@ -2839,7 +2876,7 @@ if (typeof module !== 'undefined' && require.main === module) {
     }
 
     OppoObject.prototype.compile = function() {
-      var dynamic, grp, obj, old_pairs, pair, prop, result, set_obj, sym_obj, val, _i, _len, _ref3;
+      var dynamic, obj, old_pairs, pair, prop, result, set_obj, sym_obj, val, _i, _len, _ref3;
       this.static_pairs = [];
       this.dynamic_pairs = [];
       _ref3 = this.property_value_pairs;
@@ -2877,22 +2914,20 @@ if (typeof module !== 'undefined' && require.main === module) {
         }
         return _results;
       }).call(this);
-      grp = new C.CommaGroup([set_obj].concat(__slice.call(dynamic), [sym_obj]), this.yy);
-      result = grp._compile();
+      result = dynamic.length ? (new C.CommaGroup([set_obj].concat(__slice.call(dynamic), [sym_obj]), this.yy))._compile() : obj;
       this.property_value_pairs = old_pairs;
       return result;
     };
 
     OppoObject.prototype.compile_quoted = function() {
-      var c_pairs, pair, pairs;
+      var c_pairs, pairs, prop, val;
       pairs = (function() {
-        var _i, _len, _ref3, _results;
+        var _i, _len, _ref3, _ref4, _results;
         _ref3 = this.property_value_pairs;
         _results = [];
         for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
-          pair = _ref3[_i];
-          pair.quoted = true;
-          _results.push(pair);
+          _ref4 = _ref3[_i], prop = _ref4[0], val = _ref4[1];
+          _results.push([C.Macro.transform(prop), C.Macro.transform(val)]);
         }
         return _results;
       }).call(this);
@@ -2939,7 +2974,7 @@ if (typeof module !== 'undefined' && require.main === module) {
   };
 
   push_unshift_op = function(method) {
-    return "function (a) {\n    var args = __slice__.call(arguments, 1);\n    var new_a = a.slice();\n    new_a." + method + ".apply(new_a, args);\n    return new_a;\n}";
+    return "function (a) {\n    var args = __slice__.call(arguments, 1);\n    var new_a = a == null ? [] : __typeof__(a) === \"array\" ? a.slice() : [a].slice();\n    new_a." + method + ".apply(new_a, args);\n    return new_a;\n}";
   };
 
   equality_op = function(_not) {
@@ -3163,6 +3198,9 @@ if (typeof module !== 'undefined' && require.main === module) {
       ], [
         'count', function(c) {
           var _ref3;
+          if (!(c != null)) {
+            return 0;
+          }
           if ((_ref3 = __typeof__(c)) === "array" || _ref3 === "arguments") {
             return c.length;
           } else {
@@ -3176,6 +3214,9 @@ if (typeof module !== 'undefined' && require.main === module) {
       ], [
         'contains?', function(c, v) {
           var k, x, _i, _len, _ref3;
+          if (!(c != null)) {
+            return false;
+          }
           if ((_ref3 = __typeof__(c)) === "array" || _ref3 === "arguments") {
             for (_i = 0, _len = c.length; _i < _len; _i++) {
               x = c[_i];
@@ -3198,11 +3239,17 @@ if (typeof module !== 'undefined' && require.main === module) {
         }
       ], [
         'contains-key?', function(c, k) {
+          if (!(c != null)) {
+            return false;
+          }
           return k in c;
         }
       ], [
         'map', function(f, o) {
           var k, result, t, v, x, _i, _len, _results;
+          if (!(o != null)) {
+            return [];
+          }
           t = __typeof__(o);
           if (t === "array" || o instanceof Array) {
             _results = [];
@@ -3226,6 +3273,9 @@ if (typeof module !== 'undefined' && require.main === module) {
       ], [
         'reduce', function(f, o) {
           var k, result, t, v, x, _i, _len;
+          if (!(o != null)) {
+            return [];
+          }
           t = __typeof__(o);
           if (t === "array" || o instanceof Array) {
             for (_i = 0, _len = o.length; _i < _len; _i++) {
@@ -3254,6 +3304,9 @@ if (typeof module !== 'undefined' && require.main === module) {
       ], [
         'reduce-right', function(f, o) {
           var result, t, x, _i, _len, _ref3;
+          if (!(o != null)) {
+            return [];
+          }
           t = __typeof__(o);
           if (t === "array" || o instanceof Array) {
             _ref3 = o.slice().reverse();
@@ -3273,6 +3326,9 @@ if (typeof module !== 'undefined' && require.main === module) {
       ], ['reduce-r', (new C.Symbol('reduce-right')).compile()], [
         'filter', function(f, o) {
           var k, result, t, v, x, _i, _len;
+          if (!(o != null)) {
+            return [];
+          }
           t = __typeof__(o);
           if (t === "array" || o instanceof Array) {
             result = [];
@@ -3296,7 +3352,7 @@ if (typeof module !== 'undefined' && require.main === module) {
           }
           return result;
         }
-      ], ['clone', "Object.create ? function (o) {\n  return Object.create(o)\n} : function (o) {\n  function Noop() {}\n  Noop.prototype = o;\n  return new Noop();\n}"], [
+      ], ['clone', "!Object.create ? function (o) {\n  return Object.create(o)\n} : function (o) {\n  function Noop() {}\n  Noop.prototype = o != null ? o : null;\n  return new Noop();\n}"], [
         'keys', "Object.keys || " + function(o) {
           var k, _results;
           _results = [];
@@ -3408,10 +3464,9 @@ if (typeof module !== 'undefined' && require.main === module) {
   };
 
   call_macro = function() {
-    var args, name, ret, to_call;
+    var args, name, ret;
     name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    to_call = C.get_var_val(new C.Symbol(name));
-    ret = to_call.transform.apply(to_call, args);
+    ret = call_macro_transform.apply(null, arguments);
     return ret._compile();
   };
 
@@ -3489,26 +3544,16 @@ if (typeof module !== 'undefined' && require.main === module) {
       kvpairs = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       return obj = new C.OppoObject(kvpairs);
     });
-    defmacro("get-prop", function() {
-      var c, c_o, c_p, o, p, ps, sym, _i, _len;
-      o = arguments[0], ps = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+    defmacro("get-prop", function(p, o) {
+      var c, c_o, sym;
       c_o = o._compile();
       c = "" + c_o;
-      for (_i = 0, _len = ps.length; _i < _len; _i++) {
-        p = ps[_i];
-        p = C.Macro.transform(p);
-        sym = p instanceof C.Symbol && (p.quoted || p.quasiquoted);
-        if (sym) {
-          p.quoted = p.quasiquoted = false;
-        }
-        c_p = p._compile();
-        if (sym) {
-          c = "" + c + "." + c_p;
-        } else {
-          c = "" + c + "[" + c_p + "]";
-        }
+      p = C.Macro.transform(p);
+      sym = p instanceof C.Symbol && (p.quoted || p.quasiquoted);
+      if (sym) {
+        p = new C.Keyword(p, p.yy);
       }
-      return new C.Raw(c);
+      return new C.PropertyAccess([o, p]);
     });
     defmacro("get-fn", function() {
       var args, fn, o, p, q_p, s_get_prop, s_quote;
@@ -3516,14 +3561,15 @@ if (typeof module !== 'undefined' && require.main === module) {
       s_get_prop = new C.Symbol("get-prop");
       s_quote = new C.Symbol("quote");
       q_p = new C.List([s_quote, p]);
-      fn = new C.List([s_get_prop, o, q_p]);
+      fn = new C.List([s_get_prop, q_p, o]);
       return new C.List([fn].concat(__slice.call(args)));
     });
     defmacro("new", function() {
-      var args, cls;
+      var args, cls, t_cls;
       cls = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+      t_cls = C.Macro.transform(cls);
       return new C.FunctionCall({
-        fn: cls,
+        fn: t_cls,
         args: args,
         instantiate: true
       });
@@ -3547,7 +3593,7 @@ if (typeof module !== 'undefined' && require.main === module) {
     operator_macro = function(name, className) {
       var macro_fn;
       macro_fn = function() {
-        var Cls, args, postfix, prefix, results, x, y;
+        var Cls, arg, args, postfix, prefix, results, x, y;
         args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
         Cls = C[className];
         prefix = Cls.prototype instanceof C.PrefixOperation;
@@ -3556,6 +3602,15 @@ if (typeof module !== 'undefined' && require.main === module) {
           var _results;
           _results = [];
           while (args.length) {
+            args = (function() {
+              var _i, _len, _results1;
+              _results1 = [];
+              for (_i = 0, _len = args.length; _i < _len; _i++) {
+                arg = args[_i];
+                _results1.push(C.Macro.transform(arg));
+              }
+              return _results1;
+            })();
             x = args.shift();
             _results.push((prefix || postfix ? new Cls(x, x.yy) : (y = args.shift(), new Cls([x, y], x.yy))).compile());
           }
@@ -3594,16 +3649,7 @@ if (typeof module !== 'undefined' && require.main === module) {
     */
 
     defmacro("keyword", function(keyword) {
-      if (keyword instanceof C.Symbol && (keyword.quoted || keyword.quasiquoted)) {
-        return new C.String(keyword.value, keyword.yy);
-      } else if (keyword instanceof C.String) {
-        return keyword;
-      } else {
-        return new C.Raw("String(" + (keyword._compile()) + ")");
-      }
-    });
-    defmacro("symbol->keyword", function(s) {
-      return new C.String(s.value, s.yy);
+      return new C.Keyword(keyword, keyword.yy);
     });
     defmacro("include", function() {
       var code, expressions, f, files, fname, fragment, fs, include_directory, path, text, _i, _len;

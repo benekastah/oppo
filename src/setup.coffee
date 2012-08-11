@@ -145,6 +145,11 @@ do ->
 
   C.Function.ArgsList::slice_fn = "__slice__.call"
 
+  C.FunctionCall::compile_quoted = ->
+    ls = new C.List [@fn, @args...]
+    ls.quoted = true
+    ls._compile()
+
 #-----------------------------------------------------------------------------#
 
 oppoize = oppo.oppoize = (exprs...) ->

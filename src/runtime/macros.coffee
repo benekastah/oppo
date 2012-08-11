@@ -5,14 +5,15 @@ HELPERS
 defmacro = (name, fn) ->
   s_name = new C.Symbol name
   macro_args = name: s_name
-  macro_args.transform = fn
+  macro_args.transform = ->
+    args = for arg in arguments then C.Macro.transform arg
+    fn args...
   m = new C.Macro macro_args
   m._compile()
   m
   
 call_macro = (name, args...) ->
-  to_call = C.get_var_val (new C.Symbol name)
-  ret = to_call.transform args...
+  ret = call_macro_transform arguments...
   ret._compile()
 
 call_macro_transform = (name, args...) ->
@@ -69,26 +70,20 @@ setup_built_in_macros = ->
   defmacro "object", (kvpairs...) ->
     obj = new C.OppoObject kvpairs
 
-  defmacro "get-prop", (o, ps...) ->
+  defmacro "get-prop", (p, o) ->
     c_o = o._compile()
     c = "#{c_o}"
-    for p in ps
-      p = C.Macro.transform p
-      sym = p instanceof C.Symbol and (p.quoted or p.quasiquoted)
-      if sym
-        p.quoted = p.quasiquoted = no
-      c_p = p._compile()
-      if sym
-        c = "#{c}.#{c_p}"
-      else
-        c = "#{c}[#{c_p}]"
-    new C.Raw c
+    p = C.Macro.transform p
+    sym = p instanceof C.Symbol and (p.quoted or p.quasiquoted)
+    if sym
+      p = new C.Keyword p, p.yy
+    new C.PropertyAccess [o, p]
 
   defmacro "get-fn", (p, o, args...) ->
     s_get_prop = new C.Symbol "get-prop"
     s_quote = new C.Symbol "quote"
     q_p = new C.List [s_quote, p]
-    fn = new C.List [s_get_prop, o, q_p]
+    fn = new C.List [s_get_prop, q_p, o]
     new C.List [fn, args...]
 
   defmacro "new", (cls, args...) ->
@@ -153,15 +148,7 @@ setup_built_in_macros = ->
   OPPO BUILTINS
   ###
   defmacro "keyword", (keyword) ->
-    if keyword instanceof C.Symbol and (keyword.quoted or keyword.quasiquoted)
-      new C.String keyword.value, keyword.yy
-    else if keyword instanceof C.String
-      keyword
-    else
-      new C.Raw "String(#{keyword._compile()})"
-
-  defmacro "symbol->keyword", (s) ->
-    new C.String s.value, s.yy
+    new C.Keyword keyword, keyword.yy
 
   defmacro "include", (files...) ->
     if process?.title isnt 'node'
