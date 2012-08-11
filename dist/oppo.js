@@ -1050,9 +1050,9 @@
         pair = pairs[_i];
         if (pair != null) {
           if (pair instanceof C.List) {
-            pair.quoted = true;
+            pair = pair.items;
           }
-          this.property_value_pairs.push(eval(pair._compile()));
+          this.property_value_pairs.push(pair);
         }
       }
     }
@@ -1075,16 +1075,16 @@
 
   })(C.Construct);
 
-  C.ProperyAccess = (function(_super) {
+  C.PropertyAccess = (function(_super) {
 
-    __extends(ProperyAccess, _super);
+    __extends(PropertyAccess, _super);
 
-    function ProperyAccess(_arg) {
+    function PropertyAccess(_arg) {
       this.obj = _arg[0], this.props = 2 <= _arg.length ? __slice.call(_arg, 1) : [];
-      ProperyAccess.__super__.constructor.apply(this, arguments);
+      PropertyAccess.__super__.constructor.apply(this, arguments);
     }
 
-    ProperyAccess.prototype.compile = function() {
+    PropertyAccess.prototype.compile = function() {
       var base, c_prop, prop, _i, _len, _ref1, _results;
       base = this.obj._compile();
       _ref1 = this.props;
@@ -1101,7 +1101,7 @@
       return _results;
     };
 
-    return ProperyAccess;
+    return PropertyAccess;
 
   })(C.Construct);
 
@@ -1118,7 +1118,7 @@
       var c_x, c_y;
       c_x = this.x._compile();
       c_y = this.y._compile();
-      return "" + c_x + " " + this.op + " " + c_y;
+      return "(" + c_x + " " + this.op + " " + c_y + ")";
     };
 
     return Operation;
@@ -3356,7 +3356,7 @@ if (typeof module !== 'undefined' && require.main === module) {
               arg = arguments[_i];
               if (typeof arg === "string") {
                 _results.push(arg);
-              } else if (arg.toString != null) {
+              } else if ((arg != null ? arg.toString : void 0) != null) {
                 _results.push(arg.toString());
               } else {
                 _results.push("" + arg);
