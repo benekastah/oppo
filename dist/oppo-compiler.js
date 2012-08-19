@@ -1165,7 +1165,7 @@
               arg = arguments[_i];
               if (typeof arg === "string") {
                 _results.push(arg);
-              } else if (arg.toString != null) {
+              } else if ((arg != null ? arg.toString : void 0) != null) {
                 _results.push(arg.toString());
               } else {
                 _results.push("" + arg);

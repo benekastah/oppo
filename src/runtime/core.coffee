@@ -432,7 +432,7 @@ compile_runtime = ->
       args = for arg in arguments
         if typeof arg is "string"
           arg
-        else if arg.toString?
+        else if arg?.toString?
           arg.toString()
         else
           "#{arg}"
