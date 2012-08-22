@@ -6,49 +6,142 @@ A lisp for javascript.
   - Performant. Offload work to the compiler when practical. Make use of javascript's native operators whenever possible.
   - It should be javascript. Compiled Oppo values and functions need to be directly usable in javascript and vice versa. Compiler output should be idiomatic and readable.
   - Hygenic macros. Pattern the macro system after Scheme's.
-  - More to come.
-  
-## Functions
 
-Function definitions should take a scheme-like form:
+## Runtime
+### General
+#### Macros
+  - **defmacro**
 
-  (define (identity x) x)
+    Defines a new macro:
 
-The user should be able to specify default arguments like so:
+        (defmacro (id x) `(identity ,x))
 
-  (define (get-number (x 0))
-    (->num x))
+    **defmacro** always defines its values _in the module scope_. Since macros are not true values, but compiler configurations, there is no such thing as a lexically-scoped macro.
 
-Functions need to be tail-recursive.
+  - **def**
 
-## Mathematical operations
+    Defines a new value or function:
 
-All mathematical operations that correspond with an operator in javascript need to use that operator. Hence:
+        (def a 5) ;; defines variable a with value 5
+        (def (identity x) x) ;; defines identity function
 
-  (+ 1 2 3)
-  
-should compile to:
+    **def** always defines its values _in the module scope_. In order to define local variables, **let** must be used.
 
-  1 + 2 + 3;
-  
-However, they should also be usable as functions:
+  - **set**
 
-  (map '(1 2 3) +)
-  
-should compile to:
+    Sets the value of a previously defined variable:
 
-  map([1, 2, 3], _$plus_);
-  
-The rule is that when the `+` operator is in calling position, it will compile to the javascript operator. When it is in any other position, it will pass it's function value.
+        (def a 5)
+        (set a (+ 5 1))
 
-All mathematical operations must also be redefinable. Therefore:
+  - **lambda**
 
-  (set! + concat)
-  (+ [] 1 2 3)
-  
-should compile to:
+    Defines a new function:
 
-  _$plus_ = concat;
-  _$plus_([], 1, 2, 3);
-  
-Note that here, even though `+` is in calling position, it is called as a function instead of as an operator. Once a operator-function has been redefined, it needs to act only as a function. If the definition ever goes back to the original function (and if we can detect it on the compiler side), then operators should be used again.
+        (lambda (... args) (map add args))
+
+    **lambda** equates to an anonymous function in javascript.
+
+  - **let**
+
+  - **do**
+
+  - **js-eval**
+
+  - **quote**
+
+  - **quasiquote**
+
+  - **unquote**
+
+#### Functions
+  - **eval**
+
+### Binary
+#### Macros
+  - **or**
+
+  - **and**
+
+  - **not**
+
+### Logical
+#### Macros
+  - **if**
+
+  - **>**
+
+  - **<**
+
+  - **>=**
+
+  - **<=**
+
+  - **==**
+
+  - **===**
+
+#### Functions
+  - **=**
+    
+    Tests objects for equality. Considers objects with identical property-value maps to be equal.
+
+### Math
+#### Macros
+  - **\+**
+
+        (+ 1 2 3) ;; -> 1 + 2 + 3
+
+  - **\-**
+
+        (- 5 4 3) ;; -> 5 - 4 - 3
+
+  - **\***
+
+        (* 10 30) ;; -> 10 * 30
+
+  - **/**
+
+        (/ 12 2) ;; -> 12 / 2
+
+  - **%**
+
+        (% 16 4) ;; -> 16 % 4
+
+#### Functions
+  - **add**
+    
+    Function counterpart of **\+**
+
+  - **subtract**
+    
+    Function counterpart of **\-**
+
+  - **multiply**
+    
+    Function counterpart of **\***
+
+  - **divide**
+    
+    Function counterpart of **/**
+
+  - **mod**
+    
+    Function counterpart of **%**
+
+### Collections
+#### Macros
+  - **object, {}**
+
+  - **list, []**
+
+#### Functions
+  - **map**
+
+  - **reduce, reduce-left**
+
+  - **reduce-right**
+
+  - **filter**
+
+  - **some**

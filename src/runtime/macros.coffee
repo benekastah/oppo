@@ -5,16 +5,16 @@ HELPERS
 defmacro = (name, fn) ->
   s_name = new C.Symbol name
   macro_args = name: s_name
-  macro_args.transform = ->
-    args = for arg in arguments then C.Macro.transform arg
-    fn args...
+  # macro_args.transform = ->
+  #   args = for arg in arguments then C.Macro.transform arg
+  #   fn args...
   m = new C.Macro macro_args
   m._compile()
   m
   
 call_macro = (name, args...) ->
   ret = call_macro_transform arguments...
-  ret._compile()
+  oppoize(ret)._compile()
 
 call_macro_transform = (name, args...) ->
   to_call = C.get_var_val (new C.Symbol name)

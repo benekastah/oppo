@@ -3457,19 +3457,6 @@ if (typeof module !== 'undefined' && require.main === module) {
     macro_args = {
       name: s_name
     };
-    macro_args.transform = function() {
-      var arg, args;
-      args = (function() {
-        var _i, _len, _results;
-        _results = [];
-        for (_i = 0, _len = arguments.length; _i < _len; _i++) {
-          arg = arguments[_i];
-          _results.push(C.Macro.transform(arg));
-        }
-        return _results;
-      }).apply(this, arguments);
-      return fn.apply(null, args);
-    };
     m = new C.Macro(macro_args);
     m._compile();
     return m;
@@ -3479,7 +3466,7 @@ if (typeof module !== 'undefined' && require.main === module) {
     var args, name, ret;
     name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
     ret = call_macro_transform.apply(null, arguments);
-    return ret._compile();
+    return oppoize(ret)._compile();
   };
 
   call_macro_transform = function() {
