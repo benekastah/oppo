@@ -12,10 +12,10 @@
   , "dependencies": {
       "underscore": "1.x.x"
     , "optimist": "0.2.x"
-    , "lemur": "0.x.x"
   }
   , "devDependencies": {
       "coffee-script": "1.x.x"
+    , "biwascheme": "0.x.x"
   }
   , "engines": {
       "node": "0.6.x"
