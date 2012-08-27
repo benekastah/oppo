@@ -5,12 +5,8 @@
     <script src="../dist/core.js"></script>
     <script src="../dist/reader.js"></script>
     <script src="../dist/compiler.js"></script>
+    <script src="test.js"></script>
   </head>
   <body>
-    <script>
-      var parse_tree = oppo.read('(def identity (lambda (x) x)) (alert (identity nil))');
-      var compiled = oppo.compile(parse_tree);
-      var result = eval(compiled);
-    </script>
   </body>
 </html>

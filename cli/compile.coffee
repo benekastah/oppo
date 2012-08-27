@@ -25,8 +25,20 @@ getFiles = (file_and_dir_list, base_dir = '') ->
       files.push full_item
   files
 
+get_base_dir = (file) ->
+  path.dirname path.resolve(file)
+
+get_module_name = (file, base_dir = get_base_dir file) ->
+  module_name = path.resolve file
+  # If module_name starts with base_dir, remove base_dir from the beginning
+  if module_name.substr(0, base_dir.length) is base_dir
+    module_name = module_name.substr base_dir.length
+  module_name = module_name.replace /\.oppo$/, ''
+  module_name
+
 @compile = (output, source_files, watch, beautify) ->
   files = getFiles source_files
+  base_dir = get_base_dir files[0]
 
   if /\.js$/.test output
     output_fname = path.basename output
@@ -54,24 +66,15 @@ getFiles = (file_and_dir_list, base_dir = '') ->
     
     code = fs.readFileSync file, 'utf8'
     try
+      module_name = get_module_name file, base_dir
       read_code = oppo.read code
-      compiled_code = oppo.compile read_code, false, dir
+      compiled_code = oppo.compile read_code, module_name
       console.log "Compiled #{fname}"
     catch e
       console.warn "Error compiling #{fname}", e
       compiled_code = ''
 
     compiled_code
-
-  oppo_js = fs.readFileSync "#{__dirname}/../dist/oppo.js", 'utf8'
-  include_oppo = """
-  if (typeof module !== 'undefined' && typeof require !== 'undefined') {
-    require('oppo');
-  } else {
-    #{oppo_js}
-  }
-  """
-  c_files.unshift include_oppo, oppo.compile_runtime()
 
   fs.writeFileSync jsfile, c_files.join ';'
   # fs.writeFileSync tmp_jsfile, c_files.join ';'
@@ -82,7 +85,7 @@ getFiles = (file_and_dir_list, base_dir = '') ->
   #   "rm #{tmp_jsfile}; echo \"Wrote #{jsfile}\""
 
 @runfile = (file) ->
-  dir = path.dirname file
+  module_name = get_module_name file
   code = fs.readFileSync file, 'utf8'
   read_code = oppo.read code
   compiled_code = oppo.compile read_code, null, dir

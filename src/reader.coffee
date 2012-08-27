@@ -1,121 +1,154 @@
 
 ###
-HELPERS
+HELPERS / SETUP
 ###
 {to_type} = oppo.helpers
+r_whitespace = /^\s+/
+r_number = /^-?(\d*\.\d+|\d+)/
+r_symbol = /^[\w~`!@#$%^&*\-+=|\\"':?\/<>,\.]+/
 
-oppo.Token = class Token
-  constructor: (@token_text) ->
+reader = oppo.reader = {}
 
-  add: (list, lists) ->
-    unless @ignore
-      parsed = if @parse? then @parse() else this
-      list.push parsed
-    list
+class OppoReaderError extends Error
+  constructor: (message, text, index) ->
 
-  toString: -> @token_text
 
-  @match: (text) ->
-    if text is @matcher
-      yes
-    else if (to_type @matcher) is "regexp"
-      @matcher.test text
-    else
-      no
+oppo.JavaScriptCode = class JavaScriptCode
+  constructor: (@text) ->
 
-  @make_matcher: (m) ->
+oppo.Symbol = class Symbol
+  constructor: (@text) ->
+
+###
+READTABLES
+###
+make_reader = (opts, f) ->
+  if arguments.length is 1
+    [f, opts] = [opts, f]
+  {comment_end, string_end} = opts ? {}
+  (input) ->
+    if not comment_end and reader.comment_buffer?
+      reader.comment_buffer += input
+      return
+    else if not string_end and reader.string_buffer?
+      reader.string_buffer += input
+      return
+    else if reader.read_special
+      reader.read_special = no
+    f arguments...
+
+read_true = make_reader  -> true
+read_false = make_reader  -> false
+read_nil = make_reader  -> null
+
+oppo.ReadTable = class ReadTable
+  constructor: ->
+    @table = []
+    for arg, i in arguments
+      if i % 2 is 0
+        item = []
+        @table.push item
+      item.push arg
+
+  get_match: (m, text) ->
     if (to_type m) is "regexp"
-      new RegExp "^#{m.source}$"
-    else
-      m
+      match = (text.match m)?[0]
+    else if m is (text.substr 0, m.length)
+      match = m
 
-class Number extends Token
-  parse: -> +@token_text
+  read: (text) ->
+    for [k, f] in @table
+      if match = @get_match k, text
+        result = f match
+        if result isnt undefined
+          reader.current_list.push result
+        return match.length
 
-class Boolean extends Token
+  @tables:
+    default: new ReadTable(
+      ';', make_reader ->
+        reader.comment_buffer = ''
+        undefined
 
+      '\\', make_reader ->
+        reader.escape_next_char = true
+        undefined
 
-###
-TOKEN DEFINITIONS
-###
-tokenClasses = [
-  class Token.Whitespace extends Token
-    @matcher: Token.make_matcher /\s+/
-    ignore: yes
+      '\n', make_reader {comment_end: yes}, (input) ->
+        reader.line_number += 1
+        if reader.comment_buffer?
+          comment = "//#{reader.comment_buffer}#{input}"
+          reader.comment_buffer = null
+          new JavaScriptCode comment
+        else
+          undefined
 
-  class Token.ListOpen extends Token
-    @matcher: "("
-    add: (list, lists) ->
-      new_list = []
-      list.push new_list
-      lists.push new_list
-      new_list
+      '(', make_reader ->
+        list = []
+        reader.lists.push list
+        reader.current_list = list
+        list.starting_line_number = reader.line_number
+        undefined
 
-  class Token.ListClose extends Token
-    @matcher: ")"
-    add: (list, lists) ->
-      lists.pop()
-      lists[lists.length - 1]
+      ')', make_reader ->
+        list = reader.lists.pop()
+        reader.current_list = reader.lists[reader.lists.length - 1]
+        list
 
-  class Token.Fixnum extends Number
-    @matcher: Token.make_matcher /-?\d+/
+      '"', make_reader {string_end: yes}, ->
+        if reader.string_buffer?
+          string = reader.string_buffer
+          reader.string_buffer = null
+          string
+        else
+          reader.string_buffer = ""
+          undefined
 
-  class Token.Float extends Number
-    @matcher: Token.make_matcher /-?\d*\.\d+/
+      '#', make_reader ->
+        reader.read_special = yes
+        undefined
+    )
 
-  class Token.String extends Token
-    @matcher: Token.make_matcher /"[^"]*"/
-    parse: -> @token_text.substr 1, @token_text.length - 2
+    last: new ReadTable(
+      r_whitespace, make_reader -> undefined
+      r_number, make_reader (input) -> +input
+      r_symbol, make_reader (input) -> new Symbol input
+    )
 
-  class Token.Nil extends Token
-    @matcher: "nil"
-    parse: -> null
-
-  class Token.True extends Boolean
-    @matcher: "true"
-
-  class Token.False extends Boolean
-    @matcher: "false"
-
-  class Token.Symbol extends Token
-    constructor: (token_text) ->
-      if token_text instanceof Token.Symbol
-        token_text = token_text.token_text
-      super token_text
-
-    @matcher: Token.make_matcher /[\w\-!@#$%^&*+=|\\:\/?<>\.]+/
-]
-
+    special: new ReadTable(
+      'true', read_true
+      't', read_true
+    
+      'false', read_false
+      'f', read_false
+    
+      'nil', read_nil
+      'n', read_nil
+    )
 
 ###
 READER
 ###
-read_token = (text) ->
-  token_text = ""
-  while text.length
-    token_text += text.charAt(0)
-    text = text.substr 1
-    for TokenClass in tokenClasses
-      matched = TokenClass.match token_text
-      if matched
-        match = [(new TokenClass token_text), text]
-        if token_text is TokenClass.matcher
-          return match
-        else
-          break
-    if not matched and match?
-      return match
-  match
+read_token = (text, index) ->
+  if reader.read_special
+    length = ReadTable.tables.special.read text
+    if not length?
+      throw new OppoReaderError "Invalid special syntax", text, index
+  else
+    length = ReadTable.tables.default.read text
+    if not length?
+      length = ReadTable.tables.last.read text
+
+  if length?
+    return text.substr length
 
 oppo.read = (text) ->
-  token_stream = []
-  lists = [token_stream]
-  current_list = token_stream
+  list = []
+  reader.line_number = 1
+  reader.lists = [list]
+  current_list = reader.current_list = list
   while text.length
-    [token, text] = read_token text
-    if token?
-      current_list = token.add current_list, lists
-    else
-      throw new Error "ParseError: Invalid syntax: #{text}"
-  token_stream
+    text = read_token text
+  reader.lists = reader.current_list = null
+  list
 

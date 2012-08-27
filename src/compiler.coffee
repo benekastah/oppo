@@ -1,26 +1,50 @@
 
-{Token} = oppo
-{Symbol} = Token
-{text_to_js_identifier, to_type} = oppo.helpers
+{JavaScriptCode, Symbol} = oppo
+{text_to_js_identifier, to_type, clone} = oppo.helpers
 
 symbol = (text) ->
   new Symbol text
 
-oppo.defined_symbols = {}
-lookup_symbol = (sym, m = oppo.__compiling_module__) ->
-  new_sym = symbol sym
-  sym_text = new_sym.token_text
-  possible_syms = [sym_text, "#{m}::#{new_sym.token_text}"]
-  if m isnt "core"
-    possible_syms.push "core::#{new_sym.token_text}"
+class Context
+  constructor: (@parent_context = Object.prototype) ->
+    @context = clone @parent_context
 
-  for possible_sym in possible_syms
-    c_sym = compile(symbol possible_sym)[0]
-    val = oppo.defined_symbols[c_sym]
-    return val if val?
+  var_stmt: ->
+    vars = for own k, v of @context when v not instanceof Context and (type_of v) isnt 'function'
+      compile (symbol k)
+    if vars.length
+      "var #{vars.join ', '};\n"
+    else
+      ""
 
-class JavaScriptCode
-  constructor: (@text) ->
+class Module extends Context
+  constructor: (parent_context, @name) ->
+    super parent_context
+    Module[@name] = this
+
+class ContextStack
+  constructor: ->
+    @global_context = new Context()
+    @stack = [@global_context]
+    @current_context = @global_context
+
+  push: (c) ->
+    @current_context = c
+    @stack.push c
+    c
+
+  push_new: ->
+    c = new Context @current_context
+    @push c
+
+  push_new_module: (name) ->
+    m = new Module @current_context, name
+    @push m
+
+  pop: ->
+    c = @stack.pop()
+    @current_context = @stack[@stack.length - 1]
+    c
 
 compile = (parse_tree...) ->
   for sexp in parse_tree
@@ -30,7 +54,7 @@ compile = (parse_tree...) ->
     else if sexp instanceof JavaScriptCode
       sexp.text
     else if sexp instanceof Symbol
-      text_to_js_identifier sexp.token_text
+      text_to_js_identifier sexp.text
     else if sexp_type in ["boolean", "number"]
       "#{sexp}"
     else if sexp_type is "string"
@@ -38,12 +62,20 @@ compile = (parse_tree...) ->
     else if sexp_type is "array"
       compile_list sexp
 
-oppo.compile = (parse_tree, module = "core") ->
-  last_module = oppo.__compiling_module__
-  oppo.__compiling_module__ = module
+oppo.compile = (parse_tree, module_name = "__anonymous__") ->
+  oppo.context_stack ?= new ContextStack()
+  module = oppo.context_stack.push_new_module module_name
   c = compile parse_tree...
-  oppo.__compiling_module__ = last_module
-  c.join ";\n"
+  oppo.context_stack.pop()
+
+  var_stmt = module.var_stmt()
+  """
+  (function () {
+  #{var_stmt}
+  return #{c.join ",\n"}
+  
+  }()
+  """
 
 compile_list = (ls) ->
   [callable] = ls
@@ -54,12 +86,28 @@ compile_list = (ls) ->
     ls.shift()
   compile(call_macro ls...)[0]
 
+# Macros. These will take care of virtually all compiling.
+# The only macros that will need to be predefined in javascript are:
+# - def
+# - defmacro
+# - defmodule
+# - js-eval
+# - lambda
+# - call
+# - any reader-level macros
+
 lambda = (args, body...) ->
+  context = oppo.context_stack.push_new()
+
   c_args = compile args...
   c_body = compile body...
+
+  oppo.context_stack.pop()
+  var_stmt = context.var_stmt()
+
   new JavaScriptCode """
     (function (#{c_args.join ', '}) {
-      return #{c_body.join ', '};
+      #{var_stmt}return #{c_body.join ',\n'};
     })
     """
 
@@ -87,7 +135,7 @@ define_macro
   module: "core"
   name: "defmacro"
   compile: (name, args, template) ->
-    t_name = name.token_text
+    t_name = name.text
     define_macro 
       name: t_name
       argnames: args
@@ -97,7 +145,7 @@ define_macro
   module: "core"
   name: "def"
   compile: (name, value) ->
-    t_name = name.token_text
+    t_name = name.text
     define {name: t_name, value}
 
 define_macro
@@ -112,11 +160,6 @@ define_macro
     c_fname = compile(fname)[0]
     c_args = compile args...
     new JavaScriptCode "#{c_fname}(#{c_args.join ', '})"
-
-define_macro
-  module: "core"
-  name: "callmacro"
-  compile: (macro, args...) ->
 
 define_macro
   module: "js"

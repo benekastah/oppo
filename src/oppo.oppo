@@ -1,0 +1,6 @@
+
+;; TODO: . is a required syntax construct for using a method from an object
+;; TODO: ... is a required syntax construct for rest arguments
+(def (str ...strings)
+  (.join strings ""))
+

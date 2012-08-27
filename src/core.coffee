@@ -7,6 +7,11 @@ root.oppo =
       toString = Object::toString
       (o) -> (s = toString.call o).substring(8, s.length - 1).toLowerCase()
 
+    clone: Object.create ? (o) ->
+      class Noop
+      Noop:: = o
+      new Noop
+
     text_to_js_identifier: do ->        
       WRAPPER_PREFIX = "_$"
       WRAPPER_SUFFIX = "_"
@@ -119,4 +124,3 @@ root.oppo =
           .replace /^\d/, _char_wrapper)
           .replace /[^\w\$]/g, _char_wrapper
 
-          
