@@ -9,15 +9,18 @@ r_symbol = /^[\w~`!@#$%^&*\-+=|\\"':?\/<>,\.]+/
 
 reader = oppo.reader = {}
 
-class OppoReaderError extends Error
+class OppoReadError extends Error
   constructor: (message, text, index) ->
-
+    @message = message
 
 oppo.JavaScriptCode = class JavaScriptCode
   constructor: (@text) ->
 
+oppo.JavaScriptComment = class JavaScriptComment
+
 oppo.Symbol = class Symbol
-  constructor: (@text) ->
+  constructor: (@text, base_symbol) ->
+    @line_number = base_symbol?.line_number ? reader.line_number
 
 ###
 READTABLES
@@ -79,7 +82,7 @@ oppo.ReadTable = class ReadTable
         if reader.comment_buffer?
           comment = "//#{reader.comment_buffer}#{input}"
           reader.comment_buffer = null
-          new JavaScriptCode comment
+          new JavaScriptComment comment
         else
           undefined
 
@@ -133,7 +136,7 @@ read_token = (text, index) ->
   if reader.read_special
     length = ReadTable.tables.special.read text
     if not length?
-      throw new OppoReaderError "Invalid special syntax", text, index
+      throw new OppoReadError "Invalid special syntax", text, index
   else
     length = ReadTable.tables.default.read text
     if not length?

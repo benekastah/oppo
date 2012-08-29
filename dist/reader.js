@@ -6,7 +6,7 @@ HELPERS / SETUP
 
 
 (function() {
-  var JavaScriptCode, OppoReaderError, ReadTable, Symbol, make_reader, r_number, r_symbol, r_whitespace, read_false, read_nil, read_token, read_true, reader, to_type,
+  var JavaScriptCode, JavaScriptComment, OppoReadError, ReadTable, Symbol, make_reader, r_number, r_symbol, r_whitespace, read_false, read_nil, read_token, read_true, reader, to_type,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
@@ -20,13 +20,15 @@ HELPERS / SETUP
 
   reader = oppo.reader = {};
 
-  OppoReaderError = (function(_super) {
+  OppoReadError = (function(_super) {
 
-    __extends(OppoReaderError, _super);
+    __extends(OppoReadError, _super);
 
-    function OppoReaderError(message, text, index) {}
+    function OppoReadError(message, text, index) {
+      this.message = message;
+    }
 
-    return OppoReaderError;
+    return OppoReadError;
 
   })(Error);
 
@@ -40,10 +42,20 @@ HELPERS / SETUP
 
   })();
 
+  oppo.JavaScriptComment = JavaScriptComment = (function() {
+
+    function JavaScriptComment() {}
+
+    return JavaScriptComment;
+
+  })();
+
   oppo.Symbol = Symbol = (function() {
 
-    function Symbol(text) {
+    function Symbol(text, base_symbol) {
+      var _ref;
       this.text = text;
+      this.line_number = (_ref = base_symbol != null ? base_symbol.line_number : void 0) != null ? _ref : reader.line_number;
     }
 
     return Symbol;
@@ -141,7 +153,7 @@ HELPERS / SETUP
         if (reader.comment_buffer != null) {
           comment = "//" + reader.comment_buffer + input;
           reader.comment_buffer = null;
-          return new JavaScriptCode(comment);
+          return new JavaScriptComment(comment);
         } else {
           return void 0;
         }
@@ -197,7 +209,7 @@ HELPERS / SETUP
     if (reader.read_special) {
       length = ReadTable.tables.special.read(text);
       if (!(length != null)) {
-        throw new OppoReaderError("Invalid special syntax", text, index);
+        throw new OppoReadError("Invalid special syntax", text, index);
       }
     } else {
       length = ReadTable.tables["default"].read(text);
