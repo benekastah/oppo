@@ -88,7 +88,7 @@
             return wrapper("null");
           }
           _char_wrapper = char_wrapper.bind(this, conversions);
-          return ((text.replace(WRAPPER_REGEX, wrapper)).replace(/^\d/, _char_wrapper)).replace(/[^\w\$]/g, _char_wrapper);
+          return (text.replace(/^\d/, _char_wrapper)).replace(/[^\w\$]/g, _char_wrapper);
         };
       })()
     }

@@ -119,8 +119,7 @@ root.oppo =
 
         _char_wrapper = char_wrapper.bind this, conversions
 
-        ((text
-          .replace WRAPPER_REGEX, wrapper)
+        (text
           .replace /^\d/, _char_wrapper)
           .replace /[^\w\$]/g, _char_wrapper
 

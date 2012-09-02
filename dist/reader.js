@@ -68,23 +68,20 @@ HELPERS / SETUP
 
 
   make_reader = function(opts, f) {
-    var comment_end, string_end, _ref, _ref1;
+    var comment_end, reader_fn, string_end, _ref, _ref1;
     if (arguments.length === 1) {
       _ref = [opts, f], f = _ref[0], opts = _ref[1];
     }
     _ref1 = opts != null ? opts : {}, comment_end = _ref1.comment_end, string_end = _ref1.string_end;
-    return function(input) {
-      if (!comment_end && (reader.comment_buffer != null)) {
-        reader.comment_buffer += input;
-        return;
-      } else if (!string_end && (reader.string_buffer != null)) {
-        reader.string_buffer += input;
-        return;
-      } else if (reader.read_special) {
+    reader_fn = function(input) {
+      if (reader.read_special) {
         reader.read_special = false;
       }
       return f.apply(null, arguments);
     };
+    reader_fn.comment_end = comment_end;
+    reader_fn.string_end = string_end;
+    return reader_fn;
   };
 
   read_true = make_reader(function() {
@@ -114,27 +111,42 @@ HELPERS / SETUP
       }
     }
 
-    ReadTable.prototype.get_match = function(m, text) {
+    ReadTable.prototype.get_match = function(m, f, text) {
       var match, _ref;
-      if ((to_type(m)) === "regexp") {
-        return match = (_ref = text.match(m)) != null ? _ref[0] : void 0;
-      } else if (m === (text.substr(0, m.length))) {
-        return match = m;
+      if ((!(reader.string_buffer != null) || f.string_end) && (!(reader.comment_buffer != null) || f.comment_end)) {
+        if ((to_type(m)) === "regexp") {
+          return match = (_ref = text.match(m)) != null ? _ref[0] : void 0;
+        } else if (m === (text.substr(0, m.length))) {
+          return match = m;
+        }
       }
     };
 
-    ReadTable.prototype.read = function(text) {
-      var f, k, match, result, _i, _len, _ref, _ref1;
+    ReadTable.prototype.read = function(text, prevLength) {
+      var f, k, match, newPrevLength, result, text_rest, _char, _i, _len, _ref, _ref1;
+      if (prevLength == null) {
+        prevLength = 0;
+      }
       _ref = this.table;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         _ref1 = _ref[_i], k = _ref1[0], f = _ref1[1];
-        if (match = this.get_match(k, text)) {
+        if (match = this.get_match(k, f, text)) {
           result = f(match);
           if (result !== void 0) {
             reader.current_list.push(result);
           }
-          return match.length;
+          return match.length + prevLength;
         }
+      }
+      _char = text.charAt(0);
+      text_rest = text.substr(1);
+      newPrevLength = prevLength + 1;
+      if (reader.string_buffer != null) {
+        reader.string_buffer += _char;
+        return this.read(text_rest, newPrevLength);
+      } else if (reader.comment_buffer != null) {
+        reader.comment_buffer += _char;
+        return this.read(text_rest, newPrevLength);
       }
     };
 
@@ -174,13 +186,15 @@ HELPERS / SETUP
       }, function() {
         var string;
         if (reader.string_buffer != null) {
-          string = reader.string_buffer;
+          string = reader.string_buffer.replace(/\n/g, "\\n");
           reader.string_buffer = null;
           return string;
         } else {
           reader.string_buffer = "";
           return void 0;
         }
+      }), '.', make_reader(function() {
+        return new Symbol('.');
       }), '#', make_reader(function() {
         reader.read_special = true;
         return void 0;

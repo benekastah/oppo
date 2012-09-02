@@ -1,9 +1,7 @@
 
 oppo_code = """
 
-;; Hey there!
-(def (identity x) x)
-(alert (identity .5))
+(.concat "asdf " "fdsa")
 
 """
 

@@ -29,20 +29,20 @@ make_reader = (opts, f) ->
   if arguments.length is 1
     [f, opts] = [opts, f]
   {comment_end, string_end} = opts ? {}
-  (input) ->
-    if not comment_end and reader.comment_buffer?
-      reader.comment_buffer += input
-      return
-    else if not string_end and reader.string_buffer?
-      reader.string_buffer += input
-      return
-    else if reader.read_special
+
+  reader_fn = (input) ->
+    if reader.read_special
       reader.read_special = no
     f arguments...
 
-read_true = make_reader  -> true
-read_false = make_reader  -> false
-read_nil = make_reader  -> null
+  reader_fn.comment_end = comment_end
+  reader_fn.string_end = string_end
+
+  reader_fn
+
+read_true = make_reader -> true
+read_false = make_reader -> false
+read_nil = make_reader -> null
 
 oppo.ReadTable = class ReadTable
   constructor: ->
@@ -53,19 +53,31 @@ oppo.ReadTable = class ReadTable
         @table.push item
       item.push arg
 
-  get_match: (m, text) ->
-    if (to_type m) is "regexp"
-      match = (text.match m)?[0]
-    else if m is (text.substr 0, m.length)
-      match = m
+  get_match: (m, f, text) ->
+    if (not reader.string_buffer? or f.string_end) and (not reader.comment_buffer? or f.comment_end)
+      if (to_type m) is "regexp"
+        match = (text.match m)?[0]
+      else if m is (text.substr 0, m.length)
+        match = m
 
-  read: (text) ->
+  read: (text, prevLength = 0) ->
     for [k, f] in @table
-      if match = @get_match k, text
+      if match = @get_match k, f, text
         result = f match
         if result isnt undefined
           reader.current_list.push result
-        return match.length
+        return match.length + prevLength
+
+    # Handle special buffers where syntax must be ignored.
+    _char = text.charAt 0
+    text_rest = text.substr 1
+    newPrevLength = prevLength + 1
+    if reader.string_buffer?
+      reader.string_buffer += _char
+      @read text_rest, newPrevLength
+    else if reader.comment_buffer?
+      reader.comment_buffer += _char
+      @read text_rest, newPrevLength
 
   @tables:
     default: new ReadTable(
@@ -100,12 +112,14 @@ oppo.ReadTable = class ReadTable
 
       '"', make_reader {string_end: yes}, ->
         if reader.string_buffer?
-          string = reader.string_buffer
+          string = reader.string_buffer.replace(/\n/g, "\\n")
           reader.string_buffer = null
           string
         else
           reader.string_buffer = ""
           undefined
+
+      '.', make_reader -> new Symbol '.'
 
       '#', make_reader ->
         reader.read_special = yes

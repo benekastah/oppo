@@ -7,16 +7,19 @@ symbol = (text, base_symbol) ->
   new Symbol text, base_symbol
 
 get_symbol_text = (sym) ->
-  if sym instanceof Symbol
-    sym.text
+  if (is_symbol sym)
+    c_sym = (compile sym)[0]
+    c_sym
   else if typeof sym is "string"
-    sym
+    get_symbol_text (symbol sym)
   else
-    throw new OppoCompileError "Can't get symbol text from non-symbol", sym
+    throw new OppoCompileError "Can't get symbol text from non-symbol #{sym}", sym
 
+module_splitter = null
 get_module = (sym) ->
+  module_splitter ?= compile_symbol (symbol '::')
   s_sym = get_symbol_text sym
-  a_sym = s_sym.split '::'
+  a_sym = s_sym.split module_splitter
   switch a_sym.length
     when 1
       [s_sym] = a_sym
@@ -27,13 +30,30 @@ get_module = (sym) ->
 
   return [module, (symbol s_sym, sym)]
 
+first_item_matches = (x, sym) ->
+  c_sym = compile_symbol sym
+  if (to_type x) is "array"
+    [fst] = x
+    if is_symbol fst
+      (compile_symbol fst) is c_sym
+    else
+      no
+  else
+    no
 
-class OppoCompileError
+is_symbol = (x) ->
+  x instanceof Symbol or
+  (first_item_matches x, "symbol") or
+  ((to_type x) is "array" and (is_quoted x) and is_symbol x[1])
+
+is_quoted = (x) -> x?.quoted or first_item_matches x, "quote"
+
+class OppoCompileError extends Error
   constructor: (message, @form) ->
     @line_number = @form and @form.line_number
     if @line_number
       message = "at line #{@line_number}: #{message}"
-    @message = message      
+    @message = message
 
 
 class Macro
@@ -41,11 +61,11 @@ class Macro
 
 
 class Context
-  constructor: (@parent_context = Object.prototype) ->
-    @context = clone @parent_context
+  constructor: (@parent_context) ->
+    @context = clone @parent_context?.context ? Object.prototype
 
   var_stmt: ->
-    vars = for own k, v of @context when v not instanceof Context and (type_of v) isnt 'function'
+    vars = for own k, v of @context when v not instanceof Context and (to_type v) isnt 'function'
       compile (symbol k)
     if vars.length
       "var #{vars.join ', '};\n"
@@ -59,6 +79,24 @@ class Context
       core = Module.get 'core'
       result = core.lookup sym
     result
+
+  def: (sym, value) ->
+    s_sym = get_symbol_text sym
+    if not @context[s_sym]?
+      @context[s_sym] = value
+    else
+      throw new OppoCompileError "Can't define previously defined symbol: #{s_sym}", sym
+
+  set: (sym, value) ->
+    s_sym = get_symbol_text sym
+    if @context[s_sym]?
+      @context[s_sym] = value
+    else
+      throw new OppoCompileError "Can't set value of undefined symbol: #{s_sym}", sym
+
+  get: (sym) ->
+    s_sym = get_symbol_text sym
+    @context[s_sym]
 
 
 class Module extends Context
@@ -122,7 +160,7 @@ compile = (parse_tree...) ->
     else if sexp instanceof JavaScriptCode
       sexp.text
     else if sexp instanceof Symbol
-      text_to_js_identifier sexp.text
+      compile_symbol sexp
     else if sexp_type in ["boolean", "number"]
       "#{sexp}"
     else if sexp_type is "string"
@@ -144,16 +182,19 @@ oppo.compile = (parse_tree, module_name = "__anonymous__") ->
   """
   (function () {
   #{var_stmt}
-  return #{c.join ",\n"}
+  return #{c.join ",\n"};
 
   })()
   """
+
+compile_symbol = (sym) ->
+  text_to_js_identifier if (to_type sym) is "string" then sym else sym.text
 
 compile_list = (ls) ->
   [callable] = ls
   call_macro = oppo.context_stack.current_context.lookup callable
   if call_macro not instanceof Macro
-    call_macro = Module.get('core').call
+    call_macro = Module.get('core').get 'call'
   else
     ls.shift()
   if call_macro not instanceof Macro
@@ -186,18 +227,21 @@ lambda = (args, body...) ->
     })
     """
 
-define = (name, value) ->
+define = (name, others...) ->
+  if (to_type name) is "array"
+    [name, args...] = name
+    body = others
+    return define name, [(symbol 'lambda'), args, body...]
+  else
+    [value] = others
+
   [module, name] = get_module name
   if module?
     context = Module.get module, true
   else
-    context = oppo.current_context
+    context = oppo.context_stack.current_context
 
-  s_name = get_symbol_text name
-  if not context[s_name]
-    context[s_name] = value
-  else
-    throw new OppoCompileError "Can't define previously defined symbol: #{s_name}", name
+  context.def name, value
 
   c_name = compile(name)[0]
   c_val = compile(value)[0]
@@ -215,14 +259,9 @@ define_builtin_macro = (name, template_compile) ->
 
 define_builtin_macro "core::defmacro", (name, args, template) ->
   t_name = name.text
-  define_macro 
-    name: t_name
-    argnames: args
-    template: template
+  define_macro t_name, args, template
 
-define_builtin_macro "core::def", (name, value) ->
-  t_name = name.text
-  define {name: t_name, value}
+define_builtin_macro "core::def", define
 
 define_builtin_macro "core::lambda", lambda
 
@@ -231,8 +270,20 @@ define_builtin_macro "core::call", (fname, args...) ->
   c_args = compile args...
   new JavaScriptCode "#{c_fname}(#{c_args.join ', '})"
 
+define_builtin_macro "core::object-get-value", (prop, base) ->
+  c_prop = (compile prop)[0]
+  c_base = (compile base)[0]
+  new JavaScriptCode if is_quoted prop and is_symbol prop
+    "#{c_base}.#{c_prop}"
+  else
+    "#{c_base}[#{c_prop}]"
+
+define_builtin_macro "core::.", (fname, base, args...) ->
+  fname = [(symbol 'quote'), fname]
+  [[(symbol 'object-get-value'), fname, base], args...]
+
 define_builtin_macro "js::eval", (to_eval) ->
-  type = type_of to_eval
+  type = to_type to_eval
   if type is "string"
     new JavaScriptCode to_eval
   else
