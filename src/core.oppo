@@ -1,0 +1,20 @@
+
+;; TODO: ensure that symbol lookup will handle module prefixes properly
+(def map (js::eval "function (fn, ls) {
+  var ret = [];
+  for (var i = 0, len = ls.length; i < len; i++) {
+    var item = ls[i];
+    ret.push(fn[item]);
+  }
+  return ret;
+}"))
+
+(def ->object Object)
+(def ->string String)
+(def ->number Number)
+(def ->boolean Boolean)
+
+(def (str ...strings)
+  (.join (map ->string strings) ""))
+
+(def (list ...ls) ls)

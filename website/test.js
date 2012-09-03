@@ -2,7 +2,7 @@
 (function() {
   var compiled, oppo_code, parse_tree, result;
 
-  oppo_code = "\n(.concat \"asdf \" \"fdsa\")\n";
+  oppo_code = "\n(def (list ...ls) ls)\n\n(list 1 2 3 4)\n";
 
   parse_tree = oppo.read(oppo_code);
 

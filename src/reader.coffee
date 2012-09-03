@@ -22,6 +22,8 @@ oppo.Symbol = class Symbol
   constructor: (@text, base_symbol) ->
     @line_number = base_symbol?.line_number ? reader.line_number
 
+oppo.Splat = class Splat
+
 ###
 READTABLES
 ###
@@ -119,6 +121,8 @@ oppo.ReadTable = class ReadTable
           reader.string_buffer = ""
           undefined
 
+      '...', make_reader -> new Splat()
+
       '.', make_reader -> new Symbol '.'
 
       '#', make_reader ->
@@ -163,7 +167,6 @@ oppo.read = (text) ->
   list = []
   reader.line_number = 1
   reader.lists = [list]
-  current_list = reader.current_list = list
   while text.length
     text = read_token text
   reader.lists = reader.current_list = null

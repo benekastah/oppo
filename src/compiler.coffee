@@ -1,10 +1,12 @@
 
-{JavaScriptCode, JavaScriptComment, Symbol} = oppo
+{JavaScriptCode, JavaScriptComment, Symbol, Splat} = oppo
 {text_to_js_identifier, to_type, clone} = oppo.helpers
 
 symbol = (text, base_symbol) ->
-  return text if text instanceof Symbol
-  new Symbol text, base_symbol
+  if text instanceof Symbol
+    text
+  else
+    new Symbol text, base_symbol
 
 get_symbol_text = (sym) ->
   if (is_symbol sym)
@@ -45,6 +47,8 @@ is_symbol = (x) ->
   x instanceof Symbol or
   (first_item_matches x, "symbol") or
   ((to_type x) is "array" and (is_quoted x) and is_symbol x[1])
+
+is_keyword = (x) -> first_item_matches x, 'keyword'
 
 is_quoted = (x) -> x?.quoted or first_item_matches x, "quote"
 
@@ -153,6 +157,7 @@ compile = (parse_tree...) ->
   compiled = []
   for sexp in parse_tree
     sexp_type = to_type sexp
+    
     result = if not sexp? or sexp instanceof Macro
       "null"
     else if sexp instanceof JavaScriptComment
@@ -181,26 +186,49 @@ oppo.compile = (parse_tree, module_name = "__anonymous__") ->
   var_stmt = module.var_stmt()
   """
   (function () {
-  #{var_stmt}
-  return #{c.join ",\n"};
 
-  })()
+  #{var_stmt}return #{c.join ",\n"};
+
+  })();
   """
 
 compile_symbol = (sym) ->
-  text_to_js_identifier if (to_type sym) is "string" then sym else sym.text
-
-compile_list = (ls) ->
-  [callable] = ls
-  call_macro = oppo.context_stack.current_context.lookup callable
-  if call_macro not instanceof Macro
-    call_macro = Module.get('core').get 'call'
+  sym_text = if (to_type sym) is "string" then sym else sym.text
+  if sym.quoted
+    "new oppo.Symbol(\"#{sym_text}\")"
   else
-    ls.shift()
-  if call_macro not instanceof Macro
-    throw new OppoCompileError "Can't call list: #{ls}", ls
+    text_to_js_identifier sym_text
 
-  compile(call_macro.transform ls...)[0]
+compile_list = (ls, to_compile = yes) ->
+  if ls.quoted
+    c_ls = ((compile [(symbol 'quote') x])[0] for x in ls)
+    "[#{c_ls.join ', '}]"
+  else
+    [callable] = ls
+    callable_is_keyword = is_keyword callable
+    callable_is_quoted = is_quoted callable
+    callable_is_symbol = is_symbol callable
+    callable = (compile_list callable, no) if (to_type callable) is "array" and not (callable_is_keyword or callable_is_quoted)
+
+    if not callable_is_quoted and callable_is_symbol
+      call_macro = oppo.context_stack.current_context.lookup callable
+      if call_macro not instanceof Macro
+        call_macro = Module.get('core').get 'call'
+        ls[0] = callable
+      else
+        ls = ls[1..]
+      if call_macro not instanceof Macro
+        throw new OppoCompileError "Can't call list: #{ls}", ls
+    else if callable_is_keyword or (callable_is_symbol and callable_is_quoted)
+      call_macro = Module.get('core').get 'object-get-value'
+    else
+      call_macro = Module.get('core').get 'call'
+
+    result = call_macro.transform ls...
+    if to_compile
+      (compile result)[0]
+    else
+      result
 
 # Macros. These will take care of virtually all compiling.
 # The only macros that will need to be predefined in javascript are:
@@ -215,6 +243,27 @@ compile_list = (ls) ->
 lambda = (args, body...) ->
   context = oppo.context_stack.push_new()
 
+  splat_args = []
+  normal_args = []
+  found_splat = no
+  for arg in args
+    is_splat = arg instanceof Splat
+    found_splat or= is_splat
+    continue if is_splat
+    if found_splat
+      splat_args.push arg
+    else
+      normal_args.push arg
+
+  if splat_args.length > 1
+    throw new OppoCompileError "Oppo currently does not support having more than one rest argument."
+
+  args = normal_args
+  [splat_arg] = splat_args
+  if splat_arg?
+    splat_arg_val = new JavaScriptCode "Array.prototype.slice.call(arguments, #{args.length})"
+    body = [[(symbol 'def'), splat_arg, splat_arg_val], body...]
+  
   c_args = compile args...
   c_body = compile body...
 
@@ -271,16 +320,27 @@ define_builtin_macro "core::call", (fname, args...) ->
   new JavaScriptCode "#{c_fname}(#{c_args.join ', '})"
 
 define_builtin_macro "core::object-get-value", (prop, base) ->
-  c_prop = (compile prop)[0]
   c_base = (compile base)[0]
-  new JavaScriptCode if is_quoted prop and is_symbol prop
-    "#{c_base}.#{c_prop}"
+  if (is_quoted prop) and (is_symbol prop)
+    s_prop = compile_list prop, no
+    s_prop.quoted = no
+    c_prop = (compile s_prop)[0]
+    js_code = "#{c_base}.#{c_prop}"
   else
-    "#{c_base}[#{c_prop}]"
+    c_prop = (compile prop)[0]
+    js_code = "#{c_base}[#{c_prop}]"
+
+  new JavaScriptCode js_code
 
 define_builtin_macro "core::.", (fname, base, args...) ->
   fname = [(symbol 'quote'), fname]
   [[(symbol 'object-get-value'), fname, base], args...]
+
+define_builtin_macro "core::keyword", (k) -> k
+
+define_builtin_macro "core::quote", (x) ->
+  x?.quoted = true
+  x
 
 define_builtin_macro "js::eval", (to_eval) ->
   type = to_type to_eval
@@ -288,4 +348,3 @@ define_builtin_macro "js::eval", (to_eval) ->
     new JavaScriptCode to_eval
   else
     [(symbol "eval"), (compile to_eval)[0]]
-

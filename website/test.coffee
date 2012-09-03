@@ -1,7 +1,9 @@
 
 oppo_code = """
 
-(.concat "asdf " "fdsa")
+(def (list ...ls) ls)
+
+(list 1 2 3 4)
 
 """
 

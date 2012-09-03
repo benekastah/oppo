@@ -6,7 +6,7 @@ HELPERS / SETUP
 
 
 (function() {
-  var JavaScriptCode, JavaScriptComment, OppoReadError, ReadTable, Symbol, make_reader, r_number, r_symbol, r_whitespace, read_false, read_nil, read_token, read_true, reader, to_type,
+  var JavaScriptCode, JavaScriptComment, OppoReadError, ReadTable, Splat, Symbol, make_reader, r_number, r_symbol, r_whitespace, read_false, read_nil, read_token, read_true, reader, to_type,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
@@ -59,6 +59,14 @@ HELPERS / SETUP
     }
 
     return Symbol;
+
+  })();
+
+  oppo.Splat = Splat = (function() {
+
+    function Splat() {}
+
+    return Splat;
 
   })();
 
@@ -193,6 +201,8 @@ HELPERS / SETUP
           reader.string_buffer = "";
           return void 0;
         }
+      }), '...', make_reader(function() {
+        return new Splat();
       }), '.', make_reader(function() {
         return new Symbol('.');
       }), '#', make_reader(function() {
@@ -237,11 +247,10 @@ HELPERS / SETUP
   };
 
   oppo.read = function(text) {
-    var current_list, list;
+    var list;
     list = [];
     reader.line_number = 1;
     reader.lists = [list];
-    current_list = reader.current_list = list;
     while (text.length) {
       text = read_token(text);
     }
