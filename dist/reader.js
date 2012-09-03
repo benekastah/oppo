@@ -58,6 +58,10 @@ HELPERS / SETUP
       this.line_number = (_ref = base_symbol != null ? base_symbol.line_number : void 0) != null ? _ref : reader.line_number;
     }
 
+    Symbol.prototype.toString = function() {
+      return this.text;
+    };
+
     return Symbol;
 
   })();
@@ -251,6 +255,7 @@ HELPERS / SETUP
     list = [];
     reader.line_number = 1;
     reader.lists = [list];
+    reader.current_list = list;
     while (text.length) {
       text = read_token(text);
     }

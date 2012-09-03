@@ -1,9 +1,21 @@
 
 oppo_code = """
 
-(def (list ...ls) ls)
+(def map (js::eval "function (fn, ls) {
+  var ret = [];
+  for (var i = 0, len = ls.length; i < len; i++) {
+    var item = ls[i];
+    ret.push(fn(item));
+  }
+  return ret;
+}"))
 
-(list 1 2 3 4)
+(def (->string x) (String x))
+
+(def (str ...strings)
+  (.join (map ->string strings) ""))
+
+(str 1 2 3 4 5)
 
 """
 

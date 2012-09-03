@@ -2,25 +2,39 @@
 {JavaScriptCode, JavaScriptComment, Symbol, Splat} = oppo
 {text_to_js_identifier, to_type, clone} = oppo.helpers
 
+Symbol::toString = -> get_symbol_text this
+
 symbol = (text, base_symbol) ->
   if text instanceof Symbol
     text
   else
     new Symbol text, base_symbol
 
-get_symbol_text = (sym) ->
-  if (is_symbol sym)
-    c_sym = (compile sym)[0]
-    c_sym
-  else if typeof sym is "string"
-    get_symbol_text (symbol sym)
+get_symbol = (sym) ->
+  type = to_type sym
+  if (is_symbol sym) and type is "array"
+    if is_quoted sym
+      get_symbol sym[1]
+    else
+      sym[1]
+  else if type is "string"
+    (symbol sym)
+  else if sym instanceof Symbol
+    sym
+  else
+    throw new Error "Can't get symbol from non-symbol.'"
+
+get_symbol_text = (sym, resolve_module = false) ->
+  sym = get_symbol sym
+  if sym instanceof Symbol
+    text_to_js_identifier sym.text
   else
     throw new OppoCompileError "Can't get symbol text from non-symbol #{sym}", sym
 
 module_splitter = null
 get_module = (sym) ->
-  module_splitter ?= compile_symbol (symbol '::')
-  s_sym = get_symbol_text sym
+  module_splitter ?= text_to_js_identifier '::'
+  s_sym = get_symbol_text sym, false
   a_sym = s_sym.split module_splitter
   switch a_sym.length
     when 1
@@ -33,24 +47,27 @@ get_module = (sym) ->
   return [module, (symbol s_sym, sym)]
 
 first_item_matches = (x, sym) ->
-  c_sym = compile_symbol sym
+  c_sym = get_symbol_text sym, yes
   if (to_type x) is "array"
     [fst] = x
     if is_symbol fst
-      (compile_symbol fst) is c_sym
+      c_fst = get_symbol_text fst
+      c_fst is c_sym
     else
       no
   else
     no
 
-is_symbol = (x) ->
+is_symbol = (x, recurse) ->
   x instanceof Symbol or
-  (first_item_matches x, "symbol") or
-  ((to_type x) is "array" and (is_quoted x) and is_symbol x[1])
+  (recurse and (to_type x) is "array" and is_symbol (compile_list x, no), no)
 
 is_keyword = (x) -> first_item_matches x, 'keyword'
 
-is_quoted = (x) -> x?.quoted or first_item_matches x, "quote"
+is_quoted = (x, recurse) ->
+  x?.quoted or
+  (recurse and (to_type x) is "array" and is_quoted (compile_list x, no), no)
+
 
 class OppoCompileError extends Error
   constructor: (message, @form) ->
@@ -77,9 +94,13 @@ class Context
       ""
 
   lookup: (sym) ->
-    s_sym = get_symbol_text sym
+    [module, new_sym] = get_module sym
+    if module?
+      return Module.get(module)?.lookup new_sym
+    
+    s_sym = get_symbol_text new_sym
     result = @context[s_sym]
-    if result is undefined and (this not instanceof Module or @name isnt "core")
+    if not module? and result is undefined and (this not instanceof Module or @name isnt "core")
       core = Module.get 'core'
       result = core.lookup sym
     result
@@ -115,8 +136,11 @@ class Module extends Context
 
   @get: (name, create) ->
     m = @modules[name]
-    if create and not m?
-      m = new Module null, name
+    if not m?
+      if create
+        m = new Module null, name
+      else
+        new OppoCompileError "Can't get undefined module: #{name}"
     m
 
   @set: (name, module) ->
@@ -192,12 +216,21 @@ oppo.compile = (parse_tree, module_name = "__anonymous__") ->
   })();
   """
 
-compile_symbol = (sym) ->
+compile_symbol = (sym, resolve_module = true) ->
   sym_text = if (to_type sym) is "string" then sym else sym.text
   if sym.quoted
     "new oppo.Symbol(\"#{sym_text}\")"
   else
-    text_to_js_identifier sym_text
+    if resolve_module
+      [module, new_sym] = get_module sym
+
+    value = oppo.context_stack?.current_context.lookup sym
+    if value instanceof Macro
+      value
+    else if module?
+      [(symbol "object-get-value"), (symbol module), new_sym]
+    else
+      text_to_js_identifier sym_text
 
 compile_list = (ls, to_compile = yes) ->
   if ls.quoted
@@ -208,23 +241,26 @@ compile_list = (ls, to_compile = yes) ->
     callable_is_keyword = is_keyword callable
     callable_is_quoted = is_quoted callable
     callable_is_symbol = is_symbol callable
-    callable = (compile_list callable, no) if (to_type callable) is "array" and not (callable_is_keyword or callable_is_quoted)
+    if not (callable_is_keyword or callable_is_quoted)
+      if (to_type callable) is "array"
+        c_callable = compile_list callable, no
+      else
+        c_callable = (compile callable)[0]
 
     if not callable_is_quoted and callable_is_symbol
-      call_macro = oppo.context_stack.current_context.lookup callable
-      if call_macro not instanceof Macro
-        call_macro = Module.get('core').get 'call'
+      if c_callable not instanceof Macro
+        c_callable = Module.get('core').get 'call'
         ls[0] = callable
       else
         ls = ls[1..]
-      if call_macro not instanceof Macro
+      if c_callable not instanceof Macro
         throw new OppoCompileError "Can't call list: #{ls}", ls
     else if callable_is_keyword or (callable_is_symbol and callable_is_quoted)
-      call_macro = Module.get('core').get 'object-get-value'
+      c_callable = Module.get('core').get 'object-get-value'
     else
-      call_macro = Module.get('core').get 'call'
+      c_callable = Module.get('core').get 'call'
 
-    result = call_macro.transform ls...
+    result = c_callable.transform ls...
     if to_compile
       (compile result)[0]
     else
@@ -260,6 +296,7 @@ lambda = (args, body...) ->
 
   args = normal_args
   [splat_arg] = splat_args
+  body_len = body.length # Get the body length now before we change it.
   if splat_arg?
     splat_arg_val = new JavaScriptCode "Array.prototype.slice.call(arguments, #{args.length})"
     body = [[(symbol 'def'), splat_arg, splat_arg_val], body...]
@@ -270,9 +307,11 @@ lambda = (args, body...) ->
   oppo.context_stack.pop()
   var_stmt = context.var_stmt()
 
+  return_kywd = if body_len then "return " else ""
+
   new JavaScriptCode """
     (function (#{c_args.join ', '}) {
-      #{var_stmt}return #{c_body.join ',\n'};
+      #{var_stmt}#{return_kywd}#{c_body.join ',\n'};
     })
     """
 
@@ -345,6 +384,8 @@ define_builtin_macro "core::quote", (x) ->
 define_builtin_macro "js::eval", (to_eval) ->
   type = to_type to_eval
   if type is "string"
-    new JavaScriptCode to_eval
+    quotes_escaped = to_eval.replace /"/g, '\\"' # get rid of an annoying emacs coffee-mode bug with this single-quote: '
+    s_to_eval = "\"#{quotes_escaped}\""
+    new JavaScriptCode (eval s_to_eval)
   else
     [(symbol "eval"), (compile to_eval)[0]]

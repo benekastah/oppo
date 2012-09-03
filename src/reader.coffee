@@ -22,6 +22,8 @@ oppo.Symbol = class Symbol
   constructor: (@text, base_symbol) ->
     @line_number = base_symbol?.line_number ? reader.line_number
 
+  toString: -> @text
+
 oppo.Splat = class Splat
 
 ###
@@ -167,6 +169,7 @@ oppo.read = (text) ->
   list = []
   reader.line_number = 1
   reader.lists = [list]
+  reader.current_list = list
   while text.length
     text = read_token text
   reader.lists = reader.current_list = null

@@ -81,6 +81,7 @@
         };
         return text_to_js_identifier = function(text, conversions) {
           var _char_wrapper;
+          text = text.replace(/-/g, '_');
           if ((JS_KEYWORDS.indexOf(text)) >= 0) {
             return wrapper(text);
           }

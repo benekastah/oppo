@@ -111,6 +111,8 @@ root.oppo =
         "#{WRAPPER_PREFIX}#{text}#{WRAPPER_SUFFIX}"
 
       text_to_js_identifier = (text, conversions) ->
+        text = text.replace /-/g, '_'
+        
         if (JS_KEYWORDS.indexOf text) >= 0
           return wrapper text
 
