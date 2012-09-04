@@ -80,19 +80,22 @@ HELPERS / SETUP
 
 
   make_reader = function(opts, f) {
-    var comment_end, reader_fn, string_end, _ref, _ref1;
+    var comment_special, reader_fn, string_special, _ref, _ref1;
     if (arguments.length === 1) {
       _ref = [opts, f], f = _ref[0], opts = _ref[1];
     }
-    _ref1 = opts != null ? opts : {}, comment_end = _ref1.comment_end, string_end = _ref1.string_end;
+    _ref1 = opts != null ? opts : {}, comment_special = _ref1.comment_special, string_special = _ref1.string_special;
     reader_fn = function(input) {
       if (reader.read_special) {
         reader.read_special = false;
       }
+      if (reader.escape_next_char) {
+        reader.escape_next_char = false;
+      }
       return f.apply(null, arguments);
     };
-    reader_fn.comment_end = comment_end;
-    reader_fn.string_end = string_end;
+    reader_fn.comment_special = comment_special;
+    reader_fn.string_special = string_special;
     return reader_fn;
   };
 
@@ -125,7 +128,7 @@ HELPERS / SETUP
 
     ReadTable.prototype.get_match = function(m, f, text) {
       var match, _ref;
-      if ((!(reader.string_buffer != null) || f.string_end) && (!(reader.comment_buffer != null) || f.comment_end)) {
+      if (!reader.escape_next_char && (!(reader.string_buffer != null) || f.string_special) && (!(reader.comment_buffer != null) || f.comment_special)) {
         if ((to_type(m)) === "regexp") {
           return match = (_ref = text.match(m)) != null ? _ref[0] : void 0;
         } else if (m === (text.substr(0, m.length))) {
@@ -145,12 +148,17 @@ HELPERS / SETUP
         if (match = this.get_match(k, f, text)) {
           result = f(match);
           if (result !== void 0) {
+            if (reader.wrap_next != null) {
+              result = [new Symbol(reader.wrap_next), result];
+              reader.wrap_next = null;
+            }
             reader.current_list.push(result);
           }
           return match.length + prevLength;
         }
       }
       _char = text.charAt(0);
+      reader.escape_next_char = false;
       text_rest = text.substr(1);
       newPrevLength = prevLength + 1;
       if (reader.string_buffer != null) {
@@ -166,11 +174,13 @@ HELPERS / SETUP
       "default": new ReadTable(';', make_reader(function() {
         reader.comment_buffer = '';
         return void 0;
-      }), '\\', make_reader(function() {
+      }), '\\', make_reader({
+        string_special: true
+      }, function() {
         reader.escape_next_char = true;
         return void 0;
       }), '\n', make_reader({
-        comment_end: true
+        comment_special: true
       }, function(input) {
         var comment;
         reader.line_number += 1;
@@ -182,19 +192,36 @@ HELPERS / SETUP
           return void 0;
         }
       }), '(', make_reader(function() {
-        var list;
+        var list, _ref;
         list = [];
+        if (reader.wrap_next != null) {
+          _ref = [reader.wrap_next], list.wrap = _ref[0], reader.wrap_next = _ref[1];
+        }
         reader.lists.push(list);
         reader.current_list = list;
         list.starting_line_number = reader.line_number;
         return void 0;
       }), ')', make_reader(function() {
-        var list;
+        var list, _ref;
         list = reader.lists.pop();
+        if (list.wrap != null) {
+          _ref = [list.wrap], reader.wrap_next = _ref[0], list.wrap = _ref[1];
+        }
         reader.current_list = reader.lists[reader.lists.length - 1];
         return list;
+      }), "'", make_reader(function() {
+        reader.wrap_next = 'quote';
+        return void 0;
+      }), '`', make_reader(function() {
+        reader.wrap_next = 'quasiquote';
+        return void 0;
+      }), ',@', make_reader(function() {
+        return reader.wrap_next = 'unquote-splicing';
+      }), ',', make_reader(function() {
+        reader.wrap_next = 'unquote';
+        return void 0;
       }), '"', make_reader({
-        string_end: true
+        string_special: true
       }, function() {
         var string;
         if (reader.string_buffer != null) {

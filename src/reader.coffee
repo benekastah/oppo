@@ -32,15 +32,17 @@ READTABLES
 make_reader = (opts, f) ->
   if arguments.length is 1
     [f, opts] = [opts, f]
-  {comment_end, string_end} = opts ? {}
+  {comment_special, string_special} = opts ? {}
 
   reader_fn = (input) ->
     if reader.read_special
       reader.read_special = no
+    if reader.escape_next_char
+      reader.escape_next_char = no
     f arguments...
 
-  reader_fn.comment_end = comment_end
-  reader_fn.string_end = string_end
+  reader_fn.comment_special = comment_special
+  reader_fn.string_special = string_special
 
   reader_fn
 
@@ -58,7 +60,7 @@ oppo.ReadTable = class ReadTable
       item.push arg
 
   get_match: (m, f, text) ->
-    if (not reader.string_buffer? or f.string_end) and (not reader.comment_buffer? or f.comment_end)
+    if not reader.escape_next_char and (not reader.string_buffer? or f.string_special) and (not reader.comment_buffer? or f.comment_special)
       if (to_type m) is "regexp"
         match = (text.match m)?[0]
       else if m is (text.substr 0, m.length)
@@ -69,11 +71,15 @@ oppo.ReadTable = class ReadTable
       if match = @get_match k, f, text
         result = f match
         if result isnt undefined
+          if reader.wrap_next?
+            result = [(new Symbol reader.wrap_next), result]
+            reader.wrap_next = null
           reader.current_list.push result
         return match.length + prevLength
 
     # Handle special buffers where syntax must be ignored.
     _char = text.charAt 0
+    reader.escape_next_char = no
     text_rest = text.substr 1
     newPrevLength = prevLength + 1
     if reader.string_buffer?
@@ -89,11 +95,11 @@ oppo.ReadTable = class ReadTable
         reader.comment_buffer = ''
         undefined
 
-      '\\', make_reader ->
+      '\\', make_reader {string_special: yes}, ->
         reader.escape_next_char = true
         undefined
 
-      '\n', make_reader {comment_end: yes}, (input) ->
+      '\n', make_reader {comment_special: yes}, (input) ->
         reader.line_number += 1
         if reader.comment_buffer?
           comment = "//#{reader.comment_buffer}#{input}"
@@ -104,6 +110,8 @@ oppo.ReadTable = class ReadTable
 
       '(', make_reader ->
         list = []
+        if reader.wrap_next?
+          [list.wrap, reader.wrap_next] = [reader.wrap_next]
         reader.lists.push list
         reader.current_list = list
         list.starting_line_number = reader.line_number
@@ -111,10 +119,27 @@ oppo.ReadTable = class ReadTable
 
       ')', make_reader ->
         list = reader.lists.pop()
+        if list.wrap?
+          [reader.wrap_next, list.wrap] = [list.wrap]
         reader.current_list = reader.lists[reader.lists.length - 1]
         list
 
-      '"', make_reader {string_end: yes}, ->
+      "'", make_reader ->
+        reader.wrap_next = 'quote'
+        undefined
+
+      '`', make_reader ->
+        reader.wrap_next = 'quasiquote'
+        undefined
+
+      ',@', make_reader ->
+        reader.wrap_next = 'unquote-splicing'
+
+      ',', make_reader ->
+        reader.wrap_next = 'unquote'
+        undefined
+
+      '"', make_reader {string_special: yes}, ->
         if reader.string_buffer?
           string = reader.string_buffer.replace(/\n/g, "\\n")
           reader.string_buffer = null

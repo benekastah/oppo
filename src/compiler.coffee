@@ -22,7 +22,7 @@ get_symbol = (sym) ->
   else if sym instanceof Symbol
     sym
   else
-    throw new Error "Can't get symbol from non-symbol.'"
+    throw new Error "Can't get symbol from non-symbol #{sym}"
 
 get_symbol_text = (sym, resolve_module = false) ->
   sym = get_symbol sym
@@ -30,6 +30,17 @@ get_symbol_text = (sym, resolve_module = false) ->
     text_to_js_identifier sym.text
   else
     throw new OppoCompileError "Can't get symbol text from non-symbol #{sym}", sym
+
+gensym = null
+do ->
+  gensym_id_map = {}
+  gensym = (name = "gen") ->
+    id = gensym_id_map[name]
+    if not id?
+      id = gensym_id_map[name] = 0
+    ret = symbol "#{name}_#{id}__"
+    gensym_id_map[name] += 1
+    ret
 
 module_splitter = null
 get_module = (sym) ->
@@ -58,15 +69,27 @@ first_item_matches = (x, sym) ->
   else
     no
 
-is_symbol = (x, recurse) ->
+is_symbol = (x, recurse = yes) ->
   x instanceof Symbol or
   (recurse and (to_type x) is "array" and is_symbol (compile_list x, no), no)
 
 is_keyword = (x) -> first_item_matches x, 'keyword'
 
-is_quoted = (x, recurse) ->
+is_quoted = (x, recurse = yes) ->
   x?.quoted or
   (recurse and (to_type x) is "array" and is_quoted (compile_list x, no), no)
+
+is_quasiquoted = (x, recurse = yes) ->
+  x?.quasiquoted or
+  (recurse and (to_type x) is "array" and is_quasiquoted (compile_list x, no), no)
+
+is_unquoted = (x, recurse = yes) ->
+  x?.unquoted or
+  (recurse and (to_type x) is "array" and is_unquoted (compile_list x, no), no)
+
+is_unquote_spliced = (x, recurse = yes) ->
+  x?.unquote_spliced or
+  (recurse and (to_type x) is "array" and is_unquote_spliced (compile_list x, no), no)
 
 
 class OppoCompileError extends Error
@@ -78,8 +101,12 @@ class OppoCompileError extends Error
 
 
 class Macro
-  constructor: (@transform) ->
-
+  constructor: (@name, argnames, template) ->
+    if (to_type argnames) is "function"
+      @transform = argnames
+    else
+      @transform = eval (compile [(symbol "lambda"), argnames, template...])[0]
+      
 
 class Context
   constructor: (@parent_context) ->
@@ -124,6 +151,7 @@ class Context
     @context[s_sym]
 
 
+anonymous_module_name = "__anonymous__"
 class Module extends Context
   constructor: (parent_context, @name) ->
     Module.set @name, this
@@ -144,7 +172,7 @@ class Module extends Context
     m
 
   @set: (name, module) ->
-    if @modules[name]?
+    if @modules[name]? and name isnt anonymous_module_name
       throw new OppoCompileError "Can't make same module twice: #{name}"
     else
       @modules[name] = module
@@ -201,7 +229,7 @@ compile = (parse_tree...) ->
       compiled.push result
   compiled
 
-oppo.compile = (parse_tree, module_name = "__anonymous__") ->
+oppo.compile = (parse_tree, module_name = anonymous_module_name) ->
   oppo.context_stack ?= new ContextStack()
   module = oppo.context_stack.push_new_module module_name
   c = compile parse_tree...
@@ -234,8 +262,36 @@ compile_symbol = (sym, resolve_module = true) ->
 
 compile_list = (ls, to_compile = yes) ->
   if ls.quoted
-    c_ls = ((compile [(symbol 'quote') x])[0] for x in ls)
-    "[#{c_ls.join ', '}]"
+    quasiquoted = ls.quasiquoted
+    quote_symbol = (symbol if quasiquoted then 'quasiquote' else 'quote')
+
+    c_ls = []
+    lists = [c_ls]
+    for x in ls
+      if not quasiquoted or not is_unquoted x
+        c_ls.push (compile [quote_symbol, x])[0]
+      else
+        compiled_item = (compile x)[0]
+        if is_unquote_spliced x
+          c_ls = []
+          lists.push compiled_item, c_ls
+        else        
+          c_ls.push compiled_item
+
+    concat_args = for ls in lists
+      if (to_type ls) is "array"
+        "[#{ls.join ', '}]"
+      else
+        ls
+
+    if concat_args.length > 1
+      "#{concat_args[0]}.concat(#{concat_args[1..].join ', '})"
+    else
+      concat_args[0]
+      
+  else if ls.quasiquoted
+    c_ls = ((compile [(symbol 'quasiquote'), x])[0] for x in ls when not is_unquoted x)
+    ""
   else
     [callable] = ls
     callable_is_keyword = is_keyword callable
@@ -274,6 +330,7 @@ compile_list = (ls, to_compile = yes) ->
 # - js-eval
 # - lambda
 # - call
+
 # - any reader-level macros
 
 lambda = (args, body...) ->
@@ -336,18 +393,16 @@ define = (name, others...) ->
   new JavaScriptCode "#{c_name} = #{c_val}"
 
 define_macro = (name, argnames, template) ->
-  template_compile = if (to_type template) is "function" then template
-  value = new Macro template_compile ? ->
-    compile([(lambda argnames, template...), args])[0]
+  value = new Macro name, argnames, template
   define name, value
   undefined
 
 define_builtin_macro = (name, template_compile) ->
-  define_macro (symbol name), null, template_compile
+  define_macro (symbol name), template_compile
 
-define_builtin_macro "core::defmacro", (name, args, template) ->
-  t_name = name.text
-  define_macro t_name, args, template
+define_builtin_macro "core::defmacro", (args, template...) ->
+  [name, argnames...] = args
+  define_macro name, argnames, template
 
 define_builtin_macro "core::def", define
 
@@ -378,8 +433,20 @@ define_builtin_macro "core::.", (fname, base, args...) ->
 define_builtin_macro "core::keyword", (k) -> k
 
 define_builtin_macro "core::quote", (x) ->
-  x?.quoted = true
+  x?.quoted = yes
   x
+
+define_builtin_macro "core::quasiquote", (x) ->
+  x?.quasiquoted = yes
+  [(symbol "quote"), x]
+
+define_builtin_macro "core::unquote", (x) ->
+  x?.unquoted = yes
+  x
+
+define_builtin_macro "core::unquote-splicing", (x) ->
+  x?.unquote_spliced = yes
+  [(symbol "unquote"), x]
 
 define_builtin_macro "js::eval", (to_eval) ->
   type = to_type to_eval

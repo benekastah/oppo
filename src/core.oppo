@@ -1,4 +1,6 @@
 
+(def typeof ((quote to-type) oppo))
+
 (def map (js::eval "function (fn, ls) {
   var ret = [];
   for (var i = 0, len = ls.length; i < len; i++) {
@@ -16,6 +18,17 @@
   return ret;
 }"))
 
+(def filter (js::eval "function (fn, ls) {
+  var ret, i, len, item;
+  ret = [];
+  for (i = 0, len = ls.length; i < len; i++) {
+    item = ls[i];
+    if (fn(item))
+      ret.push(item)
+  }
+  return ret;
+}"))
+
 (def (->object x) (Object x))
 (def (->string x) (String x))
 (def (->number x) (Number x))
@@ -24,3 +37,17 @@
 (def (str ...strings) (.join strings ""))
 
 (def (list ...ls) ls)
+(def object (js::eval "function () {
+  var ret, i, len, key;
+  ret = {};
+  len = arguments.length;
+  if (len % 2 !== 0)
+    throw new Error('Object must have an even number of arguments (every key must have a value)');
+  for (i = 0; i < len; i++) {
+    if (i % 2 === 0)
+      key = arguments[i];
+    else
+      ret[key] = arguments[i];
+  }
+  return ret;
+}"))
