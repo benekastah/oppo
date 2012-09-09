@@ -69,27 +69,27 @@ first_item_matches = (x, sym) ->
   else
     no
 
-is_symbol = (x, recurse = yes) ->
+is_symbol = (x, recurse = 1) ->
   x instanceof Symbol or
-  (recurse and (to_type x) is "array" and is_symbol (compile_list x, no), no)
+  (recurse and (to_type x) is "array" and is_symbol (compile_list x, no), recurse - 1)
 
 is_keyword = (x) -> first_item_matches x, 'keyword'
 
-is_quoted = (x, recurse = yes) ->
+is_quoted = (x, recurse = 2) ->
   x?.quoted or
-  (recurse and (to_type x) is "array" and is_quoted (compile_list x, no), no)
+  (recurse and (to_type x) is "array" and is_quoted (compile_list x, no), recurse - 1)
 
-is_quasiquoted = (x, recurse = yes) ->
+is_quasiquoted = (x, recurse = 2) ->
   x?.quasiquoted or
-  (recurse and (to_type x) is "array" and is_quasiquoted (compile_list x, no), no)
+  (recurse and (to_type x) is "array" and is_quasiquoted (compile_list x, no), recurse - 1)
 
-is_unquoted = (x, recurse = yes) ->
+is_unquoted = (x, recurse = 2) ->
   x?.unquoted or
-  (recurse and (to_type x) is "array" and is_unquoted (compile_list x, no), no)
+  (recurse and (to_type x) is "array" and is_unquoted (compile_list x, no), recurse - 1)
 
-is_unquote_spliced = (x, recurse = yes) ->
+is_unquote_spliced = (x, recurse = 2) ->
   x?.unquote_spliced or
-  (recurse and (to_type x) is "array" and is_unquote_spliced (compile_list x, no), no)
+  (recurse and (to_type x) is "array" and is_unquote_spliced (compile_list x, no), recurse - 1)
 
 
 class OppoCompileError extends Error
@@ -113,7 +113,7 @@ class Context
     @context = clone @parent_context?.context ? Object.prototype
 
   var_stmt: ->
-    vars = for own k, v of @context when v not instanceof Context and (to_type v) isnt 'function'
+    vars = for own k, v of @context when v not instanceof Context and v not instanceof Macro
       compile (symbol k)
     if vars.length
       "var #{vars.join ', '};\n"
@@ -210,7 +210,8 @@ compile = (parse_tree...) ->
   for sexp in parse_tree
     sexp_type = to_type sexp
     
-    result = if not sexp? or sexp instanceof Macro
+    result = if sexp_type is "undefined" or sexp instanceof Macro
+    else if sexp_type is "null"
       "null"
     else if sexp instanceof JavaScriptComment
       undefined
@@ -260,38 +261,49 @@ compile_symbol = (sym, resolve_module = true) ->
     else
       text_to_js_identifier sym_text
 
-compile_list = (ls, to_compile = yes) ->
-  if ls.quoted
-    quasiquoted = ls.quasiquoted
-    quote_symbol = (symbol if quasiquoted then 'quasiquote' else 'quote')
-
-    c_ls = []
-    lists = [c_ls]
-    for x in ls
-      if not quasiquoted or not is_unquoted x
-        c_ls.push (compile [quote_symbol, x])[0]
-      else
-        compiled_item = (compile x)[0]
-        if is_unquote_spliced x
-          c_ls = []
-          lists.push compiled_item, c_ls
-        else        
-          c_ls.push compiled_item
-
-    concat_args = for ls in lists
-      if (to_type ls) is "array"
-        "[#{ls.join ', '}]"
-      else
-        ls
-
-    if concat_args.length > 1
-      "#{concat_args[0]}.concat(#{concat_args[1..].join ', '})"
+compile_quasiquoted_list = (a) ->
+  current_list = []
+  lists = [current_list]
+  compile_quoted = (x) -> (compile [(symbol 'quasiquote'), x])[0]
+  for item in a
+    if is_unquote_spliced item
+      current_list = []
+      lists.push (compile item)[0], current_list
+    else if (to_type item) is "array"
+      resolved = compile_quasiquoted_list item
+      current_list.push resolved
     else
-      concat_args[0]
+      current_list.push compile_quoted item
       
-  else if ls.quasiquoted
-    c_ls = ((compile [(symbol 'quasiquote'), x])[0] for x in ls when not is_unquoted x)
-    ""
+  lists_len = lists.length
+  last_list = lists[lists_len - 1]
+  if lists_len > 1 and not last_list.length
+    lists.pop()
+
+  concat_args = for ls in lists
+    if (to_type ls) is "array"
+      "[#{ls.join ', '}]"
+    else
+      ls
+
+  first_arg = concat_args[0]
+  if concat_args.length > 1
+    "#{first_arg}.concat(#{concat_args[1..].join ', '})"
+  else
+    first_arg
+
+compile_list = (ls, to_compile = yes) ->
+  if ls.quasiquoted
+    compile_quasiquoted_list ls
+    
+  else if ls.quoted and not ls.unquoted
+    quote_symbol = symbol 'quote'
+    if not to_compile
+      return ls
+
+    c_ls = ((compile [quote_symbol, x])[0] for x in ls)
+    "[#{c_ls.join ', '}]"
+    
   else
     [callable] = ls
     callable_is_keyword = is_keyword callable
@@ -311,7 +323,7 @@ compile_list = (ls, to_compile = yes) ->
         ls = ls[1..]
       if c_callable not instanceof Macro
         throw new OppoCompileError "Can't call list: #{ls}", ls
-    else if callable_is_keyword or (callable_is_symbol and callable_is_quoted)
+    else if ls.length > 1 and (callable_is_keyword or (callable_is_symbol and callable_is_quoted))
       c_callable = Module.get('core').get 'object-get-value'
     else
       c_callable = Module.get('core').get 'call'
@@ -319,6 +331,8 @@ compile_list = (ls, to_compile = yes) ->
     result = c_callable.transform ls...
     if to_compile
       (compile result)[0]
+    else if (to_type result) is "array"
+      compile_list result, to_compile
     else
       result
 
@@ -433,15 +447,19 @@ define_builtin_macro "core::.", (fname, base, args...) ->
 define_builtin_macro "core::keyword", (k) -> k
 
 define_builtin_macro "core::quote", (x) ->
-  x?.quoted = yes
+  x?.quoted = yes unless x.unquoted
   x
-
+  
 define_builtin_macro "core::quasiquote", (x) ->
-  x?.quasiquoted = yes
+  #if (to_type x) is "array"
+  #  x = resolve_unquotes x
+  x?.quasiquoted = yes unless x.unquoted
   [(symbol "quote"), x]
 
 define_builtin_macro "core::unquote", (x) ->
-  x?.unquoted = yes
+  if x?
+    x.unquoted = yes
+    x.quoted = x.quasiquoted = no
   x
 
 define_builtin_macro "core::unquote-splicing", (x) ->

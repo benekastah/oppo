@@ -1,3 +1,3 @@
 #!/bin/bash
 
-coffee -jo dist -cw src
+coffee -j dist/oppo.js -cw src/core src/reader src/compiler

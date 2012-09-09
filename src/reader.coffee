@@ -134,6 +134,7 @@ oppo.ReadTable = class ReadTable
 
       ',@', make_reader ->
         reader.wrap_next = 'unquote-splicing'
+        undefined
 
       ',', make_reader ->
         reader.wrap_next = 'unquote'

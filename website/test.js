@@ -2,7 +2,7 @@
 (function() {
   var compiled, oppo_code, parse_tree, result;
 
-  oppo_code = "\n(defmacro (puts ...stuff)\n  `(.log console ,@stuff))\n\n(puts 'asdf)\n";
+  oppo_code = "\n(defmacro (get o p)\n  `((quote ,p) ,o))\n\n(get window alert)\n";
 
   parse_tree = oppo.read(oppo_code);
 

@@ -1,10 +1,10 @@
 
 oppo_code = """
 
-(defmacro (puts ...stuff)
-  `(.log console ,@stuff))
+(defmacro (get o p)
+  `((quote ,p) ,o))
 
-(puts 'asdf)
+(get window alert)
 
 """
 
