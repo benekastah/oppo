@@ -112,6 +112,7 @@ class Context
   constructor: (@parent_context) ->
     @context = clone @parent_context?.context ? Object.prototype
 
+
   var_stmt: ->
     vars = for own k, v of @context when v not instanceof Context and v not instanceof Macro
       compile (symbol k)
@@ -120,17 +121,11 @@ class Context
     else
       ""
 
+
   lookup: (sym) ->
-    [module, new_sym] = get_module sym
-    if module?
-      return Module.get(module)?.lookup new_sym
-    
-    s_sym = get_symbol_text new_sym
+    s_sym = get_symbol_text sym
     result = @context[s_sym]
-    if not module? and result is undefined and (this not instanceof Module or @name isnt "core")
-      core = Module.get 'core'
-      result = core.lookup sym
-    result
+    
 
   def: (sym, value) ->
     s_sym = get_symbol_text sym
@@ -139,12 +134,14 @@ class Context
     else
       throw new OppoCompileError "Can't define previously defined symbol: #{s_sym}", sym
 
+
   set: (sym, value) ->
     s_sym = get_symbol_text sym
     if @context[s_sym]?
       @context[s_sym] = value
     else
       throw new OppoCompileError "Can't set value of undefined symbol: #{s_sym}", sym
+
 
   get: (sym) ->
     s_sym = get_symbol_text sym
@@ -153,23 +150,43 @@ class Context
 
 anonymous_module_name = "__anonymous__"
 class Module extends Context
+  shortcut_name: "__module__"
+
   constructor: (parent_context, @name) ->
+    @full_name = "oppo.modules[\"#{@name}\"]"
     Module.set @name, this
     super parent_context
     glob = oppo.context_stack?.global_context
     if glob?[@name]?
       glob[@name] = this
 
+
+  var_stmt: -> ""
+
+  compile: (inner) ->
+    var_stmt = @var_stmt()
+    """
+    (function (#{@shortcut_name}) {
+
+    #{var_stmt}#{inner};
+
+    })(#{@full_name} || (#{@full_name} = {}));
+    """
+
+
+  toString: -> @name
   @modules = {}
 
-  @get: (name, create) ->
+
+  @get: (name, create, strict = yes) ->
     m = @modules[name]
     if not m?
       if create
         m = new Module null, name
-      else
-        new OppoCompileError "Can't get undefined module: #{name}"
+      else if strict
+        throw new OppoCompileError "Can't get undefined module: #{name}"
     m
+
 
   @set: (name, module) ->
     if @modules[name]? and name isnt anonymous_module_name
@@ -187,23 +204,50 @@ class ContextStack
     @stack = [@global_context]
     @current_context = @global_context
 
+
+  lookup: (sym) ->
+    [module, new_sym] = get_module sym
+    new_sym ?= sym
+    if module?
+      module = Module.get(module, null, no)
+      result = module?.lookup new_sym
+      return [result, module, new_sym]
+
+    index = @stack.length
+    while index--
+      c = @stack[index]
+      result = c.lookup new_sym
+      return [result, c, new_sym] if result isnt undefined
+
+    core = Module.get 'core', null, no
+    result = core?.lookup new_sym
+    if result isnt undefined
+      [result, core, new_sym]
+    else
+      []
+
+
   push: (c) ->
     @current_context = c
     @stack.push c
     c
 
+
   push_new: ->
     c = new Context @current_context
     @push c
+
 
   push_new_module: (name) ->
     m = new Module @current_context, name
     @push m
 
+
   pop: ->
     c = @stack.pop()
     @current_context = @stack[@stack.length - 1]
     c
+
 
 compile = (parse_tree...) ->
   compiled = []
@@ -232,32 +276,38 @@ compile = (parse_tree...) ->
 
 oppo.compile = (parse_tree, module_name = anonymous_module_name) ->
   oppo.context_stack ?= new ContextStack()
-  module = oppo.context_stack.push_new_module module_name
+  
+  module = Module.get module_name, null, no
+  if not module?
+    module = oppo.context_stack.push_new_module module_name  
+  oppo.current_module = module
+  
   c = compile parse_tree...
-  oppo.context_stack.pop()
+  module.compile "return #{c.join ",\n"}"
 
-  var_stmt = module.var_stmt()
-  """
-  (function () {
-
-  #{var_stmt}return #{c.join ",\n"};
-
-  })();
-  """
+oppo.eval = ->
+  js_code = oppo.compile arguments...
+  eval js_code
 
 compile_symbol = (sym, resolve_module = true) ->
   sym_text = if (to_type sym) is "string" then sym else sym.text
   if sym.quoted
     "new oppo.Symbol(\"#{sym_text}\")"
   else
-    if resolve_module
-      [module, new_sym] = get_module sym
-
-    value = oppo.context_stack?.current_context.lookup sym
+    [value, context, new_sym] = (oppo.context_stack?.lookup sym) ? []
+    if resolve_module and new_sym?
+      sym_text = new_sym.text
+    
     if value instanceof Macro
       value
-    else if module?
-      [(symbol "object-get-value"), (symbol module), new_sym]
+    else if resolve_module and context instanceof Module
+      module = context
+      if module is oppo.current_module
+        module_name = module.shortcut_name
+      else
+        module_name = module.full_name
+      s_sym = compile_symbol new_sym, false
+      "#{module_name}.#{s_sym}"
     else
       text_to_js_identifier sym_text
 
@@ -317,16 +367,16 @@ compile_list = (ls, to_compile = yes) ->
 
     if not callable_is_quoted and callable_is_symbol
       if c_callable not instanceof Macro
-        c_callable = Module.get('core').get 'call'
+        c_callable = Module.get('core', null, no)?.get 'call'
         ls[0] = callable
       else
         ls = ls[1..]
       if c_callable not instanceof Macro
         throw new OppoCompileError "Can't call list: #{ls}", ls
     else if ls.length > 1 and (callable_is_keyword or (callable_is_symbol and callable_is_quoted))
-      c_callable = Module.get('core').get 'object-get-value'
+      c_callable = Module.get('core', null, no)?.get 'object-get-value'
     else
-      c_callable = Module.get('core').get 'call'
+      c_callable = Module.get('core', null, no)?.get 'call'
 
     result = c_callable.transform ls...
     if to_compile
@@ -394,6 +444,7 @@ define = (name, others...) ->
   else
     [value] = others
 
+  full_name = name
   [module, name] = get_module name
   if module?
     context = Module.get module, true
@@ -402,7 +453,7 @@ define = (name, others...) ->
 
   context.def name, value
 
-  c_name = compile(name)[0]
+  c_name = compile(full_name)[0]
   c_val = compile(value)[0]
   new JavaScriptCode "#{c_name} = #{c_val}"
 

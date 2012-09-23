@@ -1,13 +1,12 @@
 
-oppo_code = """
+compile_code = (code) ->
+  parse_tree = oppo.read code
+  compiled = oppo.compile parse_tree
+  result = eval compiled
 
-(defmacro (get o p)
-  `((quote ,p) ,o))
 
-(get window alert)
+result = compile_code """
+
+`'(a b c)
 
 """
-
-parse_tree = oppo.read oppo_code
-compiled = oppo.compile parse_tree
-result = eval compiled

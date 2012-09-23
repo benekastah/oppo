@@ -124,3 +124,7 @@ class OppoHelpers
   
 root.oppo = 
   helpers: new OppoHelpers()
+  modules: {}
+
+if module?.exports?
+  module.exports = oppo
