@@ -105,17 +105,17 @@ class Macro
     if (to_type argnames) is "function"
       @transform = argnames
     else
-      @transform = eval (compile [(symbol "lambda"), argnames, template...])[0]
+      @transform = eval compile_item [(symbol "lambda"), argnames, template...]
       
 
 class Context
   constructor: (@parent_context) ->
-    @context = clone @parent_context?.context ? Object.prototype
+    @context = {}
 
 
   var_stmt: ->
     vars = for own k, v of @context when v not instanceof Context and v not instanceof Macro
-      compile (symbol k)
+      compile_item (symbol k)
     if vars.length
       "var #{vars.join ', '};\n"
     else
@@ -252,27 +252,29 @@ class ContextStack
 compile = (parse_tree...) ->
   compiled = []
   for sexp in parse_tree
-    sexp_type = to_type sexp
-    
-    result = if sexp_type is "undefined" or sexp instanceof Macro
-    else if sexp_type is "null"
-      "null"
-    else if sexp instanceof JavaScriptComment
-      undefined
-    else if sexp instanceof JavaScriptCode
-      sexp.text
-    else if sexp instanceof Symbol
-      compile_symbol sexp
-    else if sexp_type in ["boolean", "number"]
-      "#{sexp}"
-    else if sexp_type is "string"
-      "\"#{sexp}\""
-    else if sexp_type is "array"
-      compile_list sexp
-
+    result = compile_item sexp
     if result isnt undefined
       compiled.push result
   compiled
+
+compile_item = (sexp) ->
+  sexp_type = to_type sexp
+    
+  if sexp_type is "undefined" or sexp instanceof Macro
+  else if sexp_type is "null"
+    "null"
+  else if sexp instanceof JavaScriptComment
+    undefined
+  else if sexp instanceof JavaScriptCode
+    sexp.text
+  else if sexp instanceof Symbol
+    compile_symbol sexp
+  else if sexp_type in ["boolean", "number"]
+    "#{sexp}"
+  else if sexp_type is "string"
+    "\"#{sexp}\""
+  else if sexp_type is "array"
+    compile_list sexp
 
 oppo.compile = (parse_tree, module_name = anonymous_module_name) ->
   oppo.context_stack ?= new ContextStack()
@@ -314,11 +316,11 @@ compile_symbol = (sym, resolve_module = true) ->
 compile_quasiquoted_list = (a) ->
   current_list = []
   lists = [current_list]
-  compile_quoted = (x) -> (compile [(symbol 'quasiquote'), x])[0]
+  compile_quoted = (x) -> compile_item [(symbol 'quasiquote'), x]
   for item in a
     if is_unquote_spliced item
       current_list = []
-      lists.push (compile item)[0], current_list
+      lists.push compile_item(item), current_list
     else if (to_type item) is "array"
       resolved = compile_quasiquoted_list item
       current_list.push resolved
@@ -343,6 +345,7 @@ compile_quasiquoted_list = (a) ->
     first_arg
 
 compile_list = (ls, to_compile = yes) ->
+  _ls = ls
   if ls.quasiquoted
     compile_quasiquoted_list ls
     
@@ -351,7 +354,7 @@ compile_list = (ls, to_compile = yes) ->
     if not to_compile
       return ls
 
-    c_ls = ((compile [quote_symbol, x])[0] for x in ls)
+    c_ls = (compile_item [quote_symbol, x] for x in ls)
     "[#{c_ls.join ', '}]"
     
   else
@@ -363,7 +366,7 @@ compile_list = (ls, to_compile = yes) ->
       if (to_type callable) is "array"
         c_callable = compile_list callable, no
       else
-        c_callable = (compile callable)[0]
+        c_callable = compile_item callable
 
     if not callable_is_quoted and callable_is_symbol
       if c_callable not instanceof Macro
@@ -378,9 +381,9 @@ compile_list = (ls, to_compile = yes) ->
     else
       c_callable = Module.get('core', null, no)?.get 'call'
 
-    result = c_callable.transform ls...
+    result = c_callable.transform.apply _ls, ls
     if to_compile
-      (compile result)[0]
+      compile_item result
     else if (to_type result) is "array"
       compile_list result, to_compile
     else
@@ -430,17 +433,28 @@ lambda = (args, body...) ->
 
   return_kywd = if body_len then "return " else ""
 
+  if @function_name?
+    fn_name = get_symbol_text @function_name
+    oparen = ""
+    cparen = ""
+  else
+    fn_name = ''
+    oparen = "("
+    cparen = ")"
+    
   new JavaScriptCode """
-    (function (#{c_args.join ', '}) {
+    #{oparen}function #{fn_name}(#{c_args.join ', '}) {
       #{var_stmt}#{return_kywd}#{c_body.join ',\n'};
-    })
+    }#{cparen}
     """
 
 define = (name, others...) ->
   if (to_type name) is "array"
     [name, args...] = name
     body = others
-    return define name, [(symbol 'lambda'), args, body...]
+    val = [(symbol 'lambda'), args, body...]
+    val.function_name = name
+    return define name, val
   else
     [value] = others
 
@@ -453,8 +467,8 @@ define = (name, others...) ->
 
   context.def name, value
 
-  c_name = compile(full_name)[0]
-  c_val = compile(value)[0]
+  c_name = compile_item full_name
+  c_val = compile_item value
   new JavaScriptCode "#{c_name} = #{c_val}"
 
 define_macro = (name, argnames, template) ->
@@ -474,19 +488,19 @@ define_builtin_macro "core::def", define
 define_builtin_macro "core::lambda", lambda
 
 define_builtin_macro "core::call", (fname, args...) ->
-  c_fname = compile(fname)[0]
+  c_fname = compile_item fname
   c_args = compile args...
   new JavaScriptCode "#{c_fname}(#{c_args.join ', '})"
 
 define_builtin_macro "core::object-get-value", (prop, base) ->
-  c_base = (compile base)[0]
+  c_base = compile_item base
   if (is_quoted prop) and (is_symbol prop)
     s_prop = compile_list prop, no
     s_prop.quoted = no
-    c_prop = (compile s_prop)[0]
+    c_prop = compile_item s_prop
     js_code = "#{c_base}.#{c_prop}"
   else
-    c_prop = (compile prop)[0]
+    c_prop = compile_item prop
     js_code = "#{c_base}[#{c_prop}]"
 
   new JavaScriptCode js_code
@@ -524,4 +538,4 @@ define_builtin_macro "js::eval", (to_eval) ->
     s_to_eval = "\"#{quotes_escaped}\""
     new JavaScriptCode (eval s_to_eval)
   else
-    [(symbol "eval"), (compile to_eval)[0]]
+    [(symbol "eval"), compile_item to_eval]

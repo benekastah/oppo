@@ -10,6 +10,29 @@ class OppoHelpers
     Noop:: = o
     new Noop
 
+  to_oppo_string: (x) ->
+    {to_oppo_string, to_type} = oppo.helpers
+    type = to_type x
+    if not x?
+      "nil"
+    if x instanceof oppo.Symbol
+      "'#{x.text}"
+    else if type is "array"
+      items = (to_oppo_string item for item in x)
+      "'(#{items.join ' '})"
+    else if type is "object"
+      items = ("#{to_oppo_string k} #{to_oppo_string v}" for k, v of x)
+      "{#{items.join ',\n '}}"
+    else if type is "string"
+      "\"#{x}\""
+    else if type is "function"
+      "#<Function #{x.name or '__anonymous__'}>"
+    else
+      if x.toString?
+        x.toString()
+      else
+        "#{x}"
+
   text_to_js_identifier: do ->  
     WRAPPER_PREFIX = "_$"
     WRAPPER_SUFFIX = "_"

@@ -27,15 +27,17 @@ run = (buffer) ->
     return
   backlog = ''
 
-  oppo_data = oppo.read code
-  if compile
-    result = oppo.compile oppo_data
-  else
-    result = oppo.eval oppo_data
-    try s_result = JSON.stringify result
-    if s_result?
-      result = s_result
-  console.log result
+  try
+    oppo_data = oppo.read code
+    if compile
+      result = oppo.compile oppo_data
+    else
+      result = oppo.eval oppo_data
+      result = oppo.helpers.to_oppo_string result
+    console.log result
+  catch e
+    try console.error e.toString()
+    throw e
   
   prompt()
 

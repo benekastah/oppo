@@ -9,6 +9,6 @@
     return result = eval(compiled);
   };
 
-  result = compile_code("\n`'(a b c)\n");
+  result = compile_code("\n(def (add a b) (js::eval \"(+a) + (+b)\"))\n(def (+ ...n) (.reduce n add))\n\n(+ 1 2 3)\n");
 
 }).call(this);

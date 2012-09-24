@@ -2,20 +2,25 @@
 ###
 HELPERS / SETUP
 ###
-{to_type} = oppo.helpers
+{to_type, clone} = oppo.helpers
 r_whitespace = /^\s+/
 r_number = /^-?(\d*\.\d+|\d+)/
 r_symbol = /^[\w~`!@#$%^&*\-+=|\\"':?\/<>,\.]+/
 
 reader = oppo.reader = {}
 
-class OppoReadError extends Error
+class OppoReadError
+  # This is an inheritance hack that gets the error messeges to show up properly in the repl
+  @:: = new Error()
+  
   text_length: 50
-  constructor: (message = 'Unknown error') ->
+  name: "ReadError"
+  constructor: (@message = 'Unknown error') ->
     @text = reader.text
     @index = reader.text_index
-    
-    @message = "ReadError: #{message}"
+
+  toString: ->
+    "#{@name}: #{@message}"
 
 
 oppo.JavaScriptCode = class JavaScriptCode
@@ -133,9 +138,12 @@ oppo.ReadTable = class ReadTable
         undefined
 
       ')', make_reader (match, text, index) ->
+        open_parens = reader.open_parens -= 1
+        if open_parens < 0
+          throw new OppoReadError "You have too many `)`s"
+
         list = reader.lists.pop()
         reader.current_list = reader.lists[reader.lists.length - 1]
-        reader.open_parens -= 1
         list
 
       "'", make_reader (match) ->
@@ -216,9 +224,7 @@ oppo.read = (text) ->
 
   {open_parens} = reader
   if open_parens > 0
-    throw new OppoReadError "You still have #{open_parens} `(` with no ending `)`"
-  else if open_parens < 0
-    throw new OppoReadError "You have #{Math.abs open_parens} too many `)`s"
+    throw new OppoReadError "You have #{open_parens} too many `(`s"
 
   list = parse list
   list
