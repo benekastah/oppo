@@ -7,9 +7,6 @@ compile_code = (code) ->
 
 result = compile_code """
 
-(def (add a b) (js::eval "(+a) + (+b)"))
-(def (+ ...n) (.reduce n add))
-
-(+ 1 2 3)
+(apply ('log console) '(1 2 3))
 
 """

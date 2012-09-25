@@ -1,7 +1,13 @@
 
-(def typeof ((quote to-type) oppo))
+(def global ('root oppo))
+(def typeof ('to-type ('helpers oppo)))
 
-(def map (js::eval "function (fn, ls) {
+(def eval ('eval oppo))
+
+(defmacro (apply fn args)
+  `(.apply ,fn ,args))
+
+(def map (js::eval "function map(fn, ls) {
   var ret = [];
   for (var i = 0, len = ls.length; i < len; i++) {
     var item = ls[i];
@@ -10,7 +16,7 @@
   return ret;
 }"))
 
-(def reduce (js::eval "function (fn, ls) {
+(def reduce (js::eval "function reduce(fn, ls) {
   var ret = ls[0];
   for (var i = 1, len = ls.length; i < len; i++) {
     ret = fn(ret, ls[i]);
@@ -18,7 +24,7 @@
   return ret;
 }"))
 
-(def filter (js::eval "function (fn, ls) {
+(def filter (js::eval "function filter(fn, ls) {
   var ret, i, len, item;
   ret = [];
   for (i = 0, len = ls.length; i < len; i++) {
@@ -51,3 +57,8 @@
   }
   return ret;
 }"))
+
+
+;; Math
+(defmacro (+ ...n)
+  `(js::eval ,(.join n " + ")))

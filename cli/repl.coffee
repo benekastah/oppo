@@ -5,7 +5,10 @@ prompt_prefix = "oppo > "
 prompt_continued_prefix = ".... >   "
 compile = null
 
-repl = readline.createInterface process.stdin, process.stdout
+repl = readline.createInterface
+  input: process.stdin
+  output: process.stdout
+  terminal: yes
 
 prompt = (prefix = prompt_prefix) ->
   repl.setPrompt prefix
@@ -32,7 +35,7 @@ run = (buffer) ->
     if compile
       result = oppo.compile oppo_data
     else
-      result = oppo.eval oppo_data
+      result = oppo.eval oppo_data...
       result = oppo.helpers.to_oppo_string result
     console.log result
   catch e

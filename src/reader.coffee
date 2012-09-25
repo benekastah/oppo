@@ -22,26 +22,7 @@ class OppoReadError
   toString: ->
     "#{@name}: #{@message}"
 
-
-oppo.JavaScriptCode = class JavaScriptCode
-  constructor: (@text) ->
-
-
-oppo.JavaScriptComment = class JavaScriptComment
-
-
-oppo.Symbol = class Symbol
-  constructor: (text, base_symbol) ->
-    @text = "#{text}"
-    @line_number = base_symbol?.line_number ? reader.line_number
-
-  toString: -> @text
-
-
-oppo.Splat = class Splat
-
-
-class Wrapper
+reader.Wrapper = class Wrapper
   constructor: (symbol_text) ->
     @symbol = new Symbol symbol_text
 
