@@ -7,7 +7,9 @@ compile_code = (code) ->
 
 result = compile_code """
 
-(for-each (n '(1 2 3))
-  (puts n))
+(test::describe "oppo"
+  (test::it "has a test suite that basically works"
+    (test::assert (= 1 1))
+    (test::assert (= 5 1))))
 
 """

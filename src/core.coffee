@@ -42,13 +42,12 @@ oppo.helpers =
 
   merge: (first_o = {}, objs...) ->
     for o in objs
-      o ?= {}
+      continue if not o?
       for own k, v of o
-        if !first_o.hasOwnProperty k
-          first_o[k] = v
+        first_o[k] = v
     first_o
 
-  to_oppo_string: (x) ->
+  to_oppo_string: (x, quote_strings = yes) ->
     {to_oppo_string, to_type} = oppo.helpers
     type = to_type x
 
@@ -67,7 +66,7 @@ oppo.helpers =
     else if type is "object"
       items = ("#{k} #{to_oppo_string v}" for k, v of x)
       "{ #{items.join '\n  '} }"
-    else if type is "string"
+    else if quote_strings and type is "string"
       "\"#{x}\""
     else if type is "function"
       "#<Function #{x.name or '__anonymous__'}>"
@@ -176,6 +175,11 @@ oppo.helpers =
     {to_type, is_unquote_spliced} = oppo.helpers
     x?.unquote_spliced or
     (recurse and (to_type x) is "array" and first_item_matches x, "unquote-splicing")
+
+
+  map: (fn, ls) ->
+    for item in ls
+      fn item
 
 if module?.exports?
   module.exports = oppo

@@ -36,57 +36,39 @@ get_module_name = (file, base_dir = get_base_dir file) ->
   module_name = module_name.replace /\.oppo$/, ''
   module_name
 
-@compile = (output, source_files, watch, beautify) ->
-  files = getFiles source_files
-  base_dir = get_base_dir files[0]
+@compile = (output, files, watch, beautify) ->
+  for file in files
+    compile output, file, watch, beautify
 
+r_absolute_path = /^\//
+r_file_extension = /\.oppo$/
+compile = (output, file, watch, beautify) ->
+  if not r_absolute_path.test file
+    file = path.join __dirname, "..", file
+  
   if /\.js$/.test output
     output_fname = path.basename output
     output_dir = path.dirname output
   else
     output_dir = output
-  
-  c_files = for file in files
-    dir = path.dirname file
-    fname = path.basename file
 
-    # Ignore private files
-    if /^\./.test fname
-      continue
-    
-    if watch
-      fs.watch file, compile.bind output_dir, file
-    
-    if not /\.oppo$/.test fname
-      fname = "#{file}.oppo"
-    jsfile = output_fname ? fname.replace /\.oppo$/, '.js'
-    tmp_jsfile = jsfile.replace /\.js$/, '-TEMP.js'
-    jsfile = path.join output_dir ? dir, jsfile
-    tmp_jsfile = path.join output_dir ? dir, tmp_jsfile
-    
-    code = fs.readFileSync file, 'utf8'
-    try
-      module_name = get_module_name file, base_dir
-      read_code = oppo.read code
-      compiled_code = oppo.compile read_code, module_name
-      console.log "Compiled #{fname}"
-    catch e
-      console.warn "Error compiling #{fname}", e
-      compiled_code = ''
+  jsfile = output_fname ? file.replace r_file_extension, '.js'
+  jsfile = path.join output_dir ? dir, jsfile  
 
-    compiled_code
+  if watch
+    fs.watch file, compile.bind arguments...
+      
+  compiled_code = oppo.compile_from_file file
+  console.log "Compiled #{file}"
 
-  fs.writeFileSync jsfile, c_files.join ';'
-  # fs.writeFileSync tmp_jsfile, c_files.join ';'
-  # child_process.exec "uglifyjs --overwrite #{if beautify then '--beautify' else ''} --lift-vars #{jsfile}; rm #{tmp_jsfile}; echo \"Wrote #{jsfile}\""
-  # child_process.exec "closure-compiler --compilation_level ADVANCED_OPTIMIZATIONS " +
-  #   "#{if beautify then "--formatting=pretty_print" else ""} " +
-  #   "--js_output_file #{jsfile} --js #{tmp_jsfile}; " +
-  #   "rm #{tmp_jsfile}; echo \"Wrote #{jsfile}\""
+  fs.writeFile jsfile, compiled_code, (err) ->
+    throw err if err?
+    console.log "Wrote #{jsfile}"
+
 
 @runfile = (file) ->
   module_name = get_module_name file
   code = fs.readFileSync file, 'utf8'
   read_code = oppo.read code
-  compiled_code = oppo.compile read_code, null, dir
+  compiled_code = oppo.compile read_code, dir
   console.log (eval compiled_code)

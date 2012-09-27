@@ -63,7 +63,8 @@ class Context
     if not @context[s_sym]?
       @context[s_sym] = value
     else
-      throw new OppoCompileError "Can't define previously defined symbol: #{s_sym}", sym
+      err = new OppoCompileError "Can't define previously defined symbol: #{s_sym}", sym
+      console.warn err.toString()
 
 
   set: (sym, value) ->
@@ -71,7 +72,8 @@ class Context
     if @context[s_sym]?
       @context[s_sym] = value
     else
-      throw new OppoCompileError "Can't set value of undefined symbol: #{s_sym}", sym
+      err = new OppoCompileError "Can't set value of undefined symbol: #{s_sym}", sym
+      console.warn err
 
 
   get: (sym) ->
@@ -109,7 +111,7 @@ oppo.Module = class Module extends Context
 
     #{var_stmt}#{inner};
 
-    })(#{@full_name} || (#{@full_name} = {}));
+    })(#{@full_name} || (#{@full_name} = {}))
     """
 
   toString: -> @name
@@ -145,6 +147,10 @@ class ContextStack
       @global_context[name] = mod
 
     @stack = [@global_context]
+    @stack.push Module.get Module.core_module_name
+    for own modname, value of Module.modules when modname isnt Module.core_module_name
+      @stack.push value
+      
     @current_context = @global_context
 
 
@@ -219,6 +225,8 @@ compile_item = (sexp) ->
       sexp.text
     else if sexp instanceof Symbol
       compile_symbol sexp
+    else if sexp instanceof Splat
+      "new oppo.Splat()"
     else if sexp_type in ["boolean", "number"]
       "#{sexp}"
     else if sexp_type is "string"
@@ -241,6 +249,51 @@ oppo.compile = (parse_tree, module_name = Module.anonymous_module_name) ->
   
   c = compile parse_tree...
   module.compile "return #{c.join ",\n"}"
+
+if process?.title is "node"
+  do ->
+    path = require 'path'
+    fs = require 'fs'
+    r_leading_slash = /^\//
+    r_file_extension = /(\.oppo)?$/
+    precompiled = {}
+    basenames = []
+
+    module_base = null
+    get_module_name = (file_path) ->
+      path.relative module_base, file_path
+    
+    oppo.compile_from_file = (pathname) ->
+      basename = basenames[basenames.length - 1]
+      if basename
+        pathname = path.join basename, pathname
+      if not r_leading_slash.test pathname
+        pathname = path.join __dirname, pathname
+        
+      fname = pathname.replace r_file_extension, '.oppo'
+      pathname = pathname.replace r_file_extension, ''
+      # Don't do more work than necessary
+      preresult = precompiled[fname]
+      if preresult?
+        return preresult
+
+      new_basename = path.dirname pathname
+      module_base ?= new_basename
+      basenames.push new_basename
+      
+      module_name = get_module_name pathname
+
+      #console.log "fname", fname
+      #console.log "pathname", pathname
+      #console.log "module_name", module_name
+      
+      file_data = fs.readFileSync fname, "utf8"
+      parse_tree = oppo.read file_data
+      result = oppo.compile parse_tree, module_name
+      precompiled[fname] = result
+      basenames.pop()
+
+      result
 
 oppo.eval = (data) ->
   js_code = oppo.compile [data]
@@ -528,7 +581,8 @@ define_core_macro ".", (fname, base, args...) ->
 
 define_core_macro "quote", (x) ->
   if x?
-   x?.quoted = yes unless x.unquoted
+    x.quoted = yes unless x.unquoted
+    x.__compiled__ = undefined
   x
   
 
@@ -626,6 +680,12 @@ define_core_macro "for", ([defs, ls], body...) ->
 define_core_macro "do", ->
   c_items = compile arguments...
   new JavaScriptCode "(#{c_items.join '\n, '})"
+
+
+define_core_macro "include", (path_names...) ->
+  includes = for name in path_names
+    oppo.compile_from_file name.text or name
+  new JavaScriptCode includes.join ',\n'
 
 
 define_builtin_macro "js::eval", (to_eval) ->

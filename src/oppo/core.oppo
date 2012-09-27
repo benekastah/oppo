@@ -1,22 +1,22 @@
+(include test)
 
 (def global ('root oppo))
 (def typeof ('to-type ('helpers oppo)))
 
 (def eval ('eval oppo))
-(def (puts)
-     (.apply ('log console) console (js::eval "arguments")))
+
+(let (stringify (lambda (x) (.to-oppo-string ('helpers oppo) x #f)))
+  (def (puts ...args)
+       (.apply ('log console) console (map stringify args)))
+  (def (puts-error ...args)
+       (.apply ('error console) console (map stringify args)))
+  (def (puts-warning ...args)
+       (.apply ('warn console) console (map stringify args))))
 
 (defmacro (apply fn args)
   `(.apply ,fn #nil ,args))
 
-(def map (js::eval "function map(fn, ls) {
-  var ret = [];
-  for (var i = 0, len = ls.length; i < len; i++) {
-    var item = ls[i];
-    ret.push(fn(item));
-  }
-  return ret;
-}"))
+(def map ('map ('helpers oppo)))
 
 (def reduce (js::eval "function reduce(fn, ls) {
   var len = ls.length;
@@ -76,17 +76,25 @@
   return ret;
 }"))
 
+(let [-merge ('merge ('helpers oppo))]
+  (def [merge ...objs]
+       (apply -merge `[,(js::eval "{}") ,@objs])))
+
+
 
 (defmacro (def-infix-op-fn name ...op)
   `(let (op (lambda (a b) ,@op))
-     (def (,name) (reduce op (js::eval "arguments")))))
+     (def (,name)
+          (reduce op (js::eval "arguments")))))
 
 ;; Math
 (def-infix-op-fn + (js::eval "(+a) + (+b)"))
-(def-infix-op-fn - (js::eval "(+a) - (+b)"))
-(def-infix-op-fn * (js::eval "(+a) * (+b)"))
-(def-infix-op-fn / (js::eval "(+a) / (+b)"))
+(def-infix-op-fn - (js::eval "a - b"))
+(def-infix-op-fn * (js::eval "a * b"))
+(def-infix-op-fn / (js::eval "a / b"))
 
+(def (mod a b)
+     (js::eval "a % b"))
 (def pow ('pow Math))
 (def abs ('abs Math))
 (def (negate n)
@@ -106,3 +114,6 @@
 (def-infix-op-fn > (js::eval "a > b"))
 (def-infix-op-fn <= (js::eval "a <= b"))
 (def-infix-op-fn >= (js::eval "a >= b"))
+(def-infix-op-fn = (js::eval "a === b"))
+(def eq =)
+(def-infix-op-fn eq-typeless (js::eval "a == b"))

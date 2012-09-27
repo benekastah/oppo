@@ -203,7 +203,9 @@ oppo.read = (text) ->
   reader.open_parens = 0
 
   while reader.text_index < reader.text.length
-    read_token()
+    success = read_token()
+    if not success
+      throw new OppoReadError "Invalid character: `#{reader.text.charAt reader.text_index}`"
 
   # Reset all the reader variables we set earlier
   [ reader.line_number

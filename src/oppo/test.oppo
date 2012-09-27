@@ -1,0 +1,27 @@
+
+(def (putsgroup ...stuff)
+     (apply puts stuff))
+
+(def (putsitem ...stuff)
+     (apply puts `("    " ,@stuff)))
+
+(def (putserror ...stuff)
+     (apply puts-error `("!!    " ,@stuff)))
+
+(def (putssuccess ...stuff)
+     (apply puts `("      " ,@stuff)))
+
+(defmacro (describe thing ...body)
+  `(let (---thing--- ,thing)
+     (putsgroup ---thing---)
+     (do ,@body)))
+
+(defmacro (it attribute ...body)
+  `(let (---attribute--- ,attribute)
+     (putsitem "it" ---attribute---)
+     (do ,@body)))
+
+(defmacro (assert x)
+  `(if ,x
+       (putssuccess "OK!")
+       (putserror "Failed." ',x)))

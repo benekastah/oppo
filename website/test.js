@@ -9,6 +9,6 @@
     return result = eval(compiled);
   };
 
-  result = compile_code("\n(for-each (n '(1 2 3))\n  (puts n))\n");
+  result = compile_code("\n(test::describe \"oppo\"\n  (test::it \"has a test suite that basically works\"\n    (test::assert (= 1 1))\n    (test::assert (= 5 1))))\n");
 
 }).call(this);

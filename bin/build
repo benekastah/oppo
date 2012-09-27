@@ -2,7 +2,7 @@
 
 # Compile files and concat into single file
 coffee -j dist/compiler.js -c src/core src/text-to-js-identifier src/reader src/compiler
-bin/oppo -o dist/core.js -c src/core
+bin/oppo -o dist/core.js -c src/oppo/core
 cat dist/compiler.js dist/core.js > dist/oppo.js
 #cat dist/compiler.js > dist/oppo.js
 
