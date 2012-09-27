@@ -30,9 +30,10 @@ oppo.Symbol = class Symbol
 
 oppo.Splat = class Splat
 
-toString = Object::toString
+array_toString = Object::toString
+array_concat = Array::concat
 oppo.helpers =
-  to_type: (o) -> (s = toString.call o).substring(8, s.length - 1).toLowerCase()
+  to_type: (o) -> (s = array_toString.call o).substring(8, s.length - 1).toLowerCase()
 
   clone: Object.create ? (o) ->
     class Noop
@@ -122,6 +123,8 @@ oppo.helpers =
     else
       throw new OppoCompileError "Can't get symbol text from non-symbol #{sym}", sym
 
+  concat: (base, items...) -> array_concat.apply base, items
+
   gensym: do ->
     gensym_id_map = {}
     gensym = (name = "gen") ->
@@ -153,9 +156,6 @@ oppo.helpers =
     {to_type, is_symbol} = oppo.helpers
     x instanceof Symbol or
     (recurse and (to_type x) is "array" and is_symbol (oppo.compile_list x, no), recurse - 1)
-
-  is_keyword: (x) ->
-    oppo.helpers.first_item_matches x, 'keyword'
 
   is_quoted: (x, recurse = 2) ->
     {to_type, is_quoted} = oppo.helpers

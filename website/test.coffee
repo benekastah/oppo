@@ -7,6 +7,7 @@ compile_code = (code) ->
 
 result = compile_code """
 
-(apply ('log console) '(1 2 3))
+(for-each (n '(1 2 3))
+  (puts n))
 
 """

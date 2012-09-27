@@ -38,8 +38,6 @@ make_reader = (opts, f) ->
   reader_fn = (input) ->
     if reader.read_special
       reader.read_special = no
-    if reader.escape_next_char
-      reader.escape_next_char = no
     f arguments...
 
   reader_fn.comment_special = comment_special
@@ -79,8 +77,10 @@ oppo.ReadTable = class ReadTable
 
     # Handle special buffers where syntax must be ignored.
     _char = text.charAt 0
+    escaped = reader.escape_next_char
     reader.escape_next_char = no
     if reader.string_buffer?
+      reader.string_buffer += "\\" if escaped
       reader.string_buffer += _char
       reader.text_index += 1
       @read()
@@ -110,20 +110,29 @@ oppo.ReadTable = class ReadTable
         else
           undefined
 
-      '(', make_reader ->
+      /^(\(|\[)/, make_reader (match) ->
         list = []
+        list.opener = match
         reader.lists.push list
         reader.current_list = list
         list.starting_line_number = reader.line_number
         reader.open_parens += 1
         undefined
 
-      ')', make_reader (match, text, index) ->
+      /^(\)|\])/, make_reader (match, text, index) ->
         open_parens = reader.open_parens -= 1
         if open_parens < 0
           throw new OppoReadError "You have too many `)`s"
 
         list = reader.lists.pop()
+        {opener} = list
+        error_message = "Braces mismatch: it is illegal to open a form with"
+        error_message_ctd = "and close it with"
+        if opener is "(" and match isnt ")"
+          throw new OppoReadError "#{error_message} `(` #{error_message_ctd} `]`"
+        else if opener is '[' and match isnt ']'
+          throw new OppoReadError "#{error_message} `[` #{error_message_ctd} `)`"
+          
         reader.current_list = reader.lists[reader.lists.length - 1]
         list
 

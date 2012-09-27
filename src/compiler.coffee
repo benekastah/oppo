@@ -10,7 +10,6 @@
   gensym,
   get_module,
   is_symbol,
-  is_keyword,
   is_quoted,
   is_quasiquoted,
   is_unquoted,
@@ -22,7 +21,8 @@ oppo.Macro = class Macro
     if (to_type argnames) is "function"
       @transform = argnames
     else
-      @transform = eval compile_item [(symbol "lambda"), argnames, template...]
+      c_transform_fn = compile_item [(symbol "lambda"), argnames, template...]
+      @transform = eval c_transform_fn
 
   compile: ->
     c_name = compile_item (get_symbol_text @name)
@@ -37,7 +37,9 @@ class Context
 
   var_stmt: ->
     vars = for own k, v of @context when v not instanceof Context and v not instanceof Macro
+      k = @normalize_symbol_text k
       compile_item (symbol k)
+      
     if vars.length
       "var #{vars.join ', '};\n"
     else
@@ -46,6 +48,9 @@ class Context
 
   get_symbol_text: (sym) ->
     "#{get_symbol_text sym}__"
+
+
+  normalize_symbol_text: (text) -> text.substr 0, text.length - 2
 
 
   lookup: (sym) ->
@@ -132,6 +137,7 @@ oppo.Module = class Module extends Context
       @modules[name] = module
 
 
+__module__ = null
 class ContextStack
   constructor: ->
     @global_context = new Context()
@@ -166,6 +172,7 @@ class ContextStack
 
   push: (c) ->
     @current_context = c
+    __module__ = c.context
     @stack.push c
     c
 
@@ -183,6 +190,7 @@ class ContextStack
   pop: ->
     c = @stack.pop()
     @current_context = @stack[@stack.length - 1]
+    __module__ = @current_context.context
     c
 
 
@@ -263,14 +271,41 @@ compile_symbol = (sym, resolve_module = true, resolve_macro = true) ->
 
 compile_quasiquoted_list = (ls) ->
   quote_symbol = symbol 'quasiquote'
+  list = null
+  push_list = (item) ->
+    results.push item if item isnt undefined
+    list = []
+    results.push [quote_symbol, list]
+    
+  results = []
+  push_list()
+  
   for x in ls
-    if not is_unquoted x
+    unquoted = is_unquoted x
+    unquote_spliced = is_unquote_spliced x
+    if not (unquoted or unquote_spliced)
       if (to_type x) is "array"
         x = compile_quasiquoted_list x
       item = [quote_symbol, x]
     else
-      item = x
-    new JavaScriptCode compile_item item
+      if unquote_spliced
+        if (to_type x) is "array"
+          x = compile_list x, no
+        push_list x
+      else
+        item = x
+
+    if item isnt undefined
+      c_item = new JavaScriptCode compile_item item
+      list.push c_item
+      item = undefined
+
+  if results.length > 1
+    if not list.length
+      results.pop()
+    new JavaScriptCode compile_item [(new JavaScriptCode "oppo.helpers.concat"), results...]
+  else
+    list
 
 oppo.compile_list = compile_list = (ls, to_compile = yes) ->
   _ls = ls
@@ -280,7 +315,10 @@ oppo.compile_list = compile_list = (ls, to_compile = yes) ->
       return ls
     if quasiquoted
       q_ls = compile_quasiquoted_list ls
-      c_ls = (compile_item x for x in q_ls)
+      if (to_type q_ls) is "array"
+        c_ls = (compile_item x for x in q_ls)
+      else
+        return compile_item q_ls
     else if quoted
       quote_symbol = symbol 'quote'
       c_ls = (compile_item [quote_symbol, x] for x in ls)
@@ -289,10 +327,9 @@ oppo.compile_list = compile_list = (ls, to_compile = yes) ->
   else
     if ls.length
       [callable] = ls
-      callable_is_keyword = is_keyword callable
       callable_is_quoted = is_quoted callable
       callable_is_symbol = is_symbol callable
-      if not (callable_is_keyword or callable_is_quoted)
+      if not (callable_is_quoted)
         if (to_type callable) is "array"
           c_callable = compile_list callable, no
         else
@@ -307,7 +344,7 @@ oppo.compile_list = compile_list = (ls, to_compile = yes) ->
           ls = ls[1..]
         if c_callable not instanceof Macro
           throw new OppoCompileError "Can't call list: #{ls}", ls
-      else if ls.length > 1 and (callable_is_keyword or (callable_is_symbol and callable_is_quoted))
+      else if ls.length > 1 and (callable_is_symbol and callable_is_quoted)
         c_callable = core?.get 'object-get-value'
       else
         c_callable = core?.get 'call'
@@ -331,18 +368,13 @@ compile_object = (o) ->
   "{ #{items.join ',\n  '} }"
 
 
+################################################################################
 # Macros. These will take care of virtually all compiling.
-# The only macros that will need to be predefined in javascript are:
-# - def
-# - defmacro
-# - defmodule
-# - js-eval
-# - lambda
-# - call
-# - any reader-level macros
-
-lambda = (args, body...) ->
+################################################################################
+lambda = (options = {}, args, body...) ->
   context = oppo.context_stack.push_new()
+  {body_hook} = options
+  do_return = options.return ? yes
 
   splat_args = []
   normal_args = []
@@ -364,15 +396,17 @@ lambda = (args, body...) ->
   body_len = body.length # Get the body length now before we change it.
   if splat_arg?
     splat_arg_val = new JavaScriptCode "Array.prototype.slice.call(arguments, #{args.length})"
-    body = [[(symbol 'def'), define_in_module: no, splat_arg, splat_arg_val], body...]
+    body = [[(symbol 'def'), use_module: no, splat_arg, splat_arg_val], body...]
   
   c_args = compile args...
+  if body_hook?
+    body = body_hook.call this, body
   c_body = compile body...
 
   oppo.context_stack.pop()
   var_stmt = context.var_stmt()
 
-  return_kywd = if body_len then "return " else ""
+  return_kywd = if do_return and body_len then "return " else ""
 
   if @function_name?
     fn_name = get_symbol_text @function_name
@@ -393,8 +427,8 @@ define = (args...) ->
     [name, others...] = args
     opts = {}
 
-  {define_in_module} = opts
-  define_in_module ?= yes
+  {use_module} = opts
+  use_module ?= yes
     
   if (to_type name) is "array"
     [name, args...] = name
@@ -408,7 +442,7 @@ define = (args...) ->
   [module, name] = get_module name
   if module?
     context = Module.get module, true
-  else if define_in_module
+  else if use_module
     current_context = context = oppo.context_stack.current_context
     while context && context not instanceof Module
       context = context.parent_context
@@ -421,6 +455,27 @@ define = (args...) ->
   c_name = compile_symbol full_name, yes, no
   c_val = compile_item value
   new JavaScriptCode "#{c_name} = #{c_val}"
+
+
+set = (args...) ->
+  if args.length < 3
+    [name, value] = args
+  else
+    [opts, name, value] = args
+    
+  opts ?= {}
+  {use_module} = opts
+  use_module ?= yes
+
+  [__, context] = oppo.context_stack.lookup name
+  if context?
+    context.set name, value
+  else
+    throw new OppoCompileError "Can't set undefined symbol: #{name}", this
+
+  c_name = compile_item name
+  c_value = compile_item value
+  new JavaScriptCode "#{c_name} = #{c_value}"
 
 
 define_macro = (name, argnames, template) ->
@@ -442,7 +497,8 @@ define_core_macro "defmacro", (args, template...) ->
 
 
 define_core_macro "def", define
-define_core_macro "lambda", lambda
+define_core_macro "set!", set
+define_core_macro "lambda", -> lambda null, arguments...
 
 
 define_core_macro "call", (fname, args...) ->
@@ -456,7 +512,7 @@ define_core_macro "object-get-value", (prop, base) ->
   if (is_quoted prop) and (is_symbol prop)
     s_prop = compile_list prop, no
     s_prop.quoted = no
-    c_prop = compile_symbol s_prop, no
+    c_prop = compile_symbol s_prop, no, no
     js_code = "#{c_base}.#{c_prop}"
   else
     c_prop = compile_item prop
@@ -470,18 +526,15 @@ define_core_macro ".", (fname, base, args...) ->
   [[(symbol 'object-get-value'), fname, base], args...]
 
 
-define_core_macro "keyword", (k) -> k
-
-
 define_core_macro "quote", (x) ->
-  x?.quoted = yes unless x.unquoted
+  if x?
+   x?.quoted = yes unless x.unquoted
   x
   
 
 define_core_macro "quasiquote", (x) ->
-  #if (to_type x) is "array"
-  #  x = resolve_unquotes x
-  x?.quasiquoted = yes unless x.unquoted
+  if x?
+    x.quasiquoted = yes unless x.unquoted
   [(symbol "quote"), x]
 
 
@@ -497,6 +550,84 @@ define_core_macro "unquote-splicing", (x) ->
   [(symbol "unquote"), x]
 
 
+_let = (options = {}, locals, body...) ->
+  if locals.length % 2
+    throw new OppoCompileError "let must have an even number of binding forms", this
+  names = []
+  def_body = []
+  for item, i in locals
+    if i % 2 is 0
+      name = item
+    else
+      setter = if name not in names
+        symbol "def"
+      else
+        symbol "set!"
+      names.push name
+      
+      result = [setter, {use_module: no}, name, item]
+      def_body.push result
+      
+  body = def_body.concat body
+  [(lambda options, [], body...)]
+  
+define_core_macro "let", -> _let null, arguments...
+
+
+define_core_macro "if", (cond, when_t, when_f) ->
+  [c_cond, c_when_t, c_when_f] = compile cond, when_t, when_f ? null
+  new JavaScriptCode """
+  (#{c_cond} ?
+      #{c_when_t}
+    : #{c_when_f})
+  """
+
+
+define_core_macro "for", ([defs, ls], body...) ->
+  if (to_type defs) isnt "array"
+    defs = [defs]
+  [item, i] = defs
+  
+  temp_ls = gensym "list"
+  i ?= gensym "i"
+  len = gensym "len"
+  item ?= gensym "item"
+  result = gensym "result"
+
+  body_hook = (let_body) ->
+    prefix = compile let_body...
+
+    c_temp_ls = compile_item temp_ls
+    c_i = compile_item i
+    c_len = compile_item len
+    c_item = compile_item item
+    c_result = compile_item result
+    c_body = compile_item [(symbol "do"), body...]
+
+    _for = new JavaScriptCode """
+    #{prefix.join ',\n  '};
+    for (; #{c_i} < #{c_len}; #{c_i}++) {
+      #{c_item} = #{c_temp_ls}[#{c_i}];
+      #{c_result}.push(#{c_body});
+    }
+    return #{c_result};
+    """
+    [_for]
+
+  _let {body_hook, return: no}, [
+    temp_ls, ls
+    i, 0
+    len, [[(symbol 'quote'), (symbol "length")], temp_ls]
+    item, null
+    result, [(symbol "quote"), []]
+  ]
+
+
+define_core_macro "do", ->
+  c_items = compile arguments...
+  new JavaScriptCode "(#{c_items.join '\n, '})"
+
+
 define_builtin_macro "js::eval", (to_eval) ->
   type = to_type to_eval
   if type is "string"
@@ -505,4 +636,3 @@ define_builtin_macro "js::eval", (to_eval) ->
     new JavaScriptCode (eval s_to_eval)
   else
     [(new JavaScriptCode "oppo.root.eval"), compile_item to_eval]
-    

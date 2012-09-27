@@ -3,9 +3,11 @@
 (def typeof ('to-type ('helpers oppo)))
 
 (def eval ('eval oppo))
+(def (puts)
+     (.apply ('log console) console (js::eval "arguments")))
 
 (defmacro (apply fn args)
-  `(.apply ,fn ,args))
+  `(.apply ,fn #nil ,args))
 
 (def map (js::eval "function map(fn, ls) {
   var ret = [];
@@ -17,8 +19,22 @@
 }"))
 
 (def reduce (js::eval "function reduce(fn, ls) {
+  var len = ls.length;
+  if (len < 2)
+    throw new Error('Can\\'t reduce list with fewer than two items');
   var ret = ls[0];
-  for (var i = 1, len = ls.length; i < len; i++) {
+  for (var i = 1; i < len; i++) {
+    ret = fn(ret, ls[i]);
+  }
+  return ret;
+}"))
+
+(def reduce-right (js::eval "function reduce_right(fn, ls) {
+  var len = ls.length;
+  if (len < 2)
+    throw new Error('Can\\'t reduce list with fewer than two items');
+  var ret = ls[len - 1];
+  for (var i = len - 2; i >= 0; i--) {
     ret = fn(ret, ls[i]);
   }
   return ret;
@@ -34,6 +50,8 @@
   }
   return ret;
 }"))
+
+(def concat ('concat ('helpers oppo)))
 
 (def (->object x) (Object x))
 (def (->string x) (String x))
@@ -59,6 +77,32 @@
 }"))
 
 
+(defmacro (def-infix-op-fn name ...op)
+  `(let (op (lambda (a b) ,@op))
+     (def (,name) (reduce op (js::eval "arguments")))))
+
 ;; Math
-(defmacro (+ ...n)
-  `(js::eval ,(.join n " + ")))
+(def-infix-op-fn + (js::eval "(+a) + (+b)"))
+(def-infix-op-fn - (js::eval "(+a) - (+b)"))
+(def-infix-op-fn * (js::eval "(+a) * (+b)"))
+(def-infix-op-fn / (js::eval "(+a) / (+b)"))
+
+(def pow ('pow Math))
+(def abs ('abs Math))
+(def (negate n)
+     (js::eval "-n"))
+
+
+;; Logical
+(def (not x)
+     (js::eval "!x"))
+
+(def-infix-op-fn or (js::eval "a || b"))
+(def-infix-op-fn and (js::eval "a && b"))
+
+
+;; Comparison
+(def-infix-op-fn < (js::eval "a < b"))
+(def-infix-op-fn > (js::eval "a > b"))
+(def-infix-op-fn <= (js::eval "a <= b"))
+(def-infix-op-fn >= (js::eval "a >= b"))

@@ -9,6 +9,6 @@
     return result = eval(compiled);
   };
 
-  result = compile_code("\n(apply ('log console) '(1 2 3))\n");
+  result = compile_code("\n(for-each (n '(1 2 3))\n  (puts n))\n");
 
 }).call(this);
