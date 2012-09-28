@@ -5,83 +5,6 @@
 
 (def eval ('eval oppo))
 
-(let (stringify (lambda (x) (.to-oppo-string ('helpers oppo) x #f)))
-  (def (puts ...args)
-       (.apply ('log console) console (map stringify args)))
-  (def (puts-error ...args)
-       (.apply ('error console) console (map stringify args)))
-  (def (puts-warning ...args)
-       (.apply ('warn console) console (map stringify args))))
-
-(defmacro (apply fn args)
-  `(.apply ,fn #nil ,args))
-
-(def map ('map ('helpers oppo)))
-
-(def reduce (js::eval "function reduce(fn, ls) {
-  var len = ls.length;
-  if (len < 2)
-    throw new Error('Can\\'t reduce list with fewer than two items');
-  var ret = ls[0];
-  for (var i = 1; i < len; i++) {
-    ret = fn(ret, ls[i]);
-  }
-  return ret;
-}"))
-
-(def reduce-right (js::eval "function reduce_right(fn, ls) {
-  var len = ls.length;
-  if (len < 2)
-    throw new Error('Can\\'t reduce list with fewer than two items');
-  var ret = ls[len - 1];
-  for (var i = len - 2; i >= 0; i--) {
-    ret = fn(ret, ls[i]);
-  }
-  return ret;
-}"))
-
-(def filter (js::eval "function filter(fn, ls) {
-  var ret, i, len, item;
-  ret = [];
-  for (i = 0, len = ls.length; i < len; i++) {
-    item = ls[i];
-    if (fn(item))
-      ret.push(item)
-  }
-  return ret;
-}"))
-
-(def concat ('concat ('helpers oppo)))
-
-(def (->object x) (Object x))
-(def (->string x) (String x))
-(def (->number x) (Number x))
-(def (->boolean x) (Boolean x))
-
-(def (str ...strings) (.join strings ""))
-
-(def (list ...ls) ls)
-(def object (js::eval "function () {
-  var ret, i, len, key;
-  ret = {};
-  len = arguments.length;
-  if (len % 2 !== 0)
-    throw new Error('Object must have an even number of arguments (every key must have a value)');
-  for (i = 0; i < len; i++) {
-    if (i % 2 === 0)
-      key = arguments[i];
-    else
-      ret[key] = arguments[i];
-  }
-  return ret;
-}"))
-
-(let [-merge ('merge ('helpers oppo))]
-  (def [merge ...objs]
-       (apply -merge `[,(js::eval "{}") ,@objs])))
-
-
-
 (defmacro (def-infix-op-fn name ...op)
   `(let (op (lambda (a b) ,@op))
      (def (,name)
@@ -114,6 +37,118 @@
 (def-infix-op-fn > (js::eval "a > b"))
 (def-infix-op-fn <= (js::eval "a <= b"))
 (def-infix-op-fn >= (js::eval "a >= b"))
+
 (def-infix-op-fn = (js::eval "a === b"))
 (def eq =)
 (def-infix-op-fn eq-typeless (js::eval "a == b"))
+(def-infix-op-fn not= (js::eval "a !== b"))
+(def not-eq not=)
+(def-infix-op-fn not-eq-typeless (js::eval "a != b"))
+
+(def (nil? x) (js::eval "x == null"))
+
+
+(def (->object x) (Object x))
+(def (->string x) (String x))
+(def (->number x) (Number x))
+(def (->boolean x) (Boolean x))
+
+
+(let (stringify (lambda (x) (.to-oppo-string ('helpers oppo) x #f)))
+  (def (puts ...args)
+       (.apply ('log console) console (map stringify args)))
+  (def (puts-error ...args)
+       (.apply ('error console) console (map stringify args)))
+  (def (puts-warning ...args)
+       (.apply ('warn console) console (map stringify args))))
+
+(defmacro (apply fn args)
+  `(.apply ,fn #nil ,args))
+
+(def map ('map ('helpers oppo)))
+
+(def reduce (js::eval "function reduce(fn, ls) {
+  var len = ls.length;
+  if (len < 2)
+    throw new Error('Can\\'t reduce list with fewer than two items');
+  var ret = ls[0];
+  for (var i = 1; i < len; i++) {
+    ret = fn(ret, ls[i]);
+  }
+  return ret;
+}"))
+
+(def reduce-right (js::eval "function reduce_right(fn, ls) {
+  var len = ls.length;
+  if (len < 2)
+    throw new Error('Can\\'t reduce-right list with fewer than two items');
+  var ret = ls[len - 1];
+  for (var i = len - 2; i >= 0; i--) {
+    ret = fn(ret, ls[i]);
+  }
+  return ret;
+}"))
+
+(def filter (js::eval "function filter(fn, ls) {
+  var ret, i, len, item;
+  ret = [];
+  for (i = 0, len = ls.length; i < len; i++) {
+    item = ls[i];
+    if (fn(item))
+      ret.push(item)
+  }
+  return ret;
+}"))
+
+(def concat ('concat ('helpers oppo)))
+(def (first ls) (js::eval "ls[0]"))
+(def (second ls) (js::eval "ls[1]"))
+(def (third ls) (js::eval "ls[2]"))
+
+(def (nth ls n)
+     (if (eq n 0)
+         (do (puts-warning "nth treats lists as 1-based; accessing the 0th item will always yield #nil")
+             #nil)
+       (let (i (if (< n 0)
+                   (+ ('length ls) n)
+                   (- n 1)))
+         (js::eval "ls[i]"))))
+
+(def (empty? x)
+     (if (nil? x)
+         #t
+     (let (type (typeof x))
+       (if (eq type "array")
+           (eq ('length x) 0)
+       (if (eq type "object")
+           (empty? (keys x)))))))
+
+(def (str ...strings) (.join strings ""))
+
+(def (list ...ls) ls)
+(def object (js::eval "function () {
+  var ret, i, len, key;
+  ret = {};
+  len = arguments.length;
+  if (len % 2 !== 0)
+    throw new Error('Object must have an even number of arguments (every key must have a value)');
+  for (i = 0; i < len; i++) {
+    if (i % 2 === 0)
+      key = arguments[i];
+    else
+      ret[key] = arguments[i];
+  }
+  return ret;
+}"))
+
+(let [-merge ('merge ('helpers oppo))]
+  (def [merge ...objs]
+       (apply -merge `[,(js::eval "{}") ,@objs])))
+
+(def keys (js::eval
+  "Object.keys || function (o) {
+     var results = [];
+     for (var key in o)
+       if (o.hasOwnProperty(key)) results.push(key);
+     return results;
+   }"))
