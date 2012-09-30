@@ -64,7 +64,7 @@ class Context
       @context[s_sym] = value
     else
       err = new OppoCompileError "Can't define previously defined symbol: #{s_sym}", sym
-      console.warn err.toString()
+      # console.warn err.toString()
 
 
   set: (sym, value) ->
@@ -73,7 +73,7 @@ class Context
       @context[s_sym] = value
     else
       err = new OppoCompileError "Can't set value of undefined symbol: #{s_sym}", sym
-      console.warn err
+      # console.warn err.toString()
 
 
   get: (sym) ->
@@ -208,7 +208,7 @@ compile = (parse_tree...) ->
       compiled.push result
   compiled
 
-compile_item = (sexp) ->
+oppo.compile_item = compile_item = (sexp) ->
   result = sexp?.__compiled__
   if result isnt undefined
     return result
@@ -282,10 +282,6 @@ if process?.title is "node"
       basenames.push new_basename
       
       module_name = get_module_name pathname
-
-      #console.log "fname", fname
-      #console.log "pathname", pathname
-      #console.log "module_name", module_name
       
       file_data = fs.readFileSync fname, "utf8"
       parse_tree = oppo.read file_data
@@ -299,9 +295,9 @@ oppo.eval = (data) ->
   js_code = oppo.compile [data]
   root.eval js_code
 
-compile_symbol = (sym, resolve_module = true, resolve_macro = true) ->
+compile_symbol = (sym, resolve_module = true, resolve_macro = true, can_be_quoted = true) ->
   sym_text = if (to_type sym) is "string" then sym else sym.text
-  if sym.quoted
+  if can_be_quoted and sym.quoted
     "new oppo.Symbol(\"#{sym_text}\")"
   else
     [value, context, new_sym] = (oppo.context_stack?.lookup sym) ? []
@@ -505,7 +501,7 @@ define = (args...) ->
 
   context.def name, value
 
-  c_name = compile_symbol full_name, yes, no
+  c_name = compile_symbol full_name, yes, no, no
   c_val = compile_item value
   new JavaScriptCode "#{c_name} = #{c_val}"
 
@@ -629,7 +625,7 @@ define_core_macro "let", -> _let null, arguments...
 
 
 define_core_macro "if", (cond, when_t, when_f) ->
-  [c_cond, c_when_t, c_when_f] = compile cond, when_t, when_f ? null
+  [c_cond, c_when_t, c_when_f] = compile cond, when_t, when_f ? new JavaScriptCode "void 0"
   new JavaScriptCode """
   (#{c_cond} ?
       #{c_when_t}

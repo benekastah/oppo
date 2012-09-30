@@ -7,9 +7,7 @@ compile_code = (code) ->
 
 result = compile_code """
 
-(test::describe "oppo"
-  (test::it "has a test suite that basically works"
-    (test::assert (= 1 1))
-    (test::assert (= 5 1))))
+(def-chained-operator < "<" and)
+(< 1 2 3 4 5 6 7)
 
 """

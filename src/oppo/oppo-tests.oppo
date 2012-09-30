@@ -1,0 +1,118 @@
+
+(def (run-oppo-tests)
+     (puts "Oppo tests\n")
+     (describe "Logic"
+               (it "should be able to test for simple equality"
+                   (assert (eq 1 1))
+                   (assert (eq "string" "string"))
+                   (assert (not-eq (object) (object)))
+                   (assert (not-eq 4 5)))
+               (it "should be able to test for complex equality"
+                   (assert (= (list 1 2 3 (list 3 4 5))
+                              (list 1 2 3 (list 3 4 5))))
+                   (assert (= (object 'a 1 'b 2 'c 3 'd (object 'a 1 'b 2))
+                              (object 'b 2 'a 1 'c 3 'd (object 'b 2 'a 1))))
+                   (assert (= 5 5))
+                   (assert (= "asdf" "asdf"))
+                   (assert (= 'asdf 'asdf))
+                   (assert (not= (list 1 2 3)
+                                 (list 1 2 3 4)))
+                   (assert (not= (object)
+                                 (object 'a 1)))
+                   (assert (not= (object 'a 1)
+                                 (object 'b 1))))
+               (it "should be able to compare <, <=, >, >="
+                   (assert (> 5 4))
+                   (assert (< 6 10))
+                   (assert (>= 10 10))
+                   (assert (<= 0 5)))
+               (it "should be able to compare and, or"
+                   (assert (= 0
+                              (and 1 2 3 4 0)))
+                   (assert (= 5
+                              (or 0 #f #n 5)))
+                   (let (n #nil)
+                     (assert (nil? (and n (n 5)))))))
+
+     (describe "Math"
+               (it "should be able to add an arbitrary number of arguments"
+                   (assert (eq 65
+                               (+ 13 52)))
+                   (assert (eq 50.6
+                               (+ .3 .3 50)))
+                   (assert (eq 25
+                               (+ 1 2 3 4 5 4 3 2 1))))
+               (it "should be able to add string arguments without concatenating"
+                   (assert (eq 5
+                               (+ 3 "2")))
+                   (assert (eq 100
+                               (+ "10" "20" "70")))
+                   (assert (.isNaN global (+ 1 2 "asdf"))))
+               (it "should be able to subtract an arbitrary number of arguments"
+                   (assert (eq 1
+                               (- 5 4)))
+                   (assert (eq 3
+                               (- 10 4 3)))
+                   (assert (eq 100
+                               (- 1000 100 100 100 100 100 100 100 100 100))))
+               (it "should be able to multiply an arbitrary number of arguments"
+                   (assert (eq 9
+                               (* 3 3)))
+                   (assert (eq 1
+                               (* 1 1 1 1 1 1 1 1 1 1 1 1 1)))
+                   (assert (eq 0
+                               (* 5 4 3 2 1 0)))
+                   (assert (eq 1000
+                               (* 10 10 10))))
+               (it "should be able to divide an arbitrary number of arguments"
+                   (assert (eq 500
+                               (/ 10 2)))
+                   (assert (eq 100
+                               (/ 3000 3 10)))
+                   (assert (eq 10
+                               (/ 10 1 1 1 1 1))))
+               (it "should be able to get the modulus of two numbers"
+                   (assert (eq 0
+                               (mod 10 2)))
+                   (assert (eq 3
+                               (mod 8 5))))
+               (it "should be able to calculate exponents"
+                   (assert (eq 9
+                               (pow 3 2)))
+                   (assert (eq 1000
+                               (pow 10 3))))
+               (it "should be able to negate numbers"
+                   (assert (eq -5
+                               (negate 5)))
+                   (assert (eq 4.5
+                               (negate -4.5))))
+               (it "should be able to get the absolute value of a number"
+                   (assert (eq 100
+                               (abs -100)))
+                   (assert (eq .3
+                               (abs -.3)))))
+
+     (describe "Lists"
+               (it "should be able to create a list"
+                   (assert (= (js::eval "[1 2 3 4 5]")
+                              (list 1 2 3 4 5))))
+               (it "should be able to map a list"
+                   (assert (= (js::eval "[2 4 6 8]")
+                              (map (lambda (x)
+                                     (* x 2))
+                                   (list 1 2 3 4)))))
+               (it "should be able to reduce a list"
+                   (assert (eq 120
+                               (reduce (lambda (a b)
+                                         (* a b))
+                                       (list 1 2 3 4 5)))))
+               (it "should be able to reduce-right a list"
+                   (assert (eq 500
+                               (reduce-right (lambda (a b)
+                                               (+ a b))
+                                             (list 100 100 100 100 100)))))
+               (it "should be able to filter a list"
+                   (assert (= (js::eval "[2 4 6")
+                              (filter (lambda (x)
+                                        (eq 0 (mod x 2)))
+                                      (list 1 2 3 4 5 6 7)))))))

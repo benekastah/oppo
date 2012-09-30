@@ -176,10 +176,68 @@ oppo.helpers =
     x?.unquote_spliced or
     (recurse and (to_type x) is "array" and first_item_matches x, "unquote-splicing")
 
+  is_equal: ->
+    {to_type, keys, is_equal} = oppo.helpers
+    loop_started = false
+    for item, i in arguments
+      if not loop_started
+        prev_b = item
+        loop_started = yes
+        
+      a = prev_b
+      b = item
+      prev_b = b
+      
+      continue if a is b
+      continue if not a? and not b?
+
+      if a instanceof Symbol and b instanceof Symbol and a.text isnt b.text
+        return false
+      else
+        continue
+
+      type_a = to_type a
+      type_b = to_type b
+      if type_a isnt type_b
+        return false
+
+      type = type_a
+      if type in ["string", "number", "function"]
+        return false
+        
+      else if type is "array"
+        if a.length isnt b.length
+          return false
+        for item_a, j in item
+          if not is_equal item_a, b[j]
+            return false
+            
+      else if type is "object"
+        keys_a = keys a
+        keys_b = keys b
+        if keys_a.length isnt keys_b.length
+          return false
+        for key, item_a of a
+          if not is_equal item_a, b[key]
+            return false
+            
+      else if type is "regexp"
+        if (a.source isnt b.source) or (a.global isnt b.global) or (a.multiline isnt b.multiline) or (a.ignoreCase isnt b.ignoreCase)
+          return false
+          
+      else if type is "date"
+        if a.toISOString() isnt b.toISOString()
+          return false
+
+    true
 
   map: (fn, ls) ->
     for item in ls
       fn item
+
+  own_keys: Object.keys or (o) -> prop for own prop of o
+
+  keys: (o) -> prop for prop of o
 
 if module?.exports?
   module.exports = oppo

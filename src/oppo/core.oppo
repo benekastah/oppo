@@ -10,11 +10,43 @@
      (def (,name)
           (reduce op (js::eval "arguments")))))
 
+(defmacro (def-chained-operator name op joiner)
+  (let (unqt (lambda (x) `(unquote ,x))
+        unqt-spl (lambda (x) `(unquote-splicing ,x)))
+    `(defmacro (,name ...args)
+       (let (len ('length args))
+         (if len
+             (let (a (js::eval "args[0]"))
+               (if (js::eval "len > 1")
+                   (let (a* (.compile-item oppo a)
+                            b (.compile-item oppo (js::eval "args[1]"))
+                            list* (lambda (...ls) ls)
+                            compiled (.join (list* a* ,op b) " ")
+                            name ',name
+                            joiner ',joiner
+                            joiner (if joiner joiner name)
+                            joiner-is-name (js::eval "name.text == joiner.text")
+                            rest (if joiner-is-name
+                                     (js::eval "args.slice(2)")
+                                     (js::eval "args.slice(1)"))
+                            rest (if joiner-is-name
+                                     rest
+                                     (if (js::eval "rest.length > 1")
+                                         (list* (concat (list* name) rest))
+                                         '())))
+                     `(,(unqt 'joiner) (js::eval ,(unqt 'compiled)) ,(unqt-spl 'rest)))
+                   a)))))))
+
+
 ;; Math
-(def-infix-op-fn + (js::eval "(+a) + (+b)"))
-(def-infix-op-fn - (js::eval "a - b"))
-(def-infix-op-fn * (js::eval "a * b"))
-(def-infix-op-fn / (js::eval "a / b"))
+(def-chained-operator + "+")
+(def-chained-operator - "-")
+(def-chained-operator * "*")
+(def-chained-operator / "/")
+;; (def-infix-op-fn + (js::eval "(+a) + (+b)"))
+;; (def-infix-op-fn - (js::eval "a - b"))
+;; (def-infix-op-fn * (js::eval "a * b"))
+;; (def-infix-op-fn / (js::eval "a / b"))
 
 (def (mod a b)
      (js::eval "a % b"))
@@ -24,36 +56,35 @@
      (js::eval "-n"))
 
 
-;; Logical
-(def (not x)
-     (js::eval "!x"))
+;; LOGICAL
+(defmacro (not x)
+  (let (c-x (.compile-item oppo x)
+        list* (lambda (...ls) ls)
+        compiled (.join (list* "!" c-x) ""))
+    `(js::eval ,compiled)))
 
-(def-infix-op-fn or (js::eval "a || b"))
-(def-infix-op-fn and (js::eval "a && b"))
-
-
-;; Comparison
-(def-infix-op-fn < (js::eval "a < b"))
-(def-infix-op-fn > (js::eval "a > b"))
-(def-infix-op-fn <= (js::eval "a <= b"))
-(def-infix-op-fn >= (js::eval "a >= b"))
-
-(def-infix-op-fn = (js::eval "a === b"))
-(def eq =)
-(def-infix-op-fn eq-typeless (js::eval "a == b"))
-(def-infix-op-fn not= (js::eval "a !== b"))
-(def not-eq not=)
-(def-infix-op-fn not-eq-typeless (js::eval "a != b"))
-
-(def (nil? x) (js::eval "x == null"))
+(def-chained-operator or "||")
+(def-chained-operator and "&&")
 
 
-(def (->object x) (Object x))
-(def (->string x) (String x))
-(def (->number x) (Number x))
-(def (->boolean x) (Boolean x))
+;; COMPARISON
+(def-chained-operator < "<" and)
+(def-chained-operator > ">" and)
+(def-chained-operator <= "<=" and)
+(def-chained-operator >= ">=" and)
+(def-chained-operator eq "===" and)
+(def-chained-operator not-eq "!==" and)
+(def-chained-operator eq~ "==" and)
+(def-chained-operator not-eq~ "!=" and)
+
+(def = ('is-equal ('helpers oppo)))
+(def (not=)
+     (not (apply = (js::eval "arguments"))))
+
+(def (nil? x) (eq~ x #nil))
 
 
+;; GENERAL ENVIRONMENT
 (let (stringify (lambda (x) (.to-oppo-string ('helpers oppo) x #f)))
   (def (puts ...args)
        (.apply ('log console) console (map stringify args)))
@@ -62,8 +93,77 @@
   (def (puts-warning ...args)
        (.apply ('warn console) console (map stringify args))))
 
+(defmacro (cond ...body)
+  (let (len ('length body)
+        fst (js::eval "body[0]")
+        snd (js::eval "body[1]")
+        rest (js::eval "body.slice(2)"))
+    (if (js::eval "len % 2 !== 0") (js::eval "(function () { throw oppo.CompileError('Cannot call cond with an odd number of arguments', this); })"))
+    (if len
+        `(if ,fst ,snd (cond ,@rest)))))
+
+
+;; FUNCTIONS
 (defmacro (apply fn args)
   `(.apply ,fn #nil ,args))
+
+
+;; GENERIC COLLECTION METHODS
+(def (empty? x)
+     (let (type (typeof x))
+       (cond
+        (nil? x) #t
+        (or (eq type "array")
+            (eq type "string")) (eq ('length x) 0)
+        (eq type "object") (empty? (keys x))
+        (eq type "number") (eq x 0)
+        'else #f)))
+
+(def contains? (js::eval "function (c, v, deep) {
+  if (deep == null)
+    deep = true;
+  var is_equal, type, v2;
+
+  is_equal = oppo.helpers.is_equal;
+  type = oppo.helpers.to_type(c);
+  if (type === 'array' || type === 'string') {
+    if (!deep && c.indexOf) {
+      return c.indexOf(v) >= 0
+    } else {
+      for (var i = 0, len = c.length; i < len; i++) {
+        v2 = c[i];
+        if (deep) {
+          if (is_equal(v, v2))
+            return true;
+        } else {
+          if (v === v2)
+            return true;
+        }
+      }
+    }
+  } else if (type === 'object') {
+    for (var prop in c) {
+      v2 = c[prop]
+      if (deep) {
+        if (is_equal(v, v2))
+          return true;
+      } else {
+        if (v === v2)
+          return true;
+      }
+    }
+  }
+
+  return false;
+}"))
+
+
+
+
+
+;; LISTS
+(def (list ...ls) ls)
+(def (->list x) (js::eval "Array.prototype.slice.call(x)"))
 
 (def map ('map ('helpers oppo)))
 
@@ -114,18 +214,8 @@
                    (- n 1)))
          (js::eval "ls[i]"))))
 
-(def (empty? x)
-     (if (nil? x)
-         #t
-     (let (type (typeof x))
-       (if (eq type "array")
-           (eq ('length x) 0)
-       (if (eq type "object")
-           (empty? (keys x)))))))
 
-(def (str ...strings) (.join strings ""))
-
-(def (list ...ls) ls)
+;; OBJECTS
 (def object (js::eval "function () {
   var ret, i, len, key;
   ret = {};
@@ -141,14 +231,23 @@
   return ret;
 }"))
 
-(let [-merge ('merge ('helpers oppo))]
-  (def [merge ...objs]
-       (apply -merge `[,(js::eval "{}") ,@objs])))
+(def (->object x) (Object x))
 
-(def keys (js::eval
-  "Object.keys || function (o) {
-     var results = [];
-     for (var key in o)
-       if (o.hasOwnProperty(key)) results.push(key);
-     return results;
-   }"))
+(let [-merge ('merge ('helpers oppo))]
+     (def [merge ...objs]
+          (apply -merge `[,(js::eval "{}") ,@objs])))
+
+(def keys ('keys ('helpers oppo)))
+
+
+;; STRINGS
+(def (->string x) (String x))
+(def (str ...strings) (.join strings ""))
+
+
+;; NUMBERS
+(def (->number x) (Number x))
+
+
+;; BOOLEANS
+(def (->boolean x) (Boolean x))
