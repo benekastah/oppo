@@ -183,6 +183,7 @@ oppo.helpers =
       if not loop_started
         prev_b = item
         loop_started = yes
+        continue
         
       a = prev_b
       b = item
@@ -191,17 +192,11 @@ oppo.helpers =
       continue if a is b
       continue if not a? and not b?
 
-      if a instanceof Symbol and b instanceof Symbol and a.text isnt b.text
-        return false
-      else
-        continue
-
-      type_a = to_type a
+      type = type_a = to_type a
       type_b = to_type b
       if type_a isnt type_b
         return false
 
-      type = type_a
       if type in ["string", "number", "function"]
         return false
         
@@ -213,6 +208,12 @@ oppo.helpers =
             return false
             
       else if type is "object"
+        if a instanceof Symbol and b instanceof Symbol
+          if a.text isnt b.text
+            return false
+          else
+            continue
+      
         keys_a = keys a
         keys_b = keys b
         if keys_a.length isnt keys_b.length

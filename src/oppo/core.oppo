@@ -38,6 +38,10 @@
                    a)))))))
 
 
+(defmacro (apply fn args)
+  `(.apply ,fn #nil ,args))
+
+
 ;; Math
 (def-chained-operator + "+")
 (def-chained-operator - "-")
@@ -101,11 +105,6 @@
     (if (js::eval "len % 2 !== 0") (js::eval "(function () { throw oppo.CompileError('Cannot call cond with an odd number of arguments', this); })"))
     (if len
         `(if ,fst ,snd (cond ,@rest)))))
-
-
-;; FUNCTIONS
-(defmacro (apply fn args)
-  `(.apply ,fn #nil ,args))
 
 
 ;; GENERIC COLLECTION METHODS
