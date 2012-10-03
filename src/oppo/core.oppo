@@ -1,39 +1,39 @@
-(include test)
 
 (def global ('root oppo))
 (def typeof ('to-type ('helpers oppo)))
-
 (def eval ('eval oppo))
 
-(defmacro (def-infix-op-fn name ...op)
-  `(let (op (lambda (a b) ,@op))
-     (def (,name)
-          (reduce op (js::eval "arguments")))))
 
-(defmacro (def-chained-operator name op joiner)
+(defmacro (def-chained-operator)
+  (def #{'local #yes} args (js::eval "oppo.helpers.get_options.apply(null, arguments)"))
+  (def #{'local #yes} metadata (js::eval "args[0]"))
+  (def #{'local #yes} name (js::eval "args[1]"))
+  (def #{'local #yes} op (js::eval "args[2]"))
+  (def #{'local #yes} joiner (js::eval "args[3]"))
+
   (let (unqt (lambda (x) `(unquote ,x))
         unqt-spl (lambda (x) `(unquote-splicing ,x)))
-    `(defmacro (,name ...args)
+    `(defmacro ,metadata (,name ...args)
        (let (len ('length args))
          (if len
              (let (a (js::eval "args[0]"))
                (if (js::eval "len > 1")
                    (let (a* (.compile-item oppo a)
-                            b (.compile-item oppo (js::eval "args[1]"))
-                            list* (lambda (...ls) ls)
-                            compiled (.join (list* a* ,op b) " ")
-                            name ',name
-                            joiner ',joiner
-                            joiner (if joiner joiner name)
-                            joiner-is-name (js::eval "name.text == joiner.text")
-                            rest (if joiner-is-name
-                                     (js::eval "args.slice(2)")
-                                     (js::eval "args.slice(1)"))
-                            rest (if joiner-is-name
-                                     rest
-                                     (if (js::eval "rest.length > 1")
-                                         (list* (concat (list* name) rest))
-                                         '())))
+                         b (.compile-item oppo (js::eval "args[1]"))
+                         list* (lambda (...ls) ls)
+                         compiled (.join (list* a* ,op b) " ")
+                         name ',name
+                         joiner ',joiner
+                         joiner (if joiner joiner name)
+                         joiner-is-name (js::eval "name.text == joiner.text")
+                         rest (if joiner-is-name
+                                  (js::eval "args.slice(2)")
+                                (js::eval "args.slice(1)"))
+                         rest (if joiner-is-name
+                                  rest
+                                  (if (js::eval "rest.length > 1")
+                                      (list* (.concat (list* name) rest))
+                                      '())))
                      `(,(unqt 'joiner) (js::eval ,(unqt 'compiled)) ,(unqt-spl 'rest)))
                    a)))))))
 
@@ -42,69 +42,58 @@
   `(.apply ,fn #nil ,args))
 
 
-;; Math
-(def-chained-operator + "+")
-(def-chained-operator - "-")
-(def-chained-operator * "*")
-(def-chained-operator / "/")
-;; (def-infix-op-fn + (js::eval "(+a) + (+b)"))
-;; (def-infix-op-fn - (js::eval "a - b"))
-;; (def-infix-op-fn * (js::eval "a * b"))
-;; (def-infix-op-fn / (js::eval "a / b"))
-
-(def (mod a b)
-     (js::eval "a % b"))
-(def pow ('pow Math))
-(def abs ('abs Math))
-(def (negate n)
-     (js::eval "-n"))
-
-
-;; LOGICAL
-(defmacro (not x)
-  (let (c-x (.compile-item oppo x)
-        list* (lambda (...ls) ls)
-        compiled (.join (list* "!" c-x) ""))
-    `(js::eval ,compiled)))
-
-(def-chained-operator or "||")
-(def-chained-operator and "&&")
-
-
-;; COMPARISON
-(def-chained-operator < "<" and)
-(def-chained-operator > ">" and)
-(def-chained-operator <= "<=" and)
-(def-chained-operator >= ">=" and)
-(def-chained-operator eq "===" and)
-(def-chained-operator not-eq "!==" and)
-(def-chained-operator eq~ "==" and)
-(def-chained-operator not-eq~ "!=" and)
-
-(def = ('is-equal ('helpers oppo)))
-(def (not=)
-     (not (apply = (js::eval "arguments"))))
-
-(def (nil? x) (eq~ x #nil))
-
-
 ;; GENERAL ENVIRONMENT
-(let (stringify (lambda (x) (.to-oppo-string ('helpers oppo) x #f)))
-  (def (puts ...args)
-       (.apply ('log console) console (map stringify args)))
-  (def (puts-error ...args)
-       (.apply ('error console) console (map stringify args)))
-  (def (puts-warning ...args)
-       (.apply ('warn console) console (map stringify args))))
+(def ->oppo-string ('to-oppo-string ('helpers oppo)))
+(def (->log-string x)
+     (->oppo-string x #f))
+
+(defmacro (new Class ...args)
+  (let [list* (lambda (...ls) ls)
+        new-Class (.compile-item oppo Class)
+        new-Class (.join (list* "new" new-Class) " ")]
+        `((js::eval ,new-Class) ,@args)))
+
+(defmacro (make-symbol x)
+  `(new ('Symbol oppo) ,x))
+
+(def (symbol x)
+  (new ('Symbol oppo) x))
+
+(defmacro (puts ...args)
+  `(.apply ('log console) console (map ->log-string #[,@args])))
+
+(defmacro (puts-warning ...args)
+  `(.apply ('warn console) console (map ->log-string #[,@args])))
+
+(defmacro (puts-error ...args)
+  `(.apply ('error console) console (map ->log-string #[,@args])))
 
 (defmacro (cond ...body)
   (let (len ('length body)
         fst (js::eval "body[0]")
         snd (js::eval "body[1]")
         rest (js::eval "body.slice(2)"))
-    (if (js::eval "len % 2 !== 0") (js::eval "(function () { throw oppo.CompileError('Cannot call cond with an odd number of arguments', this); })"))
+    (if (js::eval "len % 2 !== 0") (js::eval "!function () { throw oppo.CompileError('Cannot call cond with an odd number of arguments', this); }()"))
     (if len
         `(if ,fst ,snd (cond ,@rest)))))
+
+(defmacro (use-from module ...items)
+  (if ('length items)
+      (let [item (js::eval "items[0]")
+            rest (js::eval "items.slice(1)")
+            list* (lambda (...ls) ls)
+            module-item (make-symbol (.join (list* ('text module) "::" ('text item)) ""))]
+            `(do (def #{'local #yes} ,item ,module-item)
+                 (use-from ,module ,@rest)))))
+
+(defmacro (use ...all-defs)
+  (let [len ('length all-defs)]
+       (if (js::eval "len % 2 !== 0") (js::eval "!function () { throw oppo.CompileError('Cannot call use with an odd number of arguments', this); }()"))
+       (if len
+           (let [module (js::eval "all_defs[0]")
+                 items (js::eval "all_defs[1]")
+                 rest (js::eval "all_defs.slice(2)")]
+                 `(use-from ,module ,@items)))))
 
 
 ;; GENERIC COLLECTION METHODS
@@ -112,10 +101,10 @@
      (let (type (typeof x))
        (cond
         (nil? x) #t
-        (or (eq type "array")
-            (eq type "string")) (eq ('length x) 0)
-        (eq type "object") (empty? (keys x))
-        (eq type "number") (eq x 0)
+        (or (js::eval "type === 'array'")
+            (js::eval "type === 'string'")) (js::eval "x.length === 0")
+        (js::eval "type === 'object'") (empty? (keys x))
+        (js::eval "type === 'number'") (js::eval "x === 0")
         'else #f)))
 
 (def contains? (js::eval "function (c, v, deep) {
@@ -203,9 +192,16 @@
 (def (first ls) (js::eval "ls[0]"))
 (def (second ls) (js::eval "ls[1]"))
 (def (third ls) (js::eval "ls[2]"))
+(def (last ls) (js::eval "ls[ls.length - 1]"))
+(def (slice ls start end)
+     (if ('slice ls)
+         (.slice ls start end)
+         (.call ('slice ('prototype Array)) ls start end)))
+(def (head ls) (slice ls 0 (- ('length ls) 1)))
+(def (tail ls) (slice ls 1))
 
 (def (nth ls n)
-     (if (eq n 0)
+     (if (js::eval "n === 0")
          (do (puts-warning "nth treats lists as 1-based; accessing the 0th item will always yield #nil")
              #nil)
        (let (i (if (< n 0)
@@ -250,3 +246,89 @@
 
 ;; BOOLEANS
 (def (->boolean x) (Boolean x))
+
+
+
+
+
+;; Math
+(def-chained-operator #{'runtime-function #(reduce #(+ #1 #2) arguments)} + "+")
+(def-chained-operator #{'runtime-function #(reduce #(- #1 #2) arguments)} - "-")
+(def-chained-operator #{'runtime-function #(reduce #(* #1 #2) arguments)} * "*")
+(def-chained-operator #{'runtime-function #(reduce #(/ #1 #2) arguments)} / "/")
+
+(def (mod a b)
+     (js::eval "a % b"))
+(def pow ('pow Math))
+(def abs ('abs Math))
+(def (negate n)
+     (js::eval "-n"))
+
+
+;; LOGICAL
+(defmacro (not x)
+  (let (c-x (.compile-item oppo x)
+        list* (lambda (...ls) ls)
+        compiled (.join (list* "!" c-x) ""))
+    `(js::eval ,compiled)))
+
+(def-chained-operator or "||")
+(def-chained-operator and "&&")
+
+
+;; COMPARISON
+
+
+(def-chained-operator
+  #{'runtime-function #(if (> ('length arguments) 1)
+                           (and (< #1 #2) (apply < (tail arguments)))
+                         #yes)}
+                         < "<" and)
+(def-chained-operator
+  #{'runtime-function #(if (> ('length arguments) 1)
+                          (and (> #1 #2) (apply > (tail arguments)))
+                        #yes)}
+                        > ">" and)
+(def-chained-operator
+  #{'runtime-function #(if (> ('length arguments) 1)
+                           (and (<= #1 #2) (apply <= (tail arguments)))
+                         #yes)}
+                         <= "<=" and)
+(def-chained-operator
+  #{'runtime-function #(if (> ('length arguments) 1)
+                           (and (>= #1 #2) (apply >= (tail arguments)))
+                         #yes)}
+                         >= ">=" and)
+(def-chained-operator
+  #{'runtime-function #(if (> ('length arguments) 1)
+                           (and (eq #1 #2) (apply eq (tail arguments)))
+                         #yes)}
+                         eq "===" and)
+(def-chained-operator
+  #{'runtime-function #(if (> ('length arguments) 1)
+                           (and (not-eq #1 #2) (apply not-eq (tail arguments)))
+                         #yes)}
+                         not-eq "!==" and)
+(def-chained-operator
+  #{'runtime-function #(if (> ('length arguments) 1)
+                           (and (eq~ #1 #2) (apply eq~ (tail arguments)))
+                         #yes)}
+                         eq~ "==" and)
+(def-chained-operator
+  #{'runtime-function #(if (> ('length arguments) 1)
+                           (and (not-eq~ #1 #2) (apply not-eq~ (tail arguments)))
+                         #yes)}
+                         not-eq~ "!=" and)
+
+(def = ('is-equal ('helpers oppo)))
+(def (not=)
+     (not (apply = (js::eval "arguments"))))
+
+(defmacro #{'runtime-function #(nil? #1)} (nil? x)
+  `(eq~ ,x #nil))
+
+
+
+
+;; INCLUDES GO LAST
+(include test)

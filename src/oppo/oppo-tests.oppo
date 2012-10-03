@@ -1,4 +1,6 @@
 
+(use test [describe it assert])
+
 (def (run-oppo-tests)
      (puts "Oppo tests\n")
      (describe "Logic"
@@ -94,10 +96,11 @@
 
      (describe "Lists"
                (it "should be able to create a list"
-                   (assert (= (js::eval "[1 2 3 4 5]")
-                              (list 1 2 3 4 5))))
+                   (assert (= (js::eval "[1, 2, 3, 4, 5]")
+                              (list 1 2 3 4 5)
+                              #[1 2 3 4 5])))
                (it "should be able to map a list"
-                   (assert (= (js::eval "[2 4 6 8]")
+                   (assert (= (js::eval "[2, 4, 6, 8]")
                               (map (lambda (x)
                                      (* x 2))
                                    (list 1 2 3 4)))))
@@ -112,7 +115,7 @@
                                                (+ a b))
                                              (list 100 100 100 100 100)))))
                (it "should be able to filter a list"
-                   (assert (= (js::eval "[2 4 6")
+                   (assert (= (js::eval "[2, 4, 6]")
                               (filter (lambda (x)
                                         (eq 0 (mod x 2)))
                                       (list 1 2 3 4 5 6 7)))))))

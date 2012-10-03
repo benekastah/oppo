@@ -1,5 +1,5 @@
 
-{JavaScriptCode, JavaScriptComment, Symbol, Splat} = oppo
+{JavaScriptCode, JavaScriptComment, Symbol, Splat, oppo_undefined} = oppo
 { text_to_js_identifier,
   to_type,
   clone,
@@ -13,13 +13,16 @@
   is_quoted,
   is_quasiquoted,
   is_unquoted,
-  is_unquote_spliced } = oppo.helpers
+  is_unquote_spliced,
+  is_equal,
+  get_options } = oppo.helpers
 
 
 oppo.Macro = class Macro
-  constructor: (@name, argnames, template) ->
+  constructor: (@name, argnames, template, @runtime_function) ->
     if (to_type argnames) is "function"
       @transform = argnames
+      [@runtime_function, template] = [template, @runtime_function]
     else
       c_transform_fn = compile_item [(symbol "lambda"), argnames, template...]
       @transform = eval c_transform_fn
@@ -27,7 +30,14 @@ oppo.Macro = class Macro
   compile: ->
     c_name = compile_item (get_symbol_text @name)
     c_transform = @transform.toString()
-    "new oppo.Macro(#{c_name}, #{c_transform})"
+    c_runtime_function = if to_type(@runtime_function) is "function"
+      @runtime_function.toString()
+    else if @runtime_function?
+      compile_item @runtime_function
+    args = [c_name, c_transform]
+    if c_runtime_function
+      args.push c_runtime_function
+    "new oppo.Macro(#{args.join ', '})"
       
 
 class Context
@@ -36,7 +46,7 @@ class Context
 
 
   var_stmt: ->
-    vars = for own k, v of @context when v not instanceof Context and v not instanceof Macro
+    vars = for own k, v of @context when v isnt undefined and v isnt oppo_undefined and v not instanceof Context and v not instanceof Macro
       k = @normalize_symbol_text k
       compile_item (symbol k)
       
@@ -63,8 +73,7 @@ class Context
     if not @context[s_sym]?
       @context[s_sym] = value
     else
-      err = new OppoCompileError "Can't define previously defined symbol: #{s_sym}", sym
-      # console.warn err.toString()
+      throw new OppoCompileError "Can't define previously defined symbol: #{s_sym}", sym
 
 
   set: (sym, value) ->
@@ -72,8 +81,7 @@ class Context
     if @context[s_sym]?
       @context[s_sym] = value
     else
-      err = new OppoCompileError "Can't set value of undefined symbol: #{s_sym}", sym
-      # console.warn err.toString()
+      throw new OppoCompileError "Can't set value of undefined symbol: #{s_sym}", sym
 
 
   get: (sym) ->
@@ -86,6 +94,8 @@ oppo.Module = class Module extends Context
 
   r_leading_slash = /^\//
   constructor: (parent_context, name) ->
+    @locals = {}
+    @locals_array = []
     @name = name.replace r_leading_slash, ''
     @full_name = "oppo.modules[\"#{@name}\"]"
     Module.set @name, this
@@ -94,8 +104,33 @@ oppo.Module = class Module extends Context
     if glob?[@name]?
       glob[@name] = this
 
+  is_local: (x) ->
+    xtext = x.text
+    for local in @locals_array
+      if local.text is xtext
+        return yes
+    no
+  
+  var_stmt: ->
+    context = @context
+    @context = @locals
+    result = super
+    @context = context
+    result
 
-  var_stmt: -> ""
+  def: (sym, value, local) ->
+    try result = super
+    catch e
+      if not local
+        throw e
+    
+    if local
+      @locals_array.push sym
+      context = @context
+      @context = @locals
+      super
+      @context = context
+    result
 
   compile: (inner) ->
     c_name = compile_item @name
@@ -109,7 +144,9 @@ oppo.Module = class Module extends Context
       m.context = oppo.helpers.merge(new_context, m.context);
     }();
 
-    #{var_stmt}#{inner};
+    #{var_stmt}#{inner.join ',\n  '};
+
+    return #{@shortcut_name};
 
     })(#{@full_name} || (#{@full_name} = {}))
     """
@@ -139,7 +176,6 @@ oppo.Module = class Module extends Context
       @modules[name] = module
 
 
-__module__ = null
 class ContextStack
   constructor: ->
     @global_context = new Context()
@@ -148,8 +184,6 @@ class ContextStack
 
     @stack = [@global_context]
     @stack.push Module.get Module.core_module_name
-    for own modname, value of Module.modules when modname isnt Module.core_module_name
-      @stack.push value
       
     @current_context = @global_context
 
@@ -162,11 +196,28 @@ class ContextStack
       result = module?.lookup new_sym
       return [result, module, new_sym]
 
+    {current_module} = oppo
+    if current_module?
+      current_module_result = current_module.lookup new_sym
+      current_module_info = [current_module_result, current_module, new_sym]
+
     index = @stack.length
     while index--
       c = @stack[index]
       result = c.lookup new_sym
-      return [result, c, new_sym] if result isnt undefined
+      context_info = [result, c, new_sym]
+      if result isnt undefined
+        context_found = true
+        break;
+
+    if context_found
+      if c instanceof Module
+        if current_module_result isnt undefined
+          return current_module_info
+      return context_info
+
+    if current_module_result isnt undefined
+      return current_module_info
 
     core = Module.get Module.core_module_name, null, no
     result = core?.lookup new_sym
@@ -178,7 +229,6 @@ class ContextStack
 
   push: (c) ->
     @current_context = c
-    __module__ = c.context
     @stack.push c
     c
 
@@ -196,7 +246,6 @@ class ContextStack
   pop: ->
     c = @stack.pop()
     @current_context = @stack[@stack.length - 1]
-    __module__ = @current_context.context
     c
 
 
@@ -207,6 +256,7 @@ compile = (parse_tree...) ->
     if result isnt undefined
       compiled.push result
   compiled
+
 
 oppo.compile_item = compile_item = (sexp) ->
   result = sexp?.__compiled__
@@ -239,16 +289,31 @@ oppo.compile_item = compile_item = (sexp) ->
   sexp?.__compiled__ = result
   result
 
+
+__module__ = null
 oppo.compile = (parse_tree, module_name = Module.anonymous_module_name) ->
   oppo.context_stack ?= new ContextStack()
-  
+
+  # Figure out what our module should be
   module = Module.get module_name, null, no
   if not module?
-    module = oppo.context_stack.push_new_module module_name  
+    module = oppo.context_stack.push_new_module module_name
+    
+  # Set the current module
+  old_current_module = oppo.current_module
   oppo.current_module = module
-  
+  __module__ = module.context
+
+  # Compile the module
   c = compile parse_tree...
-  module.compile "return #{c.join ",\n"}"
+  result = module.compile c
+
+  # Ensure the current module gets returned to its prior value
+  oppo.current_module = old_current_module
+  __module__ = old_current_module?.context
+  
+  result
+
 
 if process?.title is "node"
   do ->
@@ -272,6 +337,7 @@ if process?.title is "node"
         
       fname = pathname.replace r_file_extension, '.oppo'
       pathname = pathname.replace r_file_extension, ''
+
       # Don't do more work than necessary
       preresult = precompiled[fname]
       if preresult?
@@ -295,28 +361,48 @@ oppo.eval = (data) ->
   js_code = oppo.compile [data]
   root.eval js_code
 
-compile_symbol = (sym, resolve_module = true, resolve_macro = true, can_be_quoted = true) ->
+
+compile_symbol = (sym, config = {}) ->
+  {resolve_module, resolve_macro, unquote, assignable} = config
+  resolve_module ?= yes
+  if assignable
+    unquote ?= yes
+  
   sym_text = if (to_type sym) is "string" then sym else sym.text
-  if can_be_quoted and sym.quoted
+  if not unquote and sym.quoted
     "new oppo.Symbol(\"#{sym_text}\")"
   else
     [value, context, new_sym] = (oppo.context_stack?.lookup sym) ? []
     if resolve_module and new_sym?
       sym_text = new_sym.text
-    
-    if resolve_macro && value instanceof Macro
+
+    value_is_macro = value instanceof Macro
+    if resolve_macro and value_is_macro
       value
-    else if resolve_module and context instanceof Module
+    else if resolve_module and context instanceof Module and not context.is_local(new_sym)      
       module = context
       if module is oppo.current_module
         module_name = module.shortcut_name
       else
         module_name = module.full_name
-      #s_sym = compile_symbol new_sym, false
       s_sym = module.get_symbol_text new_sym
-      "#{module_name}.#{s_sym}"
+      result = "#{module_name}.#{s_sym}"
+      if not assignable and value_is_macro
+        if value.runtime_function
+          result += ".runtime_function"
+        else
+          result = compile_item null
+
+      if context?.name is "oppo-tests"
+        console.log "compile_symbol module is oppo-tests"
+        console.log "new_sym", new_sym
+        console.log "result", result
+        console.log()
+          
+      result
     else
       text_to_js_identifier sym_text
+
 
 compile_quasiquoted_list = (ls) ->
   quote_symbol = symbol 'quasiquote'
@@ -356,6 +442,7 @@ compile_quasiquoted_list = (ls) ->
   else
     list
 
+
 oppo.compile_list = compile_list = (ls, to_compile = yes) ->
   _ls = ls
   {quasiquoted, quoted, unquoted} = ls
@@ -381,6 +468,8 @@ oppo.compile_list = compile_list = (ls, to_compile = yes) ->
       if not (callable_is_quoted)
         if (to_type callable) is "array"
           c_callable = compile_list callable, no
+        else if callable instanceof Symbol
+          c_callable = compile_symbol callable, resolve_macro: yes
         else
           c_callable = compile_item callable
 
@@ -420,7 +509,9 @@ compile_object = (o) ->
 ################################################################################
 # Macros. These will take care of virtually all compiling.
 ################################################################################
-lambda = (options = {}, args, body...) ->
+lambda = ->
+  [options, args, body...] = get_options arguments...
+  
   context = oppo.context_stack.push_new()
   {body_hook} = options
   do_return = options.return ? yes
@@ -445,9 +536,13 @@ lambda = (options = {}, args, body...) ->
   body_len = body.length # Get the body length now before we change it.
   if splat_arg?
     splat_arg_val = new JavaScriptCode "Array.prototype.slice.call(arguments, #{args.length})"
-    body = [[(symbol 'def'), use_module: no, splat_arg, splat_arg_val], body...]
-  
-  c_args = compile args...
+    body = [[(symbol 'def'), {local: yes}, splat_arg, splat_arg_val], body...]
+
+  context.def (symbol "arguments"), oppo_undefined
+  c_args = for arg in args
+    context.def arg, oppo_undefined
+    compile_item arg
+
   if body_hook?
     body = body_hook.call this, body
   c_body = compile body...
@@ -469,15 +564,9 @@ lambda = (options = {}, args, body...) ->
     """
 
 
-define = (args...) ->
-  if args[0]?.constructor is Object
-    [opts, name, others...] = args
-  else
-    [name, others...] = args
-    opts = {}
-
-  {use_module} = opts
-  use_module ?= yes
+define = ->
+  [options, name, others...] = get_options arguments...
+  {local} = options
     
   if (to_type name) is "array"
     [name, args...] = name
@@ -491,30 +580,22 @@ define = (args...) ->
   [module, name] = get_module name
   if module?
     context = Module.get module, true
-  else if use_module
-    current_context = context = oppo.context_stack.current_context
-    while context && context not instanceof Module
-      context = context.parent_context
-    context ?= current_context
+  else if not local
+    context ?= oppo.current_module
   else
     context = oppo.context_stack.current_context
 
-  context.def name, value
+  # console.log "define current module name:", oppo.current_module?.name if not local
+  context.def name, value, local
 
-  c_name = compile_symbol full_name, yes, no, no
+  c_name = compile_symbol full_name, resolve_module: not local or module?, assignable: yes
   c_val = compile_item value
+
   new JavaScriptCode "#{c_name} = #{c_val}"
 
 
-set = (args...) ->
-  if args.length < 3
-    [name, value] = args
-  else
-    [opts, name, value] = args
-    
-  opts ?= {}
-  {use_module} = opts
-  use_module ?= yes
+set = ->
+  [options, name, value] = get_options arguments...
 
   [__, context] = oppo.context_stack.lookup name
   if context?
@@ -527,8 +608,8 @@ set = (args...) ->
   new JavaScriptCode "#{c_name} = #{c_value}"
 
 
-define_macro = (name, argnames, template) ->
-  value = new Macro name, argnames, template
+define_macro = (name, argnames, template, fn) ->
+  value = new Macro name, argnames, template, fn
   define name, value
 
 
@@ -540,28 +621,31 @@ define_core_macro = (name, template_compile) ->
   define_builtin_macro "#{Module.core_module_name}::#{name}", template_compile
 
 
-define_core_macro "defmacro", (args, template...) ->
+define_core_macro "defmacro", ->
+  [options, args, template...] = get_options arguments...
+
+  fn = options.runtime_function
   [name, argnames...] = args
-  define_macro name, argnames, template
+  define_macro name, argnames, template, fn
 
 
 define_core_macro "def", define
 define_core_macro "set!", set
-define_core_macro "lambda", -> lambda null, arguments...
+define_core_macro "lambda", lambda
 
 
 define_core_macro "call", (fname, args...) ->
   c_fname = compile_item fname
   c_args = compile args...
   new JavaScriptCode "#{c_fname}(#{c_args.join ', '})"
-
+  
 
 define_core_macro "object-get-value", (prop, base) ->
   c_base = compile_item base
   if (is_quoted prop) and (is_symbol prop)
     s_prop = compile_list prop, no
     s_prop.quoted = no
-    c_prop = compile_symbol s_prop, no, no
+    c_prop = compile_symbol s_prop, resolve_module: no
     js_code = "#{c_base}.#{c_prop}"
   else
     c_prop = compile_item prop
@@ -599,29 +683,35 @@ define_core_macro "unquote-splicing", (x) ->
   x?.unquote_spliced = yes
   [(symbol "unquote"), x]
 
-
-_let = (options = {}, locals, body...) ->
+  
+define_core_macro "let", ->
+  [options, locals, body...] = get_options arguments...
+  
   if locals.length % 2
     throw new OppoCompileError "let must have an even number of binding forms", this
+    
   names = []
   def_body = []
   for item, i in locals
     if i % 2 is 0
       name = item
     else
-      setter = if name not in names
+      has_name = no
+      for this_name in names
+        has_name= is_equal name, this_name
+        break if has_name
+        
+      setter = if not has_name
+        names.push name
         symbol "def"
       else
         symbol "set!"
-      names.push name
       
-      result = [setter, {use_module: no}, name, item]
+      result = [setter, {local: yes}, name, item]
       def_body.push result
       
   body = def_body.concat body
   [(lambda options, [], body...)]
-  
-define_core_macro "let", -> _let null, arguments...
 
 
 define_core_macro "if", (cond, when_t, when_f) ->
@@ -664,13 +754,13 @@ define_core_macro "for", ([defs, ls], body...) ->
     """
     [_for]
 
-  _let {body_hook, return: no}, [
+  [(symbol "let"), {body_hook, return: no}, [
     temp_ls, ls
     i, 0
     len, [[(symbol 'quote'), (symbol "length")], temp_ls]
     item, null
     result, [(symbol "quote"), []]
-  ]
+  ]]
 
 
 define_core_macro "do", ->
@@ -687,8 +777,11 @@ define_core_macro "include", (path_names...) ->
 define_builtin_macro "js::eval", (to_eval) ->
   type = to_type to_eval
   if type is "string"
-    quotes_escaped = to_eval.replace /"/g, '\\"' # get rid of an annoying emacs coffee-mode bug with this single-quote: '
-    s_to_eval = "\"#{quotes_escaped}\""
-    new JavaScriptCode (eval s_to_eval)
+    # escaped = to_eval.replace /(^|[^\\])"/g, "$1\\\""
+    s_to_eval = "\"#{to_eval}\""
+    try
+      result = new JavaScriptCode (eval s_to_eval)
+    catch e
+      result = new JavaScriptCode to_eval
   else
     [(new JavaScriptCode "oppo.root.eval"), compile_item to_eval]

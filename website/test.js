@@ -9,6 +9,6 @@
     return result = eval(compiled);
   };
 
-  result = compile_code("\n(def-chained-operator < \"<\" and)\n(< 1 2 3 4 5 6 7)\n");
+  result = compile_code("\n(def x (eq \"a\" \"a\"))\n");
 
 }).call(this);

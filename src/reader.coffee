@@ -2,7 +2,8 @@
 ###
 HELPERS / SETUP
 ###
-{to_type, clone} = oppo.helpers
+{to_type, clone, is_quoted, is_symbol} = oppo.helpers
+{JavaScriptCode} = oppo
 r_whitespace = /^\s+/
 r_number = /^-?(\d*\.\d+|\d+)/
 r_symbol = /^[\w~`!@#$%^&*\-+=|\\"':?\/<>,\.]+/
@@ -48,6 +49,32 @@ make_reader = (opts, f) ->
 read_true = make_reader -> true
 read_false = make_reader -> false
 read_nil = make_reader -> null
+
+open_list = make_reader (match) ->
+  list = []
+  list.opener = match
+  reader.lists.push list
+  reader.current_list = list
+  list.starting_line_number = reader.line_number
+  reader.open_parens += 1
+  undefined
+
+close_list = make_reader (match, text, index) ->
+  open_parens = reader.open_parens -= 1
+  if open_parens < 0
+    throw new OppoReadError "You have too many `)`s"
+
+  list = reader.lists.pop()
+  {opener} = list
+  error_message = "Braces mismatch: it is illegal to open a form with"
+  error_message_ctd = "and close it with"
+  if opener is "(" and match isnt ")"
+    throw new OppoReadError "#{error_message} `(` #{error_message_ctd} `]`"
+  else if opener is '[' and match isnt ']'
+    throw new OppoReadError "#{error_message} `[` #{error_message_ctd} `)`"
+          
+  reader.current_list = reader.lists[reader.lists.length - 1]
+  list
 
 oppo.ReadTable = class ReadTable
   constructor: ->
@@ -110,31 +137,12 @@ oppo.ReadTable = class ReadTable
         else
           undefined
 
-      /^(\(|\[)/, make_reader (match) ->
-        list = []
-        list.opener = match
-        reader.lists.push list
-        reader.current_list = list
-        list.starting_line_number = reader.line_number
-        reader.open_parens += 1
-        undefined
-
-      /^(\)|\])/, make_reader (match, text, index) ->
-        open_parens = reader.open_parens -= 1
-        if open_parens < 0
-          throw new OppoReadError "You have too many `)`s"
-
-        list = reader.lists.pop()
-        {opener} = list
-        error_message = "Braces mismatch: it is illegal to open a form with"
-        error_message_ctd = "and close it with"
-        if opener is "(" and match isnt ")"
-          throw new OppoReadError "#{error_message} `(` #{error_message_ctd} `]`"
-        else if opener is '[' and match isnt ']'
-          throw new OppoReadError "#{error_message} `[` #{error_message_ctd} `)`"
-          
-        reader.current_list = reader.lists[reader.lists.length - 1]
-        list
+      "(", open_list
+      "[", open_list
+      "{", open_list
+      ")", close_list
+      "]", close_list
+      "}", close_list
 
       "'", make_reader (match) ->
         new Wrapper 'quote'
@@ -175,12 +183,40 @@ oppo.ReadTable = class ReadTable
     special: new ReadTable(
       'true', read_true
       't', read_true
+      'yes', read_true
+      'on', read_true
     
       'false', read_false
       'f', read_false
+      'no', read_false
+      'off', read_false
     
       'nil', read_nil
       'n', read_nil
+
+      /^\d+/, make_reader (match) ->
+        new JavaScriptCode "arguments[#{match - 1}]"
+        
+      '(', make_reader ->
+        open_list arguments...
+        list = reader.current_list
+        body = []
+        list.push (new Symbol 'lambda'), [], body
+        list.push = -> body.push arguments...
+        undefined
+
+      '[', make_reader ->
+        open_list arguments...
+        list = reader.current_list
+        list.push new Symbol 'list'
+        undefined
+
+      '{', make_reader ->
+        open_list arguments...
+        list = reader.current_list
+        list.push new Symbol 'object'
+        list.is_reader_object = yes
+        undefined
     )
 
 ###
@@ -201,6 +237,7 @@ oppo.read = (text) ->
   reader.text = text
   reader.text_index = 0
   reader.open_parens = 0
+  reader.open_array = 0
 
   while reader.text_index < reader.text.length
     success = read_token()
@@ -222,9 +259,28 @@ oppo.read = (text) ->
   list
 
 
+parse_reader_object = (list) ->
+  ls = list.slice 1
+  if ls.length % 2 isnt 0
+    throw new OppoReadError "Can't create a reader object with odd number of arguments"
+
+  obj = {}
+  for item, i in ls
+    if i % 2 is 0
+      key = item
+      if ((is_quoted key) and (is_symbol key[1])) or typeof key in ["string", "number"]
+        key = key[1]
+      else
+        return list
+    else
+      obj[key] = item
+  obj
+
+
 parse = oppo.parse = (parse_tree) ->
   wrappers = []
   list = []
+  {is_reader_object} = parse_tree
   for item in parse_tree  
     if item instanceof Wrapper
       wrappers.push item
@@ -235,4 +291,7 @@ parse = oppo.parse = (parse_tree) ->
         item = [wrapper.symbol, item]
       list.push item
 
+  if is_reader_object
+    list = parse_reader_object list
+    
   list

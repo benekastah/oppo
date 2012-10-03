@@ -4,6 +4,7 @@ root.oppo =
   root: root
   modules: {}
 
+oppo.oppo_undefined = {}
 
 class OppoCompileError extends Error
   constructor: (message, @form) ->
@@ -30,10 +31,10 @@ oppo.Symbol = class Symbol
 
 oppo.Splat = class Splat
 
-array_toString = Object::toString
+object_toString = Object::toString
 array_concat = Array::concat
 oppo.helpers =
-  to_type: (o) -> (s = array_toString.call o).substring(8, s.length - 1).toLowerCase()
+  to_type: (o) -> (s = object_toString.call o).substring(8, s.length - 1).toLowerCase()
 
   clone: Object.create ? (o) ->
     class Noop
@@ -122,7 +123,11 @@ oppo.helpers =
     else
       throw new OppoCompileError "Can't get symbol text from non-symbol #{sym}", sym
 
-  concat: (base, items...) -> array_concat.apply base, items
+  concat: (base, items...) ->
+    if base.concat?
+      base.concat items...
+    else
+      array_concat.apply base, items
 
   gensym: do ->
     gensym_id_map = {}
@@ -157,24 +162,35 @@ oppo.helpers =
     (recurse and (to_type x) is "array" and is_symbol (oppo.compile_list x, no), recurse - 1)
 
   is_quoted: (x, recurse = 2) ->
-    {to_type, is_quoted} = oppo.helpers
-    x?.quoted or
-    (recurse and (to_type x) is "array" and first_item_matches x, "quote")
+    {first_item_matches} = oppo.helpers
+    x?.quoted or first_item_matches x, "quote"
+
+  is_object: (x) ->
+    {first_item_matches} = oppo.helpers
+    x?.constructor is Object or first_item_matches x, "object"
 
   is_quasiquoted: (x, recurse = 2) ->
-    {to_type, is_quasiquoted} = oppo.helpers
-    x?.quasiquoted or
-    (recurse and (to_type x) is "array" and first_item_matches x, "quasiquote")
+    {first_item_matches} = oppo.helpers
+    x?.quasiquoted or first_item_matches x, "quasiquote"
 
   is_unquoted: (x, recurse = 2) ->
-    {to_type, is_unquoted} = oppo.helpers
-    x?.unquoted or
-    (recurse and (to_type x) is "array" and first_item_matches x, "unquote")
+    {first_item_matches} = oppo.helpers
+    x?.unquoted or first_item_matches x, "unquote"
 
   is_unquote_spliced: (x, recurse = 2) ->
-    {to_type, is_unquote_spliced} = oppo.helpers
-    x?.unquote_spliced or
-    (recurse and (to_type x) is "array" and first_item_matches x, "unquote-splicing")
+    {first_item_matches} = oppo.helpers
+    x?.unquote_spliced or first_item_matches x, "unquote-splicing"
+
+  get_options: (args...) ->
+    {is_object} = oppo.helpers
+    if not is_object args[0]
+      args.unshift {}
+    else if (to_type args[0]) is "array"
+      options = args.shift()
+      options = oppo.eval options
+      args.unshift options
+      
+    args
 
   is_equal: ->
     {to_type, keys, is_equal} = oppo.helpers

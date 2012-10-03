@@ -1,27 +1,30 @@
 
-(def (putsgroup ...stuff)
-     (apply puts stuff))
+(defmacro (puts-group ...stuff)
+  `(puts ,@stuff))
 
-(def (putsitem ...stuff)
-     (apply puts `("    " ,@stuff)))
+(defmacro (puts-item ...stuff)
+  `(puts "    " ,@stuff))
 
-(def (putserror ...stuff)
-     (apply puts-error `("!!    " ,@stuff)))
+(defmacro (puts-error ...stuff)
+  `(puts-error "!!    " ,@stuff))
 
-(def (putssuccess ...stuff)
-     (apply puts `("      " ,@stuff)))
+(defmacro (puts-success ...stuff)
+  `(puts "      " ,@stuff))
 
 (defmacro (describe thing ...body)
   `(let (---thing--- ,thing)
-     (putsgroup ---thing---)
+     (puts-group ---thing---)
      (do ,@body)))
 
 (defmacro (it attribute ...body)
   `(let (---attribute--- ,attribute)
-     (putsitem "it" ---attribute---)
+     (puts-item "it" ---attribute---)
      (do ,@body)))
 
 (defmacro (assert x)
   `(if ,x
-       (putssuccess "OK!")
-       (putserror "Failed." ',x)))
+       (puts-success "OK!")
+       (puts-error "Failed." ',x)))
+
+(include oppo-tests)
+;; (def run-oppo-tests oppo-tests::run-oppo-tests)

@@ -2,9 +2,12 @@
 
 # Compile files and concat into single file
 coffee -j dist/compiler.js -c src/core src/text-to-js-identifier src/reader src/compiler
+# Overwrite oppo.js so that we will use the just-compiled version to get core.oppo
+cat dist/compiler.js > dist/oppo.js
+# Compile the core.oppo file
 bin/oppo -o dist/core.js -c src/oppo/core
+# Combine the two files into oppo.js
 cat dist/compiler.js dist/core.js > dist/oppo.js
-#cat dist/compiler.js > dist/oppo.js
 
 # Remove temporary build files
 rm dist/compiler.js

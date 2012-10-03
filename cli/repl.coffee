@@ -14,6 +14,9 @@ prompt = (prefix = prompt_prefix) ->
   repl.setPrompt prefix
   repl.prompt()
 
+puts_symbol = new oppo.Symbol "puts"
+do_symbol = new oppo.Symbol "do"
+
 backlog = ''
 run = (buffer) ->
   if not buffer?
@@ -35,9 +38,10 @@ run = (buffer) ->
     if compile
       result = oppo.compile oppo_data
     else
-      result = oppo.eval oppo_data...
+      # Log the result
+      oppo_data = [puts_symbol, [do_symbol, oppo_data...]]
+      result = oppo.eval oppo_data
       result = oppo.helpers.to_oppo_string result
-    console.log result
   catch e
     try console.error e.toString()
     throw e
