@@ -10,5 +10,5 @@ bin/oppo -o dist/core.js -c src/oppo/core
 cat dist/compiler.js dist/core.js > dist/oppo.js
 
 # Remove temporary build files
-rm dist/compiler.js
-rm dist/core.js
+# rm dist/compiler.js
+# rm dist/core.js

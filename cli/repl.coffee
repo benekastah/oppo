@@ -35,16 +35,17 @@ run = (buffer) ->
 
   try
     oppo_data = oppo.read code
-    if compile
-      result = oppo.compile oppo_data
-    else
-      # Log the result
-      oppo_data = [puts_symbol, [do_symbol, oppo_data...]]
-      result = oppo.eval oppo_data
-      result = oppo.helpers.to_oppo_string result
   catch e
-    try console.error e.toString()
-    throw e
+    return
+
+  if compile
+    result = oppo.compile oppo_data
+    console.log result
+  else
+    # Log the result
+    oppo_data = [puts_symbol, [do_symbol, oppo_data...]]
+    result = oppo.eval oppo_data
+    result = oppo.helpers.to_oppo_string result
   
   prompt()
 

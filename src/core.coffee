@@ -48,6 +48,10 @@ oppo.helpers =
         first_o[k] = v
     first_o
 
+  raise: (err) ->
+    console.error err.toString()
+    throw err
+
   to_oppo_string: (x, quote_strings = yes) ->
     {to_oppo_string, to_type} = oppo.helpers
     type = to_type x

@@ -9,6 +9,6 @@
     return result = eval(compiled);
   };
 
-  result = compile_code("\n(def x (eq \"a\" \"a\"))\n");
+  result = compile_code("\n(def (fact n)\n  (let loop [n* n\n             accum 1]\n     (if (< n* 1)\n       accum\n       (loop (- n* 1) (* n* accum)))))\n\n(puts (fact 5))\n");
 
 }).call(this);

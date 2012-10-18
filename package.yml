@@ -11,14 +11,18 @@
   version: "0.0.3"
   main: "dist/oppo.js"
   author: "Paul Harper <benekastah@gmail.com>"
+  bin:
+    oppo: "./bin/oppo"
   scripts: 
     preinstall: "bin/npm-preinstall"
   repository: 
     type: "git"
     url: "git@github.com:benekastah/oppo.git"
   dependencies: 
-    underscore: "1.x.x"
     optimist: "0.2.x"
+  optionalDependencies:
+    uglify-js: "*"
+    uglify-js2: "*"
   devDependencies: 
     coffee-script: "1.x.x"
   engines: 

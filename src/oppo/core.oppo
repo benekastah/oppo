@@ -18,10 +18,10 @@
          (if len
              (let (a (js::eval "args[0]"))
                (if (js::eval "len > 1")
-                   (let (a* (.compile-item oppo a)
+                   (let (list* (lambda (...ls) ls)
+                         a* (.compile-item oppo a)
                          b (.compile-item oppo (js::eval "args[1]"))
-                         list* (lambda (...ls) ls)
-                         compiled (.join (list* a* ,op b) " ")
+                         compiled (.join (list* "(" a* " " ,op " " b ")") "")
                          name ',name
                          joiner ',joiner
                          joiner (if joiner joiner name)
@@ -43,6 +43,11 @@
 
 
 ;; GENERAL ENVIRONMENT
+(defmacro (require varname module)
+  (let [mod (.toString (js::eval "(module || varname)"))
+        var (js::eval "new oppo.Symbol(varname)")]
+        `(def #{'local #yes} ,var ((js::eval "require") ,mod))))
+
 (def ->oppo-string ('to-oppo-string ('helpers oppo)))
 (def (->log-string x)
      (->oppo-string x #f))

@@ -2,6 +2,7 @@ path = require 'path'
 fs = require 'fs'
 oppo = require '../'
 child_process = require 'child_process'
+{exec} = child_process
 cwd = process.cwd()
 
 # console.log "oppo", oppo
@@ -36,15 +37,61 @@ get_module_name = (file, base_dir = get_base_dir file) ->
   module_name = module_name.replace /\.oppo$/, ''
   module_name
 
-@compile = (output, files, watch, beautify) ->
+
+uglify = (file, argv, callback) ->
+  ug1 = null
+  ug2 = null
+  exec "which uglifyjs2", (err, output) ->
+    ug2 = not err and !!output
+    action()
+  exec "which uglifyjs", (err, output) ->
+    ug1 = not err and !!output
+    action()
+
+  action = ->
+    if ug1? and ug2?
+      command = if ug2
+        uglify2 file, argv
+      else if ug1
+        uglify1 file, argv
+
+      if command?
+        exec command, write_file
+      else
+        callback()
+        
+  write_file = (err, output) ->
+    throw err if err?
+    fs.writeFile file, output, callback
+        
+
+uglify2 = (file, {compress}) ->
+  switches = if compress
+    "-c"
+  else
+    "-b indent-level=2 --comments all"
+  "uglifyjs2 #{file} #{switches}"
+        
+
+uglify1 = (file, {compress}) ->
+  switches = if compress
+    ""
+  else
+    "-b --indent 2 -nm -ns --no-seqs"
+  "uglifyjs #{switches} #{file}"
+
+
+@compile = (files, argv) ->
   for file in files
-    compile output, file, watch, beautify
+    compile file, argv
 
 r_absolute_path = /^\//
 r_file_extension = /\.oppo$/
-compile = (output, file, watch, beautify) ->
+compile = (file, argv) ->
+  {output, watch, beautify, include_oppo_core, browser} = argv
+  
   if not r_absolute_path.test file
-    file = path.join __dirname, "..", file
+    file = path.join process.cwd(), file
   
   if /\.js$/.test output
     output_fname = path.basename output
@@ -59,11 +106,33 @@ compile = (output, file, watch, beautify) ->
     fs.watch file, compile.bind arguments...
       
   compiled_code = oppo.compile_from_file file
+  if include_oppo_core
+    oppo_core = fs.readFileSync "#{__dirname}/../dist/oppo.js"
+    compiled_code = """
+    #{oppo_core}
+
+    #{compiled_code}
+    """
+  else if not browser
+    compiled_code = """
+    if (typeof oppo === 'undefined') {
+      try {
+        require('oppo');
+      } catch (e) {
+        throw new Error('oppo object not available. Make sure you have oppo properly installed.');
+      }
+    }
+
+    #{compiled_code}
+    """
+    
   console.log "Compiled #{file}"
 
   fs.writeFile jsfile, compiled_code, (err) ->
     throw err if err?
-    console.log "Wrote #{jsfile}"
+    uglify jsfile, argv, (err) ->
+      throw err if err?
+      console.log "Wrote #{jsfile}"
 
 
 @runfile = (file) ->

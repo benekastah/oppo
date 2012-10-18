@@ -15,7 +15,8 @@
   is_unquoted,
   is_unquote_spliced,
   is_equal,
-  get_options } = oppo.helpers
+  get_options,
+  raise } = oppo.helpers
 
 
 oppo.Macro = class Macro
@@ -73,7 +74,7 @@ class Context
     if not @context[s_sym]?
       @context[s_sym] = value
     else
-      throw new OppoCompileError "Can't define previously defined symbol: #{s_sym}", sym
+      raise new OppoCompileError "Can't define previously defined symbol: #{s_sym}", sym
 
 
   set: (sym, value) ->
@@ -81,7 +82,7 @@ class Context
     if @context[s_sym]?
       @context[s_sym] = value
     else
-      throw new OppoCompileError "Can't set value of undefined symbol: #{s_sym}", sym
+      raise new OppoCompileError "Can't set value of undefined symbol: #{s_sym}", sym
 
 
   get: (sym) ->
@@ -122,7 +123,7 @@ oppo.Module = class Module extends Context
     try result = super
     catch e
       if not local
-        throw e
+        raise e
     
     if local
       @locals_array.push sym
@@ -163,7 +164,7 @@ oppo.Module = class Module extends Context
       if create
         m = new Module null, name
       else if strict
-        throw new OppoCompileError "Can't get undefined module: #{name}"
+        raise new OppoCompileError "Can't get undefined module: #{name}"
     m
 
 
@@ -171,7 +172,7 @@ oppo.Module = class Module extends Context
     m = @get name, no, no
     if m?
       if strict and name not in [@core_module_name, @anonymous_module_name]
-        throw new OppoCompileError "Can't make same module twice: #{name}"
+        raise new OppoCompileError "Can't make same module twice: #{name}"
     else
       @modules[name] = module
 
@@ -348,6 +349,8 @@ if process?.title is "node"
       basenames.push new_basename
       
       module_name = get_module_name pathname
+
+      oppo.compiling = fname
       
       file_data = fs.readFileSync fname, "utf8"
       parse_tree = oppo.read file_data
@@ -393,11 +396,11 @@ compile_symbol = (sym, config = {}) ->
         else
           result = compile_item null
 
-      if context?.name is "oppo-tests"
-        console.log "compile_symbol module is oppo-tests"
-        console.log "new_sym", new_sym
-        console.log "result", result
-        console.log()
+      # if context?.name is "oppo-tests"
+      #   console.log "compile_symbol module is oppo-tests"
+      #   console.log "new_sym", new_sym
+      #   console.log "result", result
+      #   console.log()
           
       result
     else
@@ -463,10 +466,11 @@ oppo.compile_list = compile_list = (ls, to_compile = yes) ->
   else
     if ls.length
       [callable] = ls
+      callable_type = to_type callable
       callable_is_quoted = is_quoted callable
       callable_is_symbol = is_symbol callable
       if not (callable_is_quoted)
-        if (to_type callable) is "array"
+        if callable_type is "array"
           c_callable = compile_list callable, no
         else if callable instanceof Symbol
           c_callable = compile_symbol callable, resolve_macro: yes
@@ -481,8 +485,8 @@ oppo.compile_list = compile_list = (ls, to_compile = yes) ->
         else
           ls = ls[1..]
         if c_callable not instanceof Macro
-          throw new OppoCompileError "Can't call list: #{ls}", ls
-      else if ls.length > 1 and (callable_is_symbol and callable_is_quoted)
+          raise new OppoCompileError "Can't call list: #{ls}", ls
+      else if ls.length > 1 and ((callable_is_symbol and callable_is_quoted) or (callable_type is "string"))
         c_callable = core?.get 'object-get-value'
       else
         c_callable = core?.get 'call'
@@ -529,7 +533,7 @@ lambda = ->
       normal_args.push arg
 
   if splat_args.length > 1
-    throw new OppoCompileError "Oppo currently does not support having more than one rest argument."
+    raise new OppoCompileError "Oppo currently does not support having more than one rest argument."
 
   args = normal_args
   [splat_arg] = splat_args
@@ -601,7 +605,7 @@ set = ->
   if context?
     context.set name, value
   else
-    throw new OppoCompileError "Can't set undefined symbol: #{name}", this
+    raise new OppoCompileError "Can't set undefined symbol: #{name}", this
 
   c_name = compile_item name
   c_value = compile_item value
@@ -642,6 +646,7 @@ define_core_macro "call", (fname, args...) ->
 
 define_core_macro "object-get-value", (prop, base) ->
   c_base = compile_item base
+  
   if (is_quoted prop) and (is_symbol prop)
     s_prop = compile_list prop, no
     s_prop.quoted = no
@@ -686,11 +691,17 @@ define_core_macro "unquote-splicing", (x) ->
   
 define_core_macro "let", ->
   [options, locals, body...] = get_options arguments...
+  if locals instanceof Symbol
+    let_name = locals
+    locals = body.shift()
   
   if locals.length % 2
-    throw new OppoCompileError "let must have an even number of binding forms", this
-    
+    raise new OppoCompileError "let must have an even number of binding forms", this
+
+  let_has_name = let_name?
+  setter = symbol "set!"
   names = []
+  args = []
   def_body = []
   for item, i in locals
     if i % 2 is 0
@@ -701,17 +712,20 @@ define_core_macro "let", ->
         has_name= is_equal name, this_name
         break if has_name
         
-      setter = if not has_name
+      if not has_name
         names.push name
-        symbol "def"
-      else
-        symbol "set!"
-      
-      result = [setter, {local: yes}, name, item]
-      def_body.push result
-      
-  body = def_body.concat body
-  [(lambda options, [], body...)]
+        if let_has_name
+          args.push item
+
+      if has_name or not let_has_name
+        result = [setter, {local: yes}, name, item]
+        def_body.push result
+
+  func = [(symbol "lambda"), options, names, def_body..., body...]
+  if let_has_name
+    [[(symbol "do"), [(symbol "def"), {local: yes}, let_name, func]], args...]
+  else
+    [func, args...]
 
 
 define_core_macro "if", (cond, when_t, when_f) ->

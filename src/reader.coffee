@@ -2,7 +2,7 @@
 ###
 HELPERS / SETUP
 ###
-{to_type, clone, is_quoted, is_symbol} = oppo.helpers
+{to_type, clone, is_quoted, is_symbol, raise} = oppo.helpers
 {JavaScriptCode} = oppo
 r_whitespace = /^\s+/
 r_number = /^-?(\d*\.\d+|\d+)/
@@ -10,18 +10,29 @@ r_symbol = /^[\w~`!@#$%^&*\-+=|\\"':?\/<>,\.]+/
 
 reader = oppo.reader = {}
 
-class OppoReadError
-  # This is an inheritance hack that gets the error messeges to show up properly in the repl
-  @:: = new Error()
-  
+class OppoReadError extends Error
   text_length: 50
   name: "ReadError"
-  constructor: (@message = 'Unknown error') ->
-    @text = reader.text
-    @index = reader.text_index
+  constructor: (@message = 'Unknown error') ->    
+    @line_number = reader.line_number
+    @file = oppo.compiling
+
+    lines = reader.text.split "\n"
+    line_index = @line_number - 1
+    @line = lines[line_index]
+    
+    previous_lines = lines.slice 0, line_index
+    previous_lines = (previous_lines.join '\n') + '\n'
+    @column_number = reader.text_index - previous_lines.length
+    @column_line = "#{(new Array @column_number).join ' '}^"
 
   toString: ->
-    "#{@name}: #{@message}"
+    """
+    #{@name}: #{@message}
+    in #{@file} at line #{@line_number},#{@column_number}:
+      #{@line}
+      #{@column_line}
+    """
 
 reader.Wrapper = class Wrapper
   constructor: (symbol_text) ->
@@ -62,16 +73,16 @@ open_list = make_reader (match) ->
 close_list = make_reader (match, text, index) ->
   open_parens = reader.open_parens -= 1
   if open_parens < 0
-    throw new OppoReadError "You have too many `)`s"
+    raise new OppoReadError "You have too many `)`s"
 
   list = reader.lists.pop()
   {opener} = list
   error_message = "Braces mismatch: it is illegal to open a form with"
   error_message_ctd = "and close it with"
   if opener is "(" and match isnt ")"
-    throw new OppoReadError "#{error_message} `(` #{error_message_ctd} `]`"
+    raise new OppoReadError "#{error_message} `(` #{error_message_ctd} `]`"
   else if opener is '[' and match isnt ']'
-    throw new OppoReadError "#{error_message} `[` #{error_message_ctd} `)`"
+    raise new OppoReadError "#{error_message} `[` #{error_message_ctd} `)`"
           
   reader.current_list = reader.lists[reader.lists.length - 1]
   list
@@ -226,7 +237,7 @@ read_token = ->
   unless reader.read_special
     ReadTable.tables.default.read() or ReadTable.tables.last.read()
   else
-    ReadTable.tables.special.read() or throw new OppoReadError "Invalid special syntax"
+    ReadTable.tables.special.read() or raise new OppoReadError "Invalid special syntax"
 
 
 oppo.read = (text) ->
@@ -242,7 +253,11 @@ oppo.read = (text) ->
   while reader.text_index < reader.text.length
     success = read_token()
     if not success
-      throw new OppoReadError "Invalid character: `#{reader.text.charAt reader.text_index}`"
+      raise new OppoReadError "Invalid character: `#{reader.text.charAt reader.text_index}`"
+
+  {open_parens} = reader
+  if open_parens > 0
+    raise new OppoReadError "You have #{open_parens} too many `(`s"
 
   # Reset all the reader variables we set earlier
   [ reader.line_number
@@ -251,10 +266,6 @@ oppo.read = (text) ->
     reader.text
     reader.text_index ] = []
 
-  {open_parens} = reader
-  if open_parens > 0
-    throw new OppoReadError "You have #{open_parens} too many `(`s"
-
   list = parse list
   list
 
@@ -262,7 +273,7 @@ oppo.read = (text) ->
 parse_reader_object = (list) ->
   ls = list.slice 1
   if ls.length % 2 isnt 0
-    throw new OppoReadError "Can't create a reader object with odd number of arguments"
+    raise new OppoReadError "Can't create a reader object with odd number of arguments"
 
   obj = {}
   for item, i in ls

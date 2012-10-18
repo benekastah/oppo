@@ -3,19 +3,23 @@ optimist = require 'optimist'
 compiler = require './compile'
 
 argv = optimist
-.boolean(['c', 'w', 'r', 'b', 't'])
+.boolean(['c', 'C', 'w', 'r', 'b', 't', 'i'])
 .alias('c', 'compile')
+.alias('C', 'compress')
 .alias('w', 'watch')
 .alias('r', 'repl')
-.alias('b', 'beautify')
+.alias('b', 'browser')
+.alias('i', 'include_oppo_core')
 .alias('t', 'test')
 .alias('o', 'output')
 .argv
 
+if argv.browser
+  argv.include_oppo_core = yes
+
 if argv.compile and not argv.repl
   files = argv._
-  {output, watch, beautify} = argv
-  compiler.compile output, files, watch, beautify
+  compiler.compile files, argv
 else if argv.test
   compiler.runfile "#{__dirname}/../spec/spec.oppo"
 else if argv._.length
