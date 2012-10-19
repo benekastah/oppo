@@ -209,7 +209,6 @@ oppo.ReadTable = class ReadTable
         [base, number] = input.split '#'
         base = +base
         r_valid = base_acceptable_chars[base]
-        console.log "number_explicit_base", base, "#", number, r_valid
         if not r_valid.test number
           raise new OppoReadError "The number #{number} is improperly formatted for base #{base}."
         parseInt number, base
