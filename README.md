@@ -3,7 +3,125 @@
 **Oppo is a sweet little lisp for javascript.** This is experimental,
   and therefore any suggestions are welcome.
   
-## The language
+## Usage
+
+To install, run the following in your terminal. Make sure you have
+node.js and npm installed first.
+
+```
+npm install -g oppo
+```
+
+Now you have access to the `oppo` command. To enter the repl:
+
+```
+oppo
+```
+
+or
+
+```
+oppo -r
+```
+
+To compile a file:
+
+```
+oppo -c /path/to/file.oppo
+```
+
+You can also specify an output file:
+
+```
+oppo -o /path/to/file.js -c /path/to/file.oppo
+```
+
+In the previous command, if you have `uglify-js2` installed globally,
+it will prettify the resulting javascript. You could pass the `-C` switch to
+have it compress your code instead.
+
+To run a file:
+
+```
+oppo /path/to/file.oppo
+```
+  
+## Language Overview
+
+### The basics
+
+Since oppo is a lisp, it takes on the basic semantics of a lisp. Oppo
+isn't dissimilar to scheme or clojure, so if you want to get a feel
+for the basic semantics of lisp, there's plenty of code out there to
+look at.
+
+Here are some specifics about the way oppo is parsed:
+
+#### Numbers
+  - Integer: `2`
+  - Float: `2.5`, `.34`
+  - Scientific notation: `10e-2.5`
+  - Explicit base: `2#001101`, `8#1427`, `16#fff`
+  
+#### Strings
+`"whatever"`. If you need to escape a double-quote, you can use `\"`.
+
+#### Symbols
+Oppo accepts most characters as valid symbols. Symbols can't start
+with a number or any of the following sequences: `#`, `"`, `'`, `\``,
+`,`, `,@`, `.`. Symbols can't contain any kind of whitespace. Anything
+else on the US keyboard is fair game.
+
+#### Lists
+Lists are code. Oppo code is primarily a tree of lists. All lists are
+executable. The basic way to make a list is to put space-separated
+items in parenthesis:
+
+```
+(puts "I" "am" "a" "list")
+```
+
+Since lists are executable, this will call the `puts` macro, which
+will log the rest of the items in the list to the console. If you
+don't want your list to be executed you can quote it or use a literal
+array:
+
+```
+'(1 2 3) ;; Won't try to call this as a function
+#[1 2 3] ;; Same result
+```
+
+#### Objects
+Oppo only thinks of objects as data and never tries to execute an
+object. Objects are made like this:
+
+```
+#{'a 1 'b 2}
+```
+
+You can do some interesting things with oppo objects that you can't do
+in javascript (at least not as easily). For example, keys can be
+variables in the same way their values can:
+
+```
+(def key 'asdf)
+(def value 5)
+#{key value} ;; -> #{asdf 5}
+```
+
+#### Functions
+Oppo uses the `lambda` macro to generate functions. There is also a
+reader macro `#(...)` which acts as a shorthand for the lambda
+macro. You can also define a function with the `def` macro:
+
+```
+(lambda (a b) (+ a b))
+
+#(+ #1 #2) ;; #1 and #2 access the 0th and 1st arguments respectively
+
+(def (add-a-b a b)
+  (+ a b))
+```
 
 Following is a list of macros, functions and variables available to
 the oppo programmer. Entries take the format of
@@ -13,7 +131,7 @@ example, you can call `core::str` by simply invoking `str` (unless you
 have  replaced `str` in your current module or in an active local
 scope).
 
-### Core module
+### core module
   - macro `core::defmacro`: `(defmacro optional-metadata (macro-name
     ...args) ...body)`
     Defines a macro.
@@ -505,7 +623,7 @@ scope).
   - object `core::global`
     This refers to `global` when it is available and `window` otherwise.
     
-### js Module
+### js module
   - macro `js::eval`: `(js::eval to-eval)`
     If you pass in a string, `js::eval` will dump that string as-is
     into the compiler output. If you pass in anything else, it will be
