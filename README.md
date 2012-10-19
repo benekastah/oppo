@@ -58,8 +58,8 @@ look at.
 Here are some specifics about the way oppo is parsed:
 
 #### Numbers
-  - Integer: `2`
-  - Float: `2.5`, `.34`
+  - Integer: `2`, `-5`
+  - Float: `-2.5`, `.34`
   - Scientific notation: `10e-2.5`
   - Explicit base: `2#001101`, `8#1427`, `16#fff`
   
@@ -122,6 +122,8 @@ macro. You can also define a function with the `def` macro:
 (def (add-a-b a b)
   (+ a b))
 ```
+
+## Language Documentation
 
 Following is a list of macros, functions and variables available to
 the oppo programmer. Entries take the format of
