@@ -297,7 +297,6 @@ scope).
       - `not-eq` (javascript `!==`)
       - `eq~` (javascript `==`)
       - `not-eq~` (javascript `!=`)
-      <br />
   
   - **Type checking**
     All the following are of type function/macro and check to see that their
@@ -315,7 +314,6 @@ scope).
       - `function?`
       - `regex?`
       - `date?`
-      <br />
   
   - function `core::typeof`: `(typeof x)`
     This is the `toType` function by Angus Croll found
