@@ -119,11 +119,14 @@ oppo.helpers =
     else
       throw new Error "Can't get symbol from non-symbol #{sym}"
 
-  get_symbol_text: (sym, resolve_module = false) ->
+  get_symbol_text: (sym, resolve_module = false, raw = false) ->
     {get_symbol, text_to_js_identifier} = oppo.helpers
     sym = get_symbol sym
     if sym instanceof Symbol
-      text_to_js_identifier sym.text
+      if raw
+        sym.text
+      else
+        text_to_js_identifier sym.text
     else
       throw new OppoCompileError "Can't get symbol text from non-symbol #{sym}", sym
 
@@ -145,11 +148,11 @@ oppo.helpers =
       ret
 
   get_module: do ->
-    module_splitter = null
+    module_splitter = '::'
     get_module = (sym) ->
       {text_to_js_identifier, get_symbol_text, symbol} = oppo.helpers
-      module_splitter ?= text_to_js_identifier '::'
-      s_sym = get_symbol_text sym, false
+      # module_splitter ?= text_to_js_identifier '::'
+      s_sym = get_symbol_text sym, false, true
       a_sym = s_sym.split module_splitter
       switch a_sym.length
         when 1

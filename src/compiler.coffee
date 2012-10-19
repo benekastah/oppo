@@ -191,6 +191,10 @@ class ContextStack
 
   lookup: (sym) ->
     [module, new_sym] = get_module sym
+
+    # if /::/.test sym.text
+    #   console.log sym.text, new_sym.text, module
+    
     new_sym ?= sym
     if module?
       module = Module.get(module, null, no)
@@ -395,13 +399,6 @@ compile_symbol = (sym, config = {}) ->
           result += ".runtime_function"
         else
           result = compile_item null
-
-      # if context?.name is "oppo-tests"
-      #   console.log "compile_symbol module is oppo-tests"
-      #   console.log "new_sym", new_sym
-      #   console.log "result", result
-      #   console.log()
-          
       result
     else
       text_to_js_identifier sym_text
@@ -589,7 +586,6 @@ define = ->
   else
     context = oppo.context_stack.current_context
 
-  # console.log "define current module name:", oppo.current_module?.name if not local
   context.def name, value, local
 
   c_name = compile_symbol full_name, resolve_module: not local or module?, assignable: yes

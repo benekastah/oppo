@@ -1,0 +1,4 @@
+
+(include dir/b)
+
+(puts dir/b::test)

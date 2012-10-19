@@ -85,22 +85,13 @@ uglify1 = (file, {compress}) ->
   for file in files
     compile file, argv
 
+
 r_absolute_path = /^\//
-r_file_extension = /\.oppo$/
-compile = (file, argv) ->
-  {output, watch, beautify, include_oppo_core, browser} = argv
+compile = (file, argv, ignore_output) ->
+  {output, watch, include_oppo_core, browser, quiet} = argv
   
   if not r_absolute_path.test file
     file = path.join process.cwd(), file
-  
-  if /\.js$/.test output
-    output_fname = path.basename output
-    output_dir = path.dirname output
-  else
-    output_dir = output
-
-  jsfile = output_fname ? file.replace r_file_extension, '.js'
-  jsfile = path.join output_dir ? dir, jsfile  
 
   if watch
     fs.watch file, compile.bind arguments...
@@ -125,19 +116,39 @@ compile = (file, argv) ->
 
     #{compiled_code}
     """
+
+  console.log "Compiled #{file}" if not quiet
     
-  console.log "Compiled #{file}"
+  if not ignore_output
+    send_to_output compiled_code, file, argv
+  compiled_code
 
-  fs.writeFile jsfile, compiled_code, (err) ->
-    throw err if err?
-    uglify jsfile, argv, (err) ->
+
+r_file_extension = /\.oppo$/
+send_to_output = (compiled_code, source_file, argv) ->
+  {output, beautify, quiet} = argv
+  if output?
+    if /\.js$/.test output
+      output_fname = path.basename output
+      output_dir = path.dirname output
+    else
+      output_dir = output
+  
+    jsfile = output_fname ? file.replace r_file_extension, '.js'
+    jsfile = path.join output_dir ? dir, jsfile
+
+    fs.writeFile jsfile, compiled_code, (err) ->
       throw err if err?
-      console.log "Wrote #{jsfile}"
+      uglify jsfile, argv, (err) ->
+        throw err if err?
+        console.log "Wrote #{jsfile}" if not quiet
+  else
+    console.log compiled_code
 
 
-@runfile = (file) ->
-  module_name = get_module_name file
-  code = fs.readFileSync file, 'utf8'
-  read_code = oppo.read code
-  compiled_code = oppo.compile read_code, dir
-  console.log (eval compiled_code)
+@runfile = (file, argv) ->
+  {quiet} = argv
+  argv.quiet = yes
+  compiled_code = compile file, argv, true
+  argv.quiet = quiet
+  eval compiled_code

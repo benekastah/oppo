@@ -5,8 +5,25 @@ HELPERS / SETUP
 {to_type, clone, is_quoted, is_symbol, raise} = oppo.helpers
 {JavaScriptCode} = oppo
 r_whitespace = /^\s+/
-r_number = /^-?(\d*\.\d+|\d+)/
+r_number_explicit_base = /\d+#[\da-z]+/i
+r_number = /^(\+|-)?(\d*\.\d+|\d+)(e(\+|-)?\d+)?/i
 r_symbol = /^[\w~`!@#$%^&*\-+=|\\"':?\/<>,\.]+/
+
+r_digit = /\d/
+r_word = /\w/
+number_allowed_chars = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o",
+"p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
+base_acceptable_chars = {}
+for base in [2..36]
+  index = base - 1
+  top_char = number_allowed_chars[index]
+  if r_digit.test top_char
+    re = "[0-#{top_char}]+"
+  else if r_word.test top_char
+    re = "[0-9a-#{top_char}]+"
+  base_acceptable_chars[base] = new RegExp "^#{re}$", "i"
+
 
 reader = oppo.reader = {}
 
@@ -187,7 +204,18 @@ oppo.ReadTable = class ReadTable
 
     last: new ReadTable(
       r_whitespace, make_reader -> undefined
+      
+      r_number_explicit_base, make_reader (input) ->
+        [base, number] = input.split '#'
+        base = +base
+        r_valid = base_acceptable_chars[base]
+        console.log "number_explicit_base", base, "#", number, r_valid
+        if not r_valid.test number
+          raise new OppoReadError "The number #{number} is improperly formatted for base #{base}."
+        parseInt number, base
+        
       r_number, make_reader (input) -> +input
+      
       r_symbol, make_reader (input) -> new Symbol input
     )
 
