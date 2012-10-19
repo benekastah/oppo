@@ -299,7 +299,7 @@ scope).
       - `not-eq~` (javascript `!=`)
   
   - **Type checking**
-    All the following are function/macros and check to see that their
+    All the following are of type function/macro and check to see that their
     argument is equal to the type the name describes. (For example,
     `(number? x)` returns true when `x` is a number). All are in the
     `core` module.
