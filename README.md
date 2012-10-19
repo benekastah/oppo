@@ -297,6 +297,7 @@ scope).
       - `not-eq` (javascript `!==`)
       - `eq~` (javascript `==`)
       - `not-eq~` (javascript `!=`)
+      <br />
   
   - **Type checking**
     All the following are of type function/macro and check to see that their
@@ -304,16 +305,17 @@ scope).
     `(number? x)` returns true when `x` is a number). All are in the
     `core` module.
     
-      - number?
-      - string?
-      - array?
-      - arguments? (returns true when its argument is a function's
+      - `number?`
+      - `string?`
+      - `array?`
+      - `arguments?` (returns true when its argument is a function's
         arguments object.)
-      - nil? (returns true when its argument is either null or
+      - `nil?` (returns true when its argument is either null or
         undefined.)
-      - function?
-      - regex?
-      - date?
+      - `function?`
+      - `regex?`
+      - `date?`
+      <br />
   
   - function `core::typeof`: `(typeof x)`
     This is the `toType` function by Angus Croll found
