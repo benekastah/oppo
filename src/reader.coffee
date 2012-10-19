@@ -5,7 +5,7 @@ HELPERS / SETUP
 {to_type, clone, is_quoted, is_symbol, raise} = oppo.helpers
 {JavaScriptCode} = oppo
 r_whitespace = /^\s+/
-r_number_explicit_base = /\d+#[\da-z]+/i
+r_number_explicit_base = /^\d+#[\da-z]+/i
 r_number = /^(\+|-)?(\d*\.\d+|\d+)(e(\+|-)?\d+)?/i
 r_symbol = /^[\w~`!@#$%^&*\-+=|\\"':?\/<>,\.]+/
 

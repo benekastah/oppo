@@ -795,3 +795,7 @@ define_builtin_macro "js::eval", (to_eval) ->
       result = new JavaScriptCode to_eval
   else
     [(new JavaScriptCode "oppo.root.eval"), compile_item to_eval]
+
+define_builtin_macro "js::typeof", (x) ->
+  c_x = compile_item x
+  new JavaScriptCode "(typeof #{c_x})"

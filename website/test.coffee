@@ -7,13 +7,6 @@ compile_code = (code) ->
 
 result = compile_code """
 
-(def (fact n)
-  (let loop [n* n
-             accum 1]
-     (if (< n* 1)
-       accum
-       (loop (- n* 1) (* n* accum)))))
-
-(puts (fact 5))
+(+ 2#111 5)
 
 """

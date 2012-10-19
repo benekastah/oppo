@@ -48,21 +48,18 @@
         var (js::eval "new oppo.Symbol(varname)")]
         `(def #{'local #yes} ,var ((js::eval "require") ,mod))))
 
-(def ->oppo-string ('to-oppo-string ('helpers oppo)))
-(def (->log-string x)
-     (->oppo-string x #f))
-
 (defmacro (new Class ...args)
   (let [list* (lambda (...ls) ls)
         new-Class (.compile-item oppo Class)
         new-Class (.join (list* "new" new-Class) " ")]
         `((js::eval ,new-Class) ,@args)))
 
-(defmacro (make-symbol x)
+(defmacro #{'runtime-function #(symbol #1)} (symbol x)
   `(new ('Symbol oppo) ,x))
 
-(def (symbol x)
-  (new ('Symbol oppo) x))
+(def ->oppo-string ('to-oppo-string ('helpers oppo)))
+(def (->log-string x)
+     (->oppo-string x #f))
 
 (defmacro (puts ...args)
   `(.apply ('log console) console (map ->log-string #[,@args])))
@@ -87,7 +84,7 @@
       (let [item (js::eval "items[0]")
             rest (js::eval "items.slice(1)")
             list* (lambda (...ls) ls)
-            module-item (make-symbol (.join (list* ('text module) "::" ('text item)) ""))]
+            module-item (symbol (.join (list* ('text module) "::" ('text item)) ""))]
             `(do (def #{'local #yes} ,item ,module-item)
                  (use-from ,module ,@rest)))))
 
@@ -148,6 +145,19 @@
   }
 
   return false;
+}"))
+
+(def contains-key? (js::eval "function (coll, key) {
+  var to_type = oppo.helpers.to_type;
+  var type = to_type(coll);
+  switch (type) {
+    case 'array': case 'arguments': case 'string':
+      return !isNaN(key) && key < coll.length;
+    case 'object':
+      return key in coll;
+    default:
+      return false;
+  }
 }"))
 
 
@@ -235,7 +245,7 @@
 
 (let [-merge ('merge ('helpers oppo))]
      (def [merge ...objs]
-          (apply -merge `[,(js::eval "{}") ,@objs])))
+          (apply -merge (concat #[#{}] objs))))
 
 (def keys ('keys ('helpers oppo)))
 
@@ -329,10 +339,43 @@
 (def (not=)
      (not (apply = (js::eval "arguments"))))
 
+
+;; TYPE CHECKING METHODS
+
+(defmacro #{'runtime-function #(number? #1)} (number? x)
+  `(eq~ (js::typeof ,x) "number"))
+
+(defmacro #{'runtime-function #(string? #1)} (string? x)
+  `(eq~ (js::typeof ,x) "string"))
+
+(defmacro #{'runtime-function #(array? #1)} (array? x)
+  `(eq~ (typeof ,x) "array"))
+
+(defmacro #{'runtime-function #(arguments? #1)} (arguments? x)
+  `(eq~ (typeof ,x) "arguments"))
+
+(def (list? x)
+     (or (array? x)
+         (arguments? x)))
+
+(def (object? x)
+  (and (not (nil? x))
+       (eq~ (js::typeof x) "object")))
+
 (defmacro #{'runtime-function #(nil? #1)} (nil? x)
   `(eq~ ,x #nil))
 
+(defmacro #{'runtime-function #(function? #1)} (function? x)
+  `(eq~ (typeof ,x) "function"))
 
+(defmacro #{'runtime-function #(regex? #1)} (regex? x)
+  `(eq~ (typeof ,x) "regexp"))
+
+(defmacro #{'runtime-function #(date? #1)} (date? x)
+  `(eq~ (typeof ,x) "date"))
+
+(def (isNaN? x)
+     (not-eq~ x x))
 
 
 ;; INCLUDES GO LAST

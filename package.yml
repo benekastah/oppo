@@ -1,0 +1,29 @@
+---
+  name: "oppo"
+  description: "A lisp for javascript"
+  keywords: 
+    - "lisp"
+    - "functional programming"
+    - "fp"
+    - "parser"
+    - "compiler"
+  version: "0.1.2"
+  main: "dist/oppo.js"
+  author: "Paul Harper <benekastah@gmail.com>"
+  bin: 
+    oppo: "./bin/oppo"
+  scripts: 
+    postinstall: "bin/build"
+  repository: 
+    type: "git"
+    url: "git@github.com:benekastah/oppo.git"
+  dependencies: 
+    optimist: "0.2.x"
+  optionalDependencies: 
+    uglify-js: "*"
+    uglify-js2: "*"
+  devDependencies: 
+    coffee-script: "1.x.x"
+  engines: 
+    node: "0.8.x"
+  preferGlobal: true
