@@ -21,7 +21,6 @@
     optimist: "0.2.x"
   optionalDependencies: 
     uglify-js: "*"
-    uglify-js2: "*"
   devDependencies: 
     coffee-script: "1.x.x"
   engines: 
