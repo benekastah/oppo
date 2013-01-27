@@ -215,15 +215,6 @@
 (def (head ls) (slice ls 0 (- ('length ls) 1)))
 (def (tail ls) (slice ls 1))
 
-(def (nth ls n)
-     (if (js::eval "n === 0")
-         (do (puts-warning "nth treats lists as 1-based; accessing the 0th item will always yield #nil")
-             #nil)
-       (let (i (if (< n 0)
-                   (+ ('length ls) n)
-                   (- n 1)))
-         (js::eval "ls[i]"))))
-
 
 ;; OBJECTS
 (def object (js::eval "function () {
@@ -382,6 +373,16 @@
 (def (isNaN? x)
      (not-eq~ x x))
 
+;; Other methods
+
+(def (nth ls n)
+     (if (= n 0)
+         (do (puts-warning "nth treats lists as 1-based; accessing the 0th item will always yield #nil")
+             #nil)
+       (let (i (if (< n 0)
+                   (+ ('length ls) n)
+                 (- n 1)))
+         (js::eval "ls[i]"))))
 
 ;; INCLUDES GO LAST
 (include test)
