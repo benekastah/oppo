@@ -279,6 +279,11 @@
 (def (negate n)
      (js::eval "-n"))
 
+(defmacro #{'runtime-function #(decr #1)} (decr n)
+  `(- ,n 1))
+
+(defmacro #{'runtime-function #(incr #1)} (incr n)
+  `(+ ,n 1))
 
 ;; LOGICAL
 (defmacro (not x)

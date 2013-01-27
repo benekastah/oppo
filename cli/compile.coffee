@@ -39,46 +39,20 @@ get_module_name = (file, base_dir = get_base_dir file) ->
 
 
 uglify = (file, argv, callback) ->
-  ug1 = null
-  ug2 = null
-  exec "which uglifyjs2", (err, output) ->
-    ug2 = not err and !!output
-    action()
   exec "which uglifyjs", (err, output) ->
-    ug1 = not err and !!output
-    action()
-
-  action = ->
-    if ug1? and ug2?
-      command = if ug2
-        uglify2 file, argv
-      else if ug1
-        uglify1 file, argv
-
-      if command?
-        exec command, write_file
+    if not err and output
+      switches = if argv.compress
+        "-c"
       else
-        callback()
+        "-b indent-level=2 --comments all"
+      command = "uglifyjs #{file} #{switches}"
+      exec command, write_file
+    else
+      callback()
         
   write_file = (err, output) ->
     throw err if err?
     fs.writeFile file, output, callback
-        
-
-uglify2 = (file, {compress}) ->
-  switches = if compress
-    "-c"
-  else
-    "-b indent-level=2 --comments all"
-  "uglifyjs2 #{file} #{switches}"
-        
-
-uglify1 = (file, {compress}) ->
-  switches = if compress
-    ""
-  else
-    "-b --indent 2 -nm -ns --no-seqs"
-  "uglifyjs #{switches} #{file}"
 
 
 @compile = (files, argv) ->

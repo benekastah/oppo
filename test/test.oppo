@@ -1,3 +1,4 @@
 (include "fact.oppo")
 
-(fact 5)
+(def f (fact 5))
+(puts "5! = " f)
