@@ -1,0 +1,11 @@
+#!/bin/bash
+
+mkdir -p dist
+
+echo "(function () {" > dist/jlisp.js
+echo "var self = this;" >> dist/jlisp.js
+
+cat parser_framework.js ast.js parser.js compiler.js jlisp.js >> dist/jlisp.js
+
+echo "}).call( typeof exports !== 'undefined' ? exports : window.JLisp || (window.JLisp = {}) );" >> dist/jlisp.js
+

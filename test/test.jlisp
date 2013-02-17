@@ -1,0 +1,9 @@
+
+(@try @{ (@throw "asdf") }
+(@catch @(e) @{ ((@console.error) e) }))
+
+(@function +@((<,> a b)) @{
+	(@return (<+> a b))
+})
+
+((@console.log) (+ 1 1))

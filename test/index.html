@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+	<head>
+		<title>JliSp</title>
+
+		<script type="text/lisp" data-module-name="__main__">
+
+(@try @{ (@throw "asdf") }
+(@catch @(e) @{ ((@console.error) e) }))
+
+(@function +@((<,> a b)) @{
+	(@return (<+> a b))
+})
+
+((@console.log) (+ 1 1))
+
+		</script>
+
+		<script src="../dist/jlisp.js"></script>
+	</head>
+	<body>
+	</body>
+</html>
