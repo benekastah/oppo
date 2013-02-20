@@ -187,7 +187,11 @@ Macro.lambda = function (args, body) {
 			splat = arg;
 			splat.position = i;
 		} else if (splat) {
-			var def_arg = [new JSWord("var"), arg, new JSWord("="), [new JSBinOp("-"), new JSWord("arguments.length"), len - i]];
+			var def_arg = [new JSWord("var"), arg, new JSWord("="), 
+							[new JSWord("arguments"),
+								new JSWord("["), 
+								[new JSBinOp("-"), new JSWord("arguments.length"), len - i],
+								new JSWord("]")]];
 			post_splat.push(def_arg);
 		}
 	}
@@ -214,7 +218,7 @@ Macro.lambda = function (args, body) {
 		if (slice_end) {
 			slice.push(slice_end);
 		}
-		var def_slice = [new JSWord("var"), arg, new JSWord("="), slice];
+		var def_slice = [new JSWord("var"), splat, new JSWord("="), slice];
 		js_body.push(def_slice);
 
 		js_body.push.apply(js_body, post_splat);
