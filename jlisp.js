@@ -1,15 +1,14 @@
 
-var _clone = Object.create || function (o) {
-	function Noop() {}
-	Noop.prototype = o;
-	return new Noop();
-};
-
-this.eval = function (ast) {
+this.eval = function (compiler, ast) {
 	var result;
-	new Compiler(ast, function (err, code) {
-		result = eval(code);
-	});
+	if (arguments.length === 1) {
+		new Compiler([ast], function (err, code) {
+			result = eval(code);
+		});
+	} else {
+		var js = compiler.compile_node(ast);
+		result = eval(js);
+	}
 	return result;
 };
 

@@ -1,20 +1,4 @@
 
-var _clone = Object.create || function (o) {
-	var Noop = function () {};
-	Noop.prototype = o;
-	return new Noop();
-};
-
-var _toString = Object.prototype.toString;
-var _slice = Array.prototype.slice;
-
-var _extend = function (child, parent) {
-	child.prototype = _clone(parent.prototype);
-	child.prototype.constructor = child;
-};
-this._extend = _extend;
-
-
 /****************************************************************************/
 /* ParseError                                                               */
 /****************************************************************************/
@@ -66,9 +50,12 @@ function AstError(parser, message) {
 this.Ast = Ast;
 _extend(Ast, Array);
 
+Ast.Blank = {};
+
 function Ast(parser) {
 	this.parser = parser;
 	this.active_nodes = [this];
+	this.compile_index = 0;
 }
 
 Ast.prototype.get_active_node = function (pop) {
@@ -117,6 +104,14 @@ Ast.prototype.assert_type = function (node) {
 	}
 };
 
+Ast.prototype.chunk = function () {
+	var chunk_array = this.slice(this.compile_index);
+	this.compile_index = this.length;
+	var chunk = new this.constructor(this.parser);
+	chunk.push.apply(chunk, chunk_array);
+	chunk.parent = this;
+	return chunk;
+};
 
 /****************************************************************************/
 /* Parser                                                                   */
@@ -125,6 +120,13 @@ Ast.prototype.assert_type = function (node) {
 this.Parser = Parser;
 
 Parser.DEFAULT_STATE = "default";
+
+Parser.call_with_parent = function (name, fn) {
+	Parser.prototype[name] = function () {
+		var parent = this.parent || this;
+		return fn.apply(parent, arguments);
+	};
+};
 
 function Parser(config) {
 	if (!config) {
@@ -150,13 +152,36 @@ function Parser(config) {
 	this.tab_width = config.tab_width || 4;
 	this.parsers = [];
 	this.states = [];
+	this.balance_table = {};
 }
 
 Parser.prototype.add_parser = function (config) {
+	var catch_all;
+	if (this.has_catch_all_parser) {
+		catch_all = this.parsers.pop();
+	}
+	
+	if (config.catch_all) {
+		if (this.has_catch_all_parser) {
+			throw new Error("Can't have more than one catch-all parser");
+		}
+		this.has_catch_all_parser = true;
+	}
+
 	var p = new Parser(config);
 	this.parsers.push(p);
 	p.parent = this;
+
+	if (catch_all) {
+		this.parsers.push(catch_all);
+	}
+
 	return p;
+};
+
+Parser.prototype.catch_all_parser = function (config) {
+	config.catch_all = true;
+	this.add_parser(config);
 };
 
 Parser.prototype.match = function (main_parser) {
@@ -192,32 +217,56 @@ Parser.prototype.match = function (main_parser) {
 
 	if (match) {
 		if (this.process_match) {
-			this.process_match(re_match || [match], main_parser);
+			var ast_len = this.ast.length;
+			var to_ast = this.process_match(re_match || [match], main_parser);
+			if (typeof to_ast !== "undefined" && this.ast.length === ast_len) {
+				this.ast.add(to_ast);
+			}
 		}
 	}
 
 	return match;
 };
 
-Parser.prototype.set_state = function (state) {
-	var ctx = this.parent || this;
-	ctx.states.push(state);
-	if (ctx.accepted_states.indexOf(state) < 0) {
-		ctx.accepted_states.push(state);
+Parser.call_with_parent("set_state", function (state) {
+	this.states.push(state);
+	if (this.accepted_states.indexOf(state) < 0) {
+		this.accepted_states.push(state);
 	}
-};
+});
 
-Parser.prototype.get_state = function () {
-	var ctx = this.parent || this;
-	return ctx.states[ctx.states.length - 1] || Parser.DEFAULT_STATE;
-};
+Parser.call_with_parent("get_state", function () {
+	return this.states[this.states.length - 1] || Parser.DEFAULT_STATE;
+});
 
-Parser.prototype.pop_state = function () {
-	return (this.parent || this).states.pop() || Parser.DEFAULT_STATE;
-};
+Parser.call_with_parent("pop_state", function () {
+	return this.states.pop() || Parser.DEFAULT_STATE;
+});
+
+Parser.call_with_parent("balance", function (name, change) {
+	if (this.balance_table[name] == null) {
+		this.balance_table[name] = change;
+	} else {
+		this.balance_table[name] += change;
+	}
+});
+
+Parser.call_with_parent("is_balanced", function (name) {
+	if (name) {
+		return !this.balance_table[name];
+	} else {
+		for (name in this.balance_table) {
+			var result = this.is_balanced(name);
+			if (!result) {
+				return result;
+			}
+		}
+		return true;
+	}
+});
 
 var re_newlines = /\r?\n/g;
-Parser.prototype.parse = function (code) {
+Parser.prototype.parse = function (code, compile_chunk) {
 	var match;
 	this.code = code;
 	this.code_index = 0;
@@ -251,6 +300,13 @@ Parser.prototype.parse = function (code) {
 				if (chr === "\n") {
 					this.lines.push(this.column);
 					this.column = 0;
+				}
+			}
+
+			if (this.is_balanced() && compile_chunk) {
+				var chunk = this.ast.chunk();
+				if (chunk.length) {
+					compile_chunk(chunk);
 				}
 			}
 		}

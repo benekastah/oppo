@@ -45,10 +45,50 @@ function Compiler(sources, cb) {
 
 Compiler.main_module_name = new Symbol("__main___module").compile(null);
 
+Compiler.prototype.process_macros = function (node) {
+	var module = this.module_stack.current(),
+		macro;
+	if (node instanceof Array) {
+		for (var i = 0, len = node.length; i < len; i++) {
+			var item = node[i];
+			if (i === 0 && item.constructor === Symbol) {
+				macro = module.symbol_table[item.text];
+			} else {
+				node[i] = this.process_macros(item);
+			}
+		}
+
+		if (macro) {
+			node = macro.call(this, node.slice(1));
+			node = this.process_macros(node);
+		}
+	}
+	
+	return node;
+};
+
+Compiler.prototype.remove_blanks = function (node) {
+	if (node instanceof Array) {
+		var i = 0,
+			len = node.length;
+		while (i < len) {
+			var item = node[i];
+			if (item === Ast.Blank) {
+				node.splice(i, 1);
+			} else {
+				i += 1;
+			}
+		}
+	} else if (node === Ast.Blank) {
+		node = undefined;
+	}
+	return node;
+};
+
 Compiler.prototype.compile_node = function (node) {
-	if (node.compile) {
+	if (node && node.compile) {
 		return node.compile(this);
-	} else if (node instanceof Array || Object.prototype.toString.call(node) === "[object Array]") {
+	} else if (node instanceof Array || _toString.call(node) === "[object Array]") {
 		return this.compile_array(node);
 	} else if (typeof node === "string") {
 		return '"' + node + '"';
@@ -63,6 +103,8 @@ Compiler.prototype.compile_node = function (node) {
 
 Compiler.prototype.compile_array = function (arr) {
 	var first = arr[0];
+	var keyword;
+	
 	if (first instanceof JSBinOp) {
 		return this.compile_each(arr, 1).join(" " + this.compile_node(first) + " ");
 	} else if (first instanceof JSWord) {
@@ -74,11 +116,15 @@ Compiler.prototype.compile_array = function (arr) {
 	}
 };
 
-Compiler.prototype.compile_each = function (nodes, i) {
+Compiler.prototype.compile_each = function (nodes, i, process_node) {
 	var results = [],
 		len;
 	for (i = (i || 0), len = nodes.length; i < len; i++) {
-		results.push(this.compile_node(nodes[i]));
+		var node = nodes[i];
+		if (process_node) {
+			node = process_node(node);
+		}
+		results.push(this.compile_node(node));
 	}
 	return results;
 };
@@ -91,26 +137,44 @@ Compiler.prototype.compile = function (source, cb) {
 	cb.__errors = cb.__errors || [];
 	cb.__results = cb.__results || [];
 	
-	var module_name, error, result,
+	var module_name, error, main_ast,
+		result = [],
 		callbacks = [cb],
 
-		get_result = function (err, code) {
+		get_ast = function (err, code) {
 			if (!err) {
 				var ast;
-				if (code instanceof Ast) {
-					ast = code;
+				if (typeof code === "string") {
+					ast = read(code, module_name, get_result);
 				} else {
-					ast = read(code, module_name);
+					ast = code;
 				}
-				result = this.compile_node(ast);
 			} else {
 				error = err;
 			}
 			done();
+		},
+
+		get_result = function (ast) {
+			if (ast instanceof Module) {
+				if (!main_ast) {
+					main_ast = ast.parent || ast;
+					main_ast.set_name(module_name);
+					this.modules[main_ast.name] = main_ast;
+					this.module_stack.push(main_ast);
+				}
+			}
+
+			ast = this.process_macros(ast);
+			ast = this.remove_blanks(ast);
+			this.compile_node(ast);
 		}.bind(this),
 
 		done = function () {
 			var cbs = arguments.length ? arguments : callbacks;
+			result = main_ast.compile(this);
+			console.log(result);
+
 			for (var i = 0, len = cbs.length; i < len; i++) {
 				var cb = cbs[i];
 				cb.__calls -= 1;
@@ -120,16 +184,16 @@ Compiler.prototype.compile = function (source, cb) {
 					cb(cb.__errors, cb.__results);
 				}
 			}
-		};
+		}.bind(this);
 
-	if (source.nodeType) {
+	if (source && source.nodeType) {
 		module_name = source.getAttribute("data-module-name");
-		get_result(null, source.innerHTML);
-	} else if (typeof source === "string" && typeof require !== "undefined") {
+		get_ast(null, source.innerHTML);
+	} else if (typeof source === "string") {
 		var fs = require('fs');
 		module_name = source.replace(this.re_extension, '');
-		code = fs.readFile(source, "utf8", get_result);
+		code = fs.readFile(source, "utf8", get_ast);
 	} else {
-		get_result(err, source);
+		get_ast(null, source);
 	}
 };

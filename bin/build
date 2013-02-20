@@ -5,7 +5,11 @@ mkdir -p dist
 echo "(function () {" > dist/jlisp.js
 echo "var self = this;" >> dist/jlisp.js
 
-cat parser_framework.js ast.js parser.js compiler.js jlisp.js >> dist/jlisp.js
+declare -a files=(helpers.js parser_framework.js ast.js parser.js compiler.js jlisp.js)
+for f in "${files[@]}"; do
+	cat $f >> dist/jlisp.js
+	echo ";" >> dist/jlisp.js
+done
 
 echo "}).call( typeof exports !== 'undefined' ? exports : window.JLisp || (window.JLisp = {}) );" >> dist/jlisp.js
 
