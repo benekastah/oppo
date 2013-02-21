@@ -89,9 +89,9 @@ Comment.prototype.re_line_break = /\n/;
 
 Comment.prototype.compile = function () {
 	if (this.has_line_break) {
-		return "/* " + this.comment + " */";
+		return "/* " + this.comment + " */\n";
 	} else {
-		return "// " + this.comment;
+		return "// " + this.comment + "\n";
 	}
 };
 
@@ -155,7 +155,6 @@ JSBlock.prototype.compile = function (compiler) {
 /****************************************************************************/	
 
 this.JSGroup = JSGroup;
-
 _extend(JSGroup, Array);
 
 function JSGroup() {
@@ -176,6 +175,7 @@ JSGroup.prototype.compile = function (compiler) {
 this.Macro = Macro;
 
 Macro.lambda = function (args, body) {
+	// Find splats
 	var splat;
 	var post_splat = [];
 	for (var i = 0, len = args.length; i < len; i++) {
@@ -204,6 +204,8 @@ Macro.lambda = function (args, body) {
 	js_args.push([new JSBinOp(",")].concat(args));
 	
 	var js_body = new JSBlock();
+
+	// Figure out splats
 	if (splat) {
 		var slice_start = splat.position;
 		var slice_end;
@@ -225,9 +227,22 @@ Macro.lambda = function (args, body) {
 	}
 
 	js_body.push.apply(js_body, body);
-	var last = js_body.pop();
-	var ret = [new JSWord("return"), last];
-	js_body.push(ret);
+
+	// Return last item.
+	var last,
+		lasts = [];
+	while (js_body.length && (last = js_body.pop())) {
+		// Don't return a Comment
+		if (!(last instanceof Comment)) {
+			last = [new JSWord("return"), last];
+			lasts.unshift(last);
+			break;
+		} else {
+			lasts.unshift(last);
+		}
+	}
+	// Add everything back to js_body
+	js_body.push.apply(js_body, lasts);
 
 	var fn_ast = new JSGroup();
 	fn_ast.push(new JSWord("function"), js_args, js_body);
@@ -256,7 +271,7 @@ Macro.prototype.compile = function (compiler) {
 
 
 /****************************************************************************/
-/* Quoting / unquoting / quasiquoting									    */
+/* Quoting / unquoting / unquote-splicing / quasiquoting					*/
 /****************************************************************************/	
 
 // Quoted
@@ -273,7 +288,7 @@ Quoted.prototype.quote_node = function (node) {
 	return new Quoted(node);
 };
 
-Quoted.prototype.compile = function (compiler) {
+Quoted.prototype.compile = function (compiler, quasiquoted) {
 	if (this.item && this.item.compile_quoted) {
 		return this.item.compile_quoted(compiler);
 	} else if (this.item instanceof Array) {
@@ -282,19 +297,6 @@ Quoted.prototype.compile = function (compiler) {
 	} else {
 		return compiler.compile_node(this.item);
 	}
-};
-
-
-// Unquoted
-this.Unquoted = Unquoted;
-_extend(Unquoted, Quoted);
-
-function Unquoted(item) {
-	Quoted.call(this, item);
-}
-
-Unquoted.prototype.compile = function (compiler) {
-	return compiler.compile_node(this.item);
 };
 
 
@@ -312,6 +314,87 @@ Quasiquoted.prototype.quote_node = function (node) {
 	} else {
 		return new Quasiquoted(node);
 	}
+};
+
+Quasiquoted.prototype.compile = function (compiler) {
+	UnquotedSplicing.resolve(this);
+	if (this.item instanceof Unquoted) {
+		this.item.compile_quoted = this.item.compile;
+	}
+	return Quoted.prototype.compile.call(this, compiler);
+};
+
+
+// Unquoted
+this.Unquoted = Unquoted;
+_extend(Unquoted, Quoted);
+
+function Unquoted(item) {
+	Quoted.call(this, item);
+}
+
+Unquoted.prototype.compile = function (compiler) {
+	return compiler.compile_node(this.item);
+};
+
+
+// UnquotedSplicing
+this.UnquotedSplicing = UnquotedSplicing;
+_extend(UnquotedSplicing, Unquoted);
+
+UnquotedSplicing.resolve = function (node) {
+	if (node instanceof Array) {
+		var lists = [];
+		lists.add = function (ls) {
+			return this.push(new Quasiquoted(ls));
+		};
+
+		var slice_start = 0;
+
+		for (var i = 0, len = node.length; i < len; i++) {
+			var item = node[i];
+			if (item instanceof UnquotedSplicing) {
+				var sliced = node.slice(slice_start, i);
+				slice_start = i + 1;
+				if (sliced.length) {
+					lists.add(sliced);
+				}
+				lists.push(item);
+			} else if (item instanceof Array) {
+				node[i] = UnquotedSplicing.resolve(item);
+			}
+		}
+
+		if (lists.length) {
+			var node_tail = node.slice(slice_start);
+			if (node_tail.length) {
+				lists.add(node_tail);
+			}
+
+			if (lists.length === 1) {
+				return lists[0];
+			} else {
+				var ast = [[new JSBinOp("."), lists[0], new JSWord("concat")]].concat(lists.slice(1));
+				return new Unquoted(ast);
+			}
+		} else {
+			return node;
+		}
+	} else if (node instanceof Quoted) {
+		node.item = UnquotedSplicing.resolve(node.item);
+	}
+	return node;
+};
+
+function UnquotedSplicing(item) {
+	Unquoted.call(this, item);
+}
+
+UnquotedSplicing.prototype.inject_to_parent = function (parent, index) {
+	if (this !== parent[index]) {
+		throw new Error("Can't find this UnquotedSplicing instance in parent at given index");
+	}
+	parent.splice.apply(parent, [index, 1].concat(this.item));
 };
 
 

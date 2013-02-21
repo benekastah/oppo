@@ -4,11 +4,16 @@
 		<title>JliSp</title>
 
 		<script type="text/lisp" data-module-name="__main__">
-			(defmacro def (nm val) (quasiquote (@var (unquote nm) @= (unquote val))))
-			(defmacro puts (x) (quasiquote ((@console.log) (unquote x))))
+			(defmacro puts ((splat x)) (quasiquote ((@console.log) (unquote-splicing x))))
 
-			(def ls (lambda (a (splat b) c) c))
-			(puts (ls 1 2 3 4 5))
+			(defmacro def (nm val) (quasiquote (@var (unquote nm) @= (unquote val))))
+			(def list (lambda ((splat ls)) ls))
+
+			(def ls1 (list 1 2))
+			(def ls2 (list 6 7 8))
+			(def eleven 11)
+
+			(puts (quasiquote (0 (unquote-splicing ls1) 3 4 5 (unquote-splicing ls2) 9 10 (unquote eleven) 12)))
 		</script>
 
 		<script src="../dist/jlisp.js"></script>

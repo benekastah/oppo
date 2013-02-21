@@ -48,6 +48,10 @@ SymbolTable.defmacro("unquote", function (item) {
 	return new Unquoted(item);
 });
 
+SymbolTable.defmacro("unquote-splicing", function (item) {
+	return new UnquotedSplicing(item);
+});
+
 SymbolTable.defmacro("quasiquote", function (item) {
 	return new Quasiquoted(item);
 });

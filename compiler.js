@@ -54,7 +54,7 @@ Compiler.prototype.process_macros = function (node) {
 			if (i === 0 && item.constructor === Symbol) {
 				macro = module.symbol_table[item.text];
 			} else {
-				node[i] = this.process_macros(item);
+				item = node[i] = this.process_macros(item);
 			}
 		}
 

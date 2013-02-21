@@ -21,7 +21,7 @@ JLispParser.add_parser({
 
 // Comments
 JLispParser.add_parser({
-	pattern: /^;+(.*)$/,
+	pattern: /^;+(.*)\n/,
 	match: function (m) {
 		this.ast.add(new Comment(m[1]));
 	}
@@ -43,9 +43,15 @@ JLispParser.add_parser({
 	}
 });
 JLispParser.add_parser({
-	pattern: new RegExp("^@([" + any_word_breaker + "]|" + any_non_word_breaker + "+)"),
+	pattern: new RegExp("^@([" + any_word_breaker + "]{,1}|" + any_non_word_breaker + "+)"),
 	match: function (m) {
 		this.ast.add(new JSWord(m[1]));
+	}
+});
+JLispParser.add_parser({
+	pattern: "@",
+	match: function (m) {
+		this.ast.add(new JSWord(""));
 	}
 });
 JLispParser.add_parser({
