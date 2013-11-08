@@ -9,7 +9,7 @@ To install, run the following in your terminal. Make sure you have
 node.js and npm installed first.
 
 ```
-npm install -g oppo
+npm install -g oppo@0.1.2 # The repl doesn't work properly in 0.1.3
 ```
 
 Now you have access to the `oppo` command. To enter the repl:
