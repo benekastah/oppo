@@ -1,3 +1,5 @@
+**Note to anyone who may care:** I haven't used or substantially updated this project in a long time and do not plan on putting any further effort into it. The npm package has been deprecated to reflect this. If you want this to work for you, feel free to fork it.
+
 # Oppo
 
 **Oppo is a sweet little lisp for javascript.** This is experimental,
